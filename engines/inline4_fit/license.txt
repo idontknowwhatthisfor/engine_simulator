@@ -1,0 +1,11 @@
+Model Information:
+* title:	Inline-4 Engine
+* source:	https://sketchfab.com/3d-models/inline-4-engine-64c16a336bd74b2db337ca03bc156f7a
+* author:	rafaelaraujo55 (https://sketchfab.com/rafaelaraujo55)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Inline-4 Engine" (https://sketchfab.com/3d-models/inline-4-engine-64c16a336bd74b2db337ca03bc156f7a) by rafaelaraujo55 (https://sketchfab.com/rafaelaraujo55) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

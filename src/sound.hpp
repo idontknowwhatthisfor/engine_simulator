@@ -1,0 +1,303 @@
+// engine sound: synthesised from the simulation at the physics rate, streamed to the sound card
+#pragma once
+#include "physics.hpp"
+
+// ---------------------------------------------------------------------------------------------
+// engine sound: synthesised from the simulation at the physics rate
+// ---------------------------------------------------------------------------------------------
+// The main voice is exhaust blowdown: when an exhaust valve opens, gas rushes out at a rate that
+// grows with the cylinder pressure, giving one pulse per firing (2 per revolution). Those pulses
+// go through a crude exhaust pipe (resonance + low-pass) with flow turbulence on top. Intake
+// pulsing, throttle hiss, combustion clatter and the starter's gear whine are mixed in quietly.
+
+struct biquad {
+    double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+    enum type { LOWPASS, HIGHPASS, BANDPASS };
+    // RBJ audio EQ cookbook; BANDPASS has 0 dB peak gain
+    static biquad make(type t, double fs, double f0, double q) {
+        double w0 = 2.0 * 3.14159265358979323846 * f0 / fs, cs = std::cos(w0), al = std::sin(w0) / (2.0 * q);
+        biquad f;
+        double a0 = 1.0 + al;
+        if (t == LOWPASS) { f.b0 = (1 - cs) / 2; f.b1 = 1 - cs; f.b2 = (1 - cs) / 2; }
+        if (t == HIGHPASS) { f.b0 = (1 + cs) / 2; f.b1 = -(1 + cs); f.b2 = (1 + cs) / 2; }
+        if (t == BANDPASS) { f.b0 = al; f.b1 = 0; f.b2 = -al; }
+        f.a1 = -2.0 * cs;
+        f.a2 = 1.0 - al;
+        f.b0 /= a0; f.b1 /= a0; f.b2 /= a0; f.a1 /= a0; f.a2 /= a0;
+        return f;
+    }
+    double run(double x) {
+        double y = b0 * x + z1;
+        z1 = b1 * x - a1 * y + z2;
+        z2 = b2 * x - a2 * y;
+        return y;
+    }
+};
+
+struct engineSound {
+    double fs;
+    soundParams sp;
+    biquad dcBlock, pipeLow, pipeRes, turbulence, intake, clatter, master;
+    std::uint32_t rng = 0x12345678u;
+    double gearPhase = 0.0, armaturePhase = 0.0;
+    // superbike stages
+    std::vector<double> pipeBuf;      // round trip of the exhaust pipe
+    std::size_t pipePos = 0;
+    double pipeFrac = 0.0, pipeDampZ = 0.0, pipeDampA = 0.0;
+    biquad flapShut, flapOpen, airbox, howl, popBand, popThump, whineBand, burbleLow;
+    double flap = 0.0;                // 0 shut .. 1 open, follows rpm and throttle with a servo lag
+    double lastTube = 0.0;
+    std::array<int, 4> lastRegion{};  // to spot each exhaust valve opening
+    double popEnv = 0.0, popAmp = 0.0, tickEnv = 0.0;
+    biquad tickBand;
+    double sinceLift = 1e9;           // s since the throttle was snapped shut
+    bool lastQs = false;
+    double primaryPhase = 0.0, gearMeshPhase = 0.0;
+
+    engineSound(double sampleRate, const soundParams &p = soundParams()) : fs(sampleRate), sp(p) {
+        dcBlock = biquad::make(biquad::HIGHPASS, fs, 15.0, 0.707);  // below the 26.7 Hz idle firing rate
+        pipeLow = biquad::make(biquad::LOWPASS, fs, sp.pipeLowHz, 0.9);
+        pipeRes = biquad::make(biquad::BANDPASS, fs, sp.pipeResHz, 3.0);
+        turbulence = biquad::make(biquad::BANDPASS, fs, 1200.0, 0.8);
+        intake = biquad::make(biquad::BANDPASS, fs, 350.0, 1.5);
+        clatter = biquad::make(biquad::HIGHPASS, fs, 2500.0, 0.707);
+        master = biquad::make(biquad::LOWPASS, fs, sp.masterHz, 0.707);
+        if (sp.superbike) {
+            // the quarter-wave pipe: one round trip (2L / c) of delay with an inverting, lossy
+            // reflection at the open end
+            double delay = 2.0 * sp.pipeLength / sp.gasSpeed * fs;
+            pipeBuf.assign(static_cast<std::size_t>(delay) + 2, 0.0);
+            pipeFrac = delay - std::floor(delay);
+            pipeDampA = std::exp(-2.0 * 3.14159265358979323846 * sp.pipeDampHz / fs);
+            flapShut = biquad::make(biquad::LOWPASS, fs, sp.flapShutHz, 0.707);
+            flapOpen = biquad::make(biquad::LOWPASS, fs, sp.flapOpenHz, 0.707);
+            airbox = biquad::make(biquad::BANDPASS, fs, sp.airboxHz, 2.0);
+            howl = biquad::make(biquad::BANDPASS, fs, sp.intakeHowlHz, 1.2);
+            popBand = biquad::make(biquad::BANDPASS, fs, 1100.0, 0.9);
+            popThump = biquad::make(biquad::LOWPASS, fs, 180.0, 0.707);
+            whineBand = biquad::make(biquad::HIGHPASS, fs, 400.0, 0.707);
+            burbleLow = biquad::make(biquad::LOWPASS, fs, 300.0, 0.707);
+            tickBand = biquad::make(biquad::BANDPASS, fs, 3200.0, 1.5);
+            lastRegion.fill(-1);
+        }
+    }
+
+    double noise() {  // xorshift32, uniform in [-1, 1]
+        rng ^= rng << 13;
+        rng ^= rng >> 17;
+        rng ^= rng << 5;
+        return rng / 2147483648.0 - 1.0;
+    }
+
+    // quarter-wave exhaust pipe: y = x - r * damped(y delayed by one round trip)
+    double pipe(double x) {
+        // the write head walks backwards, so the sample written k steps ago sits at pipePos + k
+        std::size_t n = pipeBuf.size(), d = n - 2;  // whole samples of the round trip
+        double old = pipeBuf[(pipePos + d) % n] * (1.0 - pipeFrac) + pipeBuf[(pipePos + d + 1) % n] * pipeFrac;
+        pipeDampZ = (1.0 - pipeDampA) * old + pipeDampA * pipeDampZ;
+        double y = x - sp.pipeReflect * pipeDampZ;
+        pipeBuf[pipePos] = y;
+        pipePos = (pipePos + n - 1) % n;
+        return y;
+    }
+
+    // one output sample for the current simulation state; call once per physics step
+    float sample(const engineSim &sim) {
+        const double TWO_PI = 2.0 * 3.14159265358979323846;
+        double exhaust = 0.0, intakeFlow = 0.0, heat = 0.0;
+        int opened = 0;  // exhaust valves that opened this sample
+        for (int c = 0; c < 4; c++) {
+            const cylinderState &s = sim.cyl[c];
+            double x, dx, d2x;
+            engineSim::geom(sim.phase(c), s.r, s.L, x, dx, d2x);
+            double pistonSpeed = dx * sim.omega / 15.0;  // relative to a brisk 15 m/s
+            if (s.region == 2) {
+                // blowdown (signed: an over-expanded cylinder at light load sucks back a weaker pulse)
+                // plus the gas the piston pushes out on the exhaust stroke
+                double dp = (s.p - sim.P.pExhaust) / 1e5;
+                // the displaced gas is scaled by how full the cylinder was (tiny charge on overrun)
+                double fullCharge = sim.P.pAtm * s.vDisp / (sim.P.rGas * sim.P.tIntake);
+                double charge = std::sqrt(std::clamp(s.mAir / fullCharge, 0.0, 1.0));
+                double blow = (dp >= 0.0 ? 1.0 : -0.5) * std::sqrt(std::fabs(dp));
+                if (sp.superbike) {
+                    // the valve takes ~30 deg to lift: the blowdown swells in instead of stepping
+                    // (a step would radiate as a click on every opening)
+                    double since = std::fmod(sim.phase(c) - sim.P.evo + 4.0 * CYCLE, CYCLE) / DEGR;
+                    double u = std::clamp(since / 30.0, 0.0, 1.0);
+                    blow *= u * u * (3.0 - 2.0 * u);
+                }
+                exhaust += blow + 1.2 * charge * std::max(0.0, -pistonSpeed);
+            }
+            if (s.region == 0) intakeFlow += std::max(0.0, pistonSpeed) * sim.pMan / sim.P.pAtm;
+            heat += s.heatRate;
+            if (sp.superbike) {
+                if (s.region == 2 && lastRegion[c] != 2 && lastRegion[c] >= 0) opened++;
+                lastRegion[c] = s.region;
+            }
+        }
+        double ex = dcBlock.run(exhaust);
+        if (!sp.superbike) {
+            double body = pipeLow.run(ex) + sp.pipeResGain * pipeRes.run(ex);
+            double rasp = 0.6 * turbulence.run(noise() * exhaust);
+            double induction = intake.run(0.4 * intakeFlow + 3.0 * sim.throttleFlow * noise());
+            double knock = 0.15 * clatter.run(noise() * std::min(1.0, heat / 5e6));
+            double mix = master.run(body + rasp + induction + knock + starterWhine(sim));
+            return static_cast<float>(0.8 * std::tanh(sp.drive * mix));
+        }
+
+        // ---- superbike voice -------------------------------------------------------------------
+        double rpm = std::fabs(sim.rpm());
+        double demand = std::max(sim.pedal, sim.blip);
+        // exhaust flap: opens with revs or throttle (a servo, ~0.3 s)
+        double want = std::clamp((rpm - sp.flapOpenRpm) / sp.flapSpan + 0.5, 0.0, 1.0);
+        want = std::max(want, std::clamp((demand - 0.25) / 0.25, 0.0, 1.0) * std::clamp((rpm - 2500.0) / 1500.0, 0.0, 1.0));
+        flap += (want - flap) * std::min(1.0, 1.0 / (0.3 * fs));
+
+        // header: the firing pulses ring in the pipe; the quarter-wave modes give the hollow howl
+        double tube = pipe(ex);
+        double radiated = (tube - lastTube) * fs / (2.0 * 3.14159265358979323846 * sp.radiateHz);
+        lastTube = tube;
+        double body = pipeLow.run(radiated) + sp.pipeResGain * pipeRes.run(tube) + sp.burble * burbleLow.run(tube);
+        // turbulent rasp rides on the gas flow, brighter as the revs climb
+        // turbulence noise climbs steeply with the gas speed (jet noise goes as a high power of it), so it
+        // follows the outflow squared: a full charge at high revs roars, the thin overrun flow barely hisses
+        double outflow = std::max(0.0, exhaust);
+        double rasp = 0.5 * turbulence.run(noise() * outflow * std::min(outflow, 3.0) / 1.5);
+        double raw = body + rasp;
+        // silencer: shut flap = dull and quieter, open = bright and loud (crossfade, both always running)
+        double shut = sp.flapShutGain * flapShut.run(raw), open = flapOpen.run(raw);
+        double exhaustOut = shut + (open - shut) * flap;
+
+        // airbox: tonal honk from the intake pulses plus the howl of the bellmouths; it mostly
+        // speaks with the throttle open
+        double open3 = sim.throttleOpen * std::sqrt(sim.throttleOpen);
+        double ipulse = intakeFlow * (0.15 + open3);
+        double induction = sp.intakeGain * (0.9 * airbox.run(ipulse) + 0.5 * howl.run(ipulse + 0.6 * open3 * noise())) +
+                           intake.run(1.5 * sim.throttleFlow * noise());
+
+        // overrun crackle: a share of the exhaust valve openings on a closed throttle light up the
+        // unburnt mixture in the hot header; the quickshifter cut ends in a bark and the limiter crackles
+        bool overrun = demand < 0.02 && rpm > sp.popRpm && sim.ignition;
+        sinceLift = demand < 0.02 ? sinceLift + 1.0 / fs : 0.0;
+        double fade = std::exp(-sinceLift / 1.0);  // the ECU leans the overrun out after a second or so
+        bool cut = sim.revCut || sim.qsCut;
+        for (int k = 0; k < opened; k++) {
+            double chance = overrun ? sp.popChance * fade * std::clamp((rpm - sp.popRpm) / 3000.0, 0.2, 1.0) : cut ? 0.5 : 0.0;
+            if (0.5 * (noise() + 1.0) < chance) trigger(0.6 + 0.6 * std::fabs(noise()));
+        }
+        if (lastQs && !sim.qsCut) trigger(1.3);  // power comes back after the shift: bark
+        lastQs = sim.qsCut;
+        double pn = noise() * popEnv;
+        double pops = popAmp * (1.4 * popBand.run(pn) + 2.5 * popThump.run(pn));
+        popEnv *= std::exp(-1.0 / (0.008 * fs));
+
+        // straight-cut gears: the primary pair whines all the time, the engaged pair under load
+        double crankHz = rpm / 60.0;
+        const drivetrainParams &dp = sim.drive.P;
+        primaryPhase = std::fmod(primaryPhase + TWO_PI * crankHz * dp.primaryIn / fs, TWO_PI);
+        double whine = 0.4 * std::sin(primaryPhase);
+        int g = sim.drive.gear;
+        if (g > 0 && g < 7 && dp.teethIn[g] > 0 && !sim.standalone) {
+            double mainHz = std::fabs(sim.drive.omegaIn) / TWO_PI / dp.primary;
+            gearMeshPhase = std::fmod(gearMeshPhase + TWO_PI * mainHz * dp.teethIn[g] / fs, TWO_PI);
+            double load = std::clamp(std::fabs(sim.drive.clutchTorque) / 80.0, 0.0, 1.0);
+            whine += load * (std::sin(gearMeshPhase) + 0.3 * std::sin(2.0 * gearMeshPhase));
+        }
+        whine = sp.whineGain * whineBand.run(whine) * std::clamp(crankHz / 40.0, 0.0, 1.0);
+
+        double knock = 0.08 * clatter.run(noise() * std::min(1.0, heat / 5e6));
+        // valvetrain: each exhaust opening is also an intake closing on another cylinder; the clicks
+        // matter at idle and drown in the exhaust once the revs are up
+        if (opened) tickEnv = 1.0;
+        double ticks = sp.tick * tickBand.run(noise() * tickEnv);
+        tickEnv *= std::exp(-1.0 / (0.0015 * fs));
+        double mix = master.run(exhaustOut + induction + pops + whine + knock + ticks + starterWhine(sim));
+        return static_cast<float>(0.8 * std::tanh(sp.drive * mix));
+    }
+
+private:
+    void trigger(double amp) {
+        popEnv = 1.0;
+        popAmp = amp;
+    }
+
+    double starterWhine(const engineSim &sim) {
+        if (!sim.starter) return 0.0;
+        const double TWO_PI = 2.0 * 3.14159265358979323846;
+        double crankHz = std::fabs(sim.rpm()) / 60.0;
+        gearPhase = std::fmod(gearPhase + TWO_PI * crankHz * 130.0 / fs, TWO_PI);          // 130-tooth ring gear
+        armaturePhase = std::fmod(armaturePhase + TWO_PI * crankHz * 13.0 / fs, TWO_PI);   // 13:1 reduction
+        return 0.07 * (std::sin(gearPhase) + 0.4 * std::sin(2.0 * gearPhase)) + 0.05 * std::sin(armaturePhase);
+    }
+};
+
+// single-producer single-consumer ring of samples: main thread writes, audio thread reads
+class audioRing {
+public:
+    bool push(float v) {
+        std::size_t w = wr.load(std::memory_order_relaxed), next = (w + 1) & MASK;
+        if (next == rd.load(std::memory_order_acquire)) return false;  // full: drop
+        buf[w] = v;
+        wr.store(next, std::memory_order_release);
+        return true;
+    }
+    bool pop(float &v) {
+        std::size_t r = rd.load(std::memory_order_relaxed);
+        if (r == wr.load(std::memory_order_acquire)) return false;
+        v = buf[r];
+        rd.store((r + 1) & MASK, std::memory_order_release);
+        return true;
+    }
+    std::size_t size() const {
+        return (wr.load(std::memory_order_acquire) - rd.load(std::memory_order_acquire)) & MASK;
+    }
+
+private:
+    static constexpr std::size_t N = 1u << 16, MASK = N - 1;
+    std::array<float, N> buf{};
+    std::atomic<std::size_t> wr{0}, rd{0};
+};
+
+// streams the synthesised samples to the sound card, resampling from the physics rate. In slow
+// motion fewer samples arrive per second and they are stretched, so the pitch drops like a slowed
+// recording. The read rate is nudged to keep about 50 ms queued, which absorbs frame jitter.
+class engineAudio : public sf::SoundStream {
+public:
+    static constexpr unsigned RATE = 44100;
+    audioRing ring;
+    std::atomic<double> simPerOut{40000.0 / RATE};  // simulation samples per output sample
+    std::atomic<bool> muted{false};
+
+    engineAudio() { initialize(1, RATE, {sf::SoundChannel::Mono}); }
+    ~engineAudio() override { stop(); }
+
+private:
+    std::vector<std::int16_t> out = std::vector<std::int16_t>(512);
+    double frac = 0.0;
+    float s0 = 0.f, s1 = 0.f, vol = 1.f;
+
+    bool onGetData(Chunk &data) override {
+        double base = simPerOut.load();
+        double target = std::max(64.0, 0.05 * RATE * base);
+        double fill = static_cast<double>(ring.size());
+        double step = base * std::clamp(1.0 + 0.05 * (fill - target) / target, 0.9, 1.1);
+        for (auto &o : out) {
+            frac += step;
+            while (frac >= 1.0) {
+                frac -= 1.0;
+                s0 = s1;
+                float v;
+                if (ring.pop(v)) s1 = v;
+                else s1 *= 0.995f;  // starved (paused): fade out instead of clicking
+            }
+            float x = s0 + (s1 - s0) * static_cast<float>(frac);
+            vol += ((muted.load() ? 0.f : 1.f) - vol) * 0.002f;
+            o = static_cast<std::int16_t>(std::clamp(x * vol, -1.f, 1.f) * 30000.f);
+        }
+        data.samples = out.data();
+        data.sampleCount = out.size();
+        return true;
+    }
+    void onSeek(sf::Time) override {}
+};
+

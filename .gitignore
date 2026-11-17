@@ -1,0 +1,9 @@
+# build output (make rebuilds these)
+/engine_sim
+*.mesh
+
+# generated audio (./engine_sim --engine-type s1000rr --wav s1000rr_demo.wav)
+*.wav
+
+__pycache__/
+.DS_Store
