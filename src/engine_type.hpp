@@ -3,6 +3,7 @@
 // --engine-type.
 #pragma once
 #include "physics.hpp"
+#include "exhaust.hpp"
 
 // what the superbike physics test expects from an engine (published figures, with tolerance)
 struct bikeSpec {
@@ -54,5 +55,7 @@ struct engineType {
     // bike gearbox drawing (src/bike_gearbox.hpp): where the crank's primary gear sits along the crank,
     // which side of the crank the box goes (+1 toward +x, -1 toward -x) and the primary gear module
     float zPrimary = 119.f, gearboxSide = 1.f, primaryModule = 2.6f;
+    // the exhaust system (src/exhaust.hpp): headers from the ports to the tailpipe, in mesh space
+    exhaustLayout (*exhaust)(const engineModel &) = nullptr;
     std::vector<rideStep> ride;            // bikes: the --wav demo ride (empty: the stand script)
 };

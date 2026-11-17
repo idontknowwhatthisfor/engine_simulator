@@ -61,6 +61,7 @@ The original model, split into moving parts from the glTF.
 | Drivetrain | Friction clutch, automatic mode (shift schedule, kickdown, downshift under load, sport mode with rev-matched downshifts) or manual (clutch pedal, stalls if you dump it at idle) |
 | Results (sim) | 0–100 km/h in 7.7 s |
 | 3D | The see-through block, and a procedural 5-speed gearbox with a reverse idler behind the flywheel |
+| Exhaust (3D) | Tubular 4-2-1 manifold (1+4, 2+3) on a cast flange, close-coupled catalyst, mid pipe, silencer and tailpipe running back beside the gearbox |
 
 ### `v4`: Ducati Desmosedici Stradale (Panigale V4)
 
@@ -74,6 +75,7 @@ Built from the inline-4's piston and rod, scaled, on a new procedural crank and 
 | Gearbox | Primary 54/30; gears 38/14, 36/17, 33/19, 32/21, 30/22, 30/24; chain 41/16; 200/55 ZR17 rear |
 | Vehicle | 278 kg with rider, CdA 0.32 |
 | Rider aids | Sequential 1-N-2-…-6 box, up/down quickshifter (rev-matched downshifts), slipper clutch, launch control, wheelie control |
+| Exhaust (3D) | Front-bank headers wrap down in front of the crankcase, rear-bank headers drop behind the gearbox; each bank's pair merges and both feed the black pre-silencer under the engine, with an exhaust valve and two short outlets on the right |
 | Results (sim) | 0–100 km/h 3.3 s, 0–200 km/h 6.8 s, top speed ~289 km/h |
 | Sound | Its own Ducati voice. The Twin Pulse firing comes from the physics: pulses arrive in pairs, so the howl sits at the crank rate (rpm/60), an octave below an even-firing inline-4, with a loping, off-beat idle. On top of that:<br>• longer headers from both banks (lower, darker pipe modes)<br>• an idle burble that gives way to the radiated howl as the revs rise<br>• exhaust valve, airbox honk<br>• more overrun crackle than the BMW<br>• Desmo valvetrain clatter |
 
@@ -91,8 +93,28 @@ crank.
 | Gearbox | Primary 76/46 (1.652); gears 45/17, 46/22, 38/22, 33/22, 34/25, 29/23; chain 46/17; 190/55 ZR17 rear |
 | Vehicle | 197 kg wet + 80 kg rider, CdA 0.31 |
 | Rider aids | Same as the V4: quickshifter with rev-matched downshifts, slipper clutch, launch control, wheelie control |
+| Exhaust (3D) | 4-2-1 titanium headers from the front of the inclined head, under the engine (1+4 and 2+3 merge), collector, link pipe with the exhaust flap, short silencer rising on the right behind the gearbox |
 | Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 6.9 s, 307 km/h in 6th |
 | Sound | Its own voice (the inline-4 keeps the original one):<br>• radiated exhaust (brightens with revs) through a 4-2-1 quarter-wave pipe<br>• exhaust flap, shut at idle and open from ~5000 rpm or under throttle<br>• airbox honk at full throttle<br>• overrun crackle that fades out<br>• quickshifter bark<br>• straight-cut gear whine<br>• valvetrain tick |
+
+### Exhaust
+
+Each engine draws its exhaust beside the block (not with `--engine-only`). The pipes are swept tubes
+built from the engine's layout (`src/exhaust.hpp`), and they move with the engine on its mounts.
+
+- **Heat.** Each cylinder's gas path heats toward the burned-gas temperature at exhaust valve opening,
+  scaled by the gas flow (rpm), over a few seconds, and cools more slowly after a lift-off. It cools
+  along the pipe, so the headers glow cherry red, then orange, at sustained full throttle while the
+  silencer stays darker. The HUD shows the header temperature (a rough estimate).
+- **Pulses.** When a cylinder's exhaust valve opens, a slug of hot gas runs down its runner and on
+  through the merges at the gas flow speed. Slow motion (`[`) shows the firing order travelling down
+  the pipes.
+- **Exhaust valve** (bikes). A lever on the pipe, driven like the sound's flap: shut at idle and light
+  load, open with revs or throttle. The HUD shows how far it is open.
+- **Crackle** (bikes). Every pop the sound makes (overrun crackle, limiter, quickshifter bark) shoots a
+  short flame out of the tailpipes. Some pops, and every bark, also throw a few sparks that arc down
+  under gravity. They run on simulated time, so slow motion slows them too. The car makes no pops, so
+  it has no flames.
 
 **Estimates.** These values are not published: the V4 rod length; the S 1000 RR bore spacing (92 mm);
 and the crank inertia, reciprocating mass, friction and cam timing of both bikes. They are estimates,
@@ -142,6 +164,7 @@ src/
   common.hpp                includes, vec3/mat4, orbit camera
   model.hpp                 mesh loading (v1 and banked v2), slider-crank kinematics, --selftest
   render.hpp                OpenGL 2.1 renderer, combustion glow, motion blur, gear meshes
+  exhaust.hpp               exhaust systems (3D): swept tubes from each engine's layout, heat, gas pulses, valve, crackle fire
   physics.hpp               engine model, ECU, drivetrain, vehicle (parameter structs + engineSim)
   engine_type.hpp           engineType: what an engine provides (params, mesh, labels, tests, demo)
   engines.hpp               registry for --engine-type, setupSim()
@@ -178,6 +201,9 @@ sit behind the crank.
    - an `engineParams` function (geometry, cam timing, VE curve, limiter, and `sound` for the voice);
    - a `drivetrainParams` function (gearing and vehicle);
    - a `bikeSpec` function for the test targets (bikes);
+   - an `exhaustLayout` function: the pipes (control points in mesh space, radii, which cylinder or
+     upstream pipes feed each one), optional flange boxes, the tailpipe outlets (for the crackle flames) and an exhaust valve. `cylPoint` and `cylDir`
+     place the ports on the head in the cylinder's own frame;
    - a function returning its `engineType`, with the id, labels, mesh path, physics test, and for bikes
      the gearbox placement and an optional `ride` for `--wav`.
 3. **Register it.** Add it to `engineTypes()` in `src/engines.hpp`, include the header in

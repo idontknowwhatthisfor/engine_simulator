@@ -109,6 +109,56 @@ bikeSpec ducatiSpec() {
 }
 
 
+// exhaust: the Panigale V4's layout. The front bank's headers leave forward and wrap down in front of
+// the crankcase; the rear bank's leave backward and drop behind the gearbox. Each bank's pair merges
+// (front 1+3, rear 2+4) and both feed the pre-silencer under the engine, which has an exhaust valve
+// and two short outlets on the right (+z) that point back along the bike. Mesh space: front -x, "up" -y.
+exhaustLayout ducatiV4Exhaust(const engineModel &e) {
+    exhaustLayout L;
+    const std::array<float, 4> STEEL{0.55f, 0.48f, 0.40f, 1.f}, BLACK{0.09f, 0.09f, 0.10f, 1.f};
+    auto pipe = [&](std::vector<vec3> pts, float r0, float r1, int cyl, std::vector<int> from, std::array<float, 4> c,
+                    bool caps = false) {
+        pipeSpec p;
+        p.pts = pts; p.r0 = r0; p.r1 = r1; p.cyl = cyl; p.from = from; p.rgba = c;
+        p.rough = c == BLACK ? 0.6f : 0.35f;
+        p.metal = c == BLACK ? 0.3f : 0.85f;
+        p.capStart = p.capEnd = caps;
+        L.pipes.push_back(p);
+        return static_cast<int>(L.pipes.size()) - 1;
+    };
+    // ports on the exhaust side of each head (front bank: local -x, rear bank: local +x), mid-head
+    auto port = [&](int c, float side) { return cylPoint(e, c, side * (0.5f * e.cyls[c].bore + 18.f), e.cyls[c].deckY - 36.f); };
+    auto out = [&](int c, float side) { return port(c, side) + cylDir(e, c, side, 0.25f) * 45.f; };
+    // front bank: cylinders 1 (z -62) and 3 (z +38)
+    for (int c : {0, 2}) {
+        float z = e.cyls[c].zCentre, zm = c == 0 ? -40.f : 15.f;
+        pipe({port(c, -1.f), out(c, -1.f), {-262.f, 0.f, z}, {-250.f, 110.f, z * 0.85f}, {-190.f, 190.f, z * 0.6f},
+              {-150.f, 210.f, zm}, {-120.f, 215.f, -12.f}}, 20.f, 21.f, c, {}, STEEL);
+    }
+    // rear bank: cylinders 2 (z -38) and 4 (z +62)
+    for (int c : {1, 3}) {
+        float z = e.cyls[c].zCentre, zm = c == 1 ? -10.f : 35.f;
+        pipe({port(c, 1.f), out(c, 1.f), {262.f, -30.f, z}, {275.f, 80.f, z * 0.85f}, {268.f, 180.f, z * 0.6f},
+              {250.f, 215.f, zm}, {225.f, 225.f, 12.f}}, 20.f, 21.f, c, {}, STEEL);
+    }
+    int front = pipe({{-120.f, 215.f, -12.f}, {-90.f, 250.f, -6.f}, {-50.f, 270.f, 0.f}}, 26.f, 28.f, -1, {0, 1}, STEEL);
+    int rear = pipe({{225.f, 225.f, 12.f}, {200.f, 252.f, 8.f}, {150.f, 270.f, 0.f}}, 26.f, 28.f, -1, {2, 3}, STEEL);
+    int box = pipe({{-60.f, 270.f, 0.f}, {160.f, 270.f, 0.f}}, 46.f, 46.f, -1, {front, rear}, BLACK, true);
+    // two short outlets leave the box's right side and turn back along the bike (rear is +x), one above
+    // the other, ending just behind the box like the Panigale V4's low right-hand tips
+    pipe({{60.f, 262.f, 30.f}, {110.f, 262.f, 62.f}, {170.f, 260.f, 74.f}, {225.f, 258.f, 80.f}}, 18.f, 18.f, -1, {box}, STEEL, true);
+    pipe({{60.f, 292.f, 30.f}, {110.f, 296.f, 62.f}, {170.f, 300.f, 74.f}, {220.f, 303.f, 80.f}}, 18.f, 18.f, -1, {box}, STEEL, true);
+    L.outlets.push_back({{225.f, 258.f, 80.f}, {1.f, -0.04f, 0.11f}, 18.f});
+    L.outlets.push_back({{220.f, 303.f, 80.f}, {1.f, 0.06f, 0.12f}, 18.f});
+    // exhaust valve in the rear secondary
+    L.flap.on = true;
+    L.flap.at = {205.f, 249.f, 9.f};
+    L.flap.axis = normalize(vec3{-1.f, 0.6f, 0.f});
+    L.flap.shaft = {0.f, 0.f, 1.f};
+    L.flap.pipeR = 27.f;
+    return L;
+}
+
 const engineType &ducatiV4Type() {
     static const engineType T = [] {
         engineType t;
@@ -126,6 +176,7 @@ const engineType &ducatiV4Type() {
         t.engine = ducatiV4Params;
         t.drive = ducatiDriveParams;
         t.physTest = physicsTestBike;
+        t.exhaust = ducatiV4Exhaust;
         t.spec = ducatiSpec;
         t.zPrimary = 119.f;        // build_v4.py: the crank's primary gear hub
         t.gearboxSide = 1.f;       // counter-rotating crank, front at -x: the box sits toward +x
