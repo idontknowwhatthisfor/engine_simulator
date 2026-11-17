@@ -139,13 +139,13 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (opt.selftest) return selfTest(eng, type.name);
-    if (opt.phystest) return type.physTest(eng, type);
+    if (opt.phystest) return opt.turbo ? type.physTestTurbo(eng, type) : type.physTest(eng, type);
     if (!opt.wav.empty()) return renderWav(eng, type, opt.wav);
 
     // engine state; theta of cylinder 1 starts at the model's rest pose unless --crank says otherwise
     const double THETA0 = opt.crankDeg < 0.f ? eng.cyls[0].theta0 : opt.crankDeg * DEGR;
     engineSim sim;
-    setupSim(sim, eng, type, THETA0, type.bike && opt.engineOnly);
+    setupSim(sim, eng, type, THETA0, type.bike && opt.engineOnly, opt.turbo);
     double latchedThrottle = opt.throttle;
     sim.drive.wheelieControl = opt.wheelie;
     sim.drive.grade = opt.grade / 100.0;
@@ -491,6 +491,9 @@ int main(int argc, char **argv) {
                       "   " + f0(dv.v * 3.6) + " km/h" + camStr +
                       (bike ? "\n twist grip " : "\n pedal ") + f0(sim.pedal * 100.0) + "%  throttle " + f0(sim.throttleOpen * 100.0) +
                       "%  manifold " + f0(sim.pMan / 1000.0) + " kPa" +
+                      (sim.P.turbo.on ? "\n boost " + std::string(sim.boostBar() >= 0.0 ? "+" : "") + numToStr(static_cast<float>(sim.boostBar()), 2) +
+                                            " bar  wastegate " + f0(sim.wastegate * 100.0) + "%  back pressure " + f0(sim.pExh / 1000.0) + " kPa"
+                                      : std::string()) +
                       "\n torque " + numToStr(static_cast<float>(sim.brakeAvg), 1) + " N m  power " +
                       numToStr(static_cast<float>(std::max(kw, 0.0)), 1) + " kW  wheels " +
                       numToStr(static_cast<float>((bike ? sim.wheelForceFilt : dv.wheelForce) / 1000.0), 2) + " kN" +
@@ -499,7 +502,7 @@ int main(int argc, char **argv) {
                       f0(dv.mass()) + " kg" + (dv.cargo > 0 ? (bike ? " (passenger)" : " (cargo)") : "") +
                       (showExhaust ? "\n exhaust: headers ~" + std::to_string(exhaust.headerC()) + " C" +
                                          (exhaust.flapAt.on ? "  valve " + f0(exhaust.flap * 100.0) + "% open" : "") +
-                                         (showTurbo ? "  turbo " + f0(turbo.shaftRpm / 1000.0) + "k rpm" : "")
+                                         (showTurbo ? "  turbo " + f0(sim.turboRpm() / 1000.0) + "k rpm" : "")
                                    : std::string()) +
                       (flags.empty() ? "" : "\n" + flags) +
                       "\n shake 1st " + numToStr(static_cast<float>(sim.shake1() / 1000.0), 2) + " kN  2nd " +

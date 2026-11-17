@@ -116,7 +116,7 @@ struct engineSound {
             if (s.region == 2) {
                 // blowdown (signed: an over-expanded cylinder at light load sucks back a weaker pulse)
                 // plus the gas the piston pushes out on the exhaust stroke
-                double dp = (s.p - sim.P.pExhaust) / 1e5;
+                double dp = (s.p - sim.pExh) / 1e5;
                 // the displaced gas is scaled by how full the cylinder was (tiny charge on overrun)
                 double fullCharge = sim.P.pAtm * s.vDisp / (sim.P.rGas * sim.P.tIntake);
                 double charge = std::sqrt(std::clamp(s.mAir / fullCharge, 0.0, 1.0));

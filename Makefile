@@ -63,6 +63,7 @@ test: all
 		printf "%-8s selftest " $$t; ./engine_sim --engine-type $$t --selftest | tail -1; \
 		printf "%-8s phystest " $$t; ./engine_sim --engine-type $$t --phystest | tail -1; \
 	done
+	@if [ -f $(I4)/turbo.mesh ]; then printf "%-8s phystest " "turbo"; ./engine_sim --turbo yes --phystest | tail -1; fi
 
 clean:
 	rm -f engine_sim

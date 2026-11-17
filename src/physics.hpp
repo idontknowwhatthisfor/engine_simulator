@@ -53,8 +53,29 @@ struct soundParams {
     double tickHz = 3200.0;         // ... centred here (a Desmo's rocker clatter sits lower)
 };
 
+// turbocharger (--turbo yes), a mean-value model: the exhaust gas fills the exhaust manifold and
+// leaves through the turbine and the wastegate; the turbine's power spins the shaft against the
+// compressor's and the bearings'; the compressor's pressure ratio rises with the shaft speed and
+// feeds the throttle. The ECU works the wastegate to hold the boost the pedal asks for.
+struct turboParams {
+    bool on = false;
+    double inertia = 2.0e-5;        // kg m^2, shaft + both wheels
+    double maxRpm = 175000.0;       // overspeed: the shaft is held here
+    double prRef = 2.4, rpmRef = 160000.0;  // compressor pressure ratio at rpmRef (rises with speed^2)
+    double etaC = 0.72, etaT = 0.68;  // compressor / turbine efficiency
+    double turbineArea = 0.75e-3;   // m^2, effective flow area of the turbine nozzle (small: early spool)
+    double wastegateArea = 3.0e-3;  // m^2, wastegate fully open
+    double vExhaust = 2.0e-3;       // m^3, exhaust manifold + turbine housing
+    double bearingLoss = 1.4e-6;    // W per (rad/s)^2: ~150 W at 100k rpm
+    double boostMap = 160e3;        // Pa, manifold pressure at full pedal (~0.6 bar boost)
+    double wgKp = 2.0, wgKi = 10.0;  // wastegate PI: travel per bar over the target, per bar second
+    double knockRetard = 8.0;       // deg of spark taken out per bar over atmospheric
+    double tExhLight = 850.0, tExhFull = 1150.0;  // K, exhaust gas at light and full load
+};
+
 struct engineParams {
     soundParams sound;
+    turboParams turbo;
     double bore = 0.085;            // m
     double compression = 10.0;
     double gamma = 1.3;             // polytropic exponent, compression and expansion
@@ -562,6 +583,15 @@ struct engineSim {
     double throttleFlow = 0.0;  // kg/s through throttle + idle valve (intake hiss)
     double throttleOpen = 0.0;  // throttle plate opening 0..1 set by the drive-by-wire
     double blip = 0.0;          // rev-match throttle the gearbox asks for on a sport downshift, 0..1
+    // turbo (P.turbo.on); without it pExh stays at P.pExhaust and pBoost at P.pAtm
+    double pExh = 105000.0;     // Pa, exhaust manifold (back pressure on the exhaust stroke)
+    double pBoost = 101325.0;   // Pa, compressor outlet = throttle inlet
+    double turboOmega = 0.0;    // rad/s, turbo shaft
+    double wastegate = 0.0;     // 0 shut .. 1 open
+    double wgInt = 0.0;         // wastegate PI integral
+    double turbinePower = 0.0, compressorPower = 0.0;  // W
+    double turboRpm() const { return turboOmega * 60.0 / (2.0 * 3.14159265358979323846); }
+    double boostBar() const { return (pMan - P.pAtm) / 1e5; }
 
     // vibration: forces the moving parts put into the block
     double shakeForce = 0.0;   // N, vertical, from piston accelerations
@@ -602,6 +632,9 @@ struct engineSim {
         theta = wrapCycle(theta1);
         omega = 0.0;
         pMan = P.pAtm;
+        pExh = P.pExhaust;
+        pBoost = P.pAtm;
+        turboOmega = wastegate = wgInt = turbinePower = compressorPower = 0.0;
         idleArea = P.idleBase;
         idleInt = 0.0;
         rpmFilt = 0.0;
@@ -671,7 +704,9 @@ struct engineSim {
         // at idle the ECU trims spark around a retarded base: slower rpm -> more advance -> more torque
         if (idleActive)
             return std::clamp(P.idleSparkBase + P.idleSparkGain * (P.idleRpm - rpmFilt), -5.0, 25.0) * DEGR;
-        return (P.sparkLow + (P.sparkHigh - P.sparkLow) * std::clamp((r - P.sparkFrom) / P.sparkSpan, 0.0, 1.0)) * DEGR;
+        double adv = P.sparkLow + (P.sparkHigh - P.sparkLow) * std::clamp((r - P.sparkFrom) / P.sparkSpan, 0.0, 1.0);
+        if (P.turbo.on) adv -= P.turbo.knockRetard * std::max(0.0, pMan - P.pAtm) / 1e5;  // boost: back off for knock
+        return adv * DEGR;
     }
 
     // residual-gas dilution makes low-load combustion less effective (and is why idle needs ~30 kPa)
@@ -700,14 +735,14 @@ struct engineSim {
                     s.mAir = trappedAir(s, r);
                     s.sparked = false;
                 } else {        // turned backwards out of the exhaust stroke
-                    s.p = P.pExhaust;
+                    s.p = pExh;
                     s.mAir = 0.0;
                     s.sparked = true;
                 }
             } else if (forward) {   // exhaust valve just opened: remember how hot the gas was
                 s.glowEvo = burnGlow(s, phiOld);
             } else {                // backwards out of intake into exhaust
-                s.p = P.pExhaust;
+                s.p = pExh;
                 s.glowEvo = 0.0;
             }
             s.region = region;
@@ -737,7 +772,7 @@ struct engineSim {
             }
             if (dt > 0.0) s.p = P.pCrankcase + (s.p - P.pCrankcase) * std::exp(-dt / P.leakTau);
         } else {
-            s.p = P.pExhaust + (s.p - P.pExhaust) * std::exp(-std::fabs(dphi) / P.blowdown);
+            s.p = pExh + (s.p - pExh) * std::exp(-std::fabs(dphi) / P.blowdown);
         }
     }
 
@@ -892,16 +927,19 @@ struct engineSim {
         // drive-by-wire: the pedal asks for a manifold pressure (so torque follows the pedal roughly
         // linearly at any rpm) and the throttle opens to whatever area passes that flow at this rpm,
         // inverting the flow model below. Full pedal is always wide open.
-        double pWant = P.mapMin + demand * (P.pAtm - P.mapMin);
+        // with the turbo, full pedal asks for the boost target and the throttle is fed from the compressor
+        double pUp = P.turbo.on ? pBoost : P.pAtm;
+        double pWant = P.mapMin + demand * ((P.turbo.on ? P.turbo.boostMap : P.pAtm) - P.mapMin);
         double flowWant = volEff(r) * pWant * vDispTotal * std::fabs(omega) / (4.0 * 3.14159265358979323846) / (P.rGas * P.tIntake);
-        double flux = P.throttleCd * P.pAtm / std::sqrt(P.rGas * P.tIntake) * flowFunction(std::min(pWant / P.pAtm, 0.995));
+        double flux = P.throttleCd * pUp / std::sqrt(P.rGas * P.tIntake) * flowFunction(std::min(pWant / pUp, 0.995));
         double etc = demand > 0.001 ? std::min(P.throttleArea, flowWant / flux) : 0.0;
         throttleOpen = std::max(etc, P.throttleArea * demand * demand * demand) / P.throttleArea;
         double area = P.throttleArea * throttleOpen + idleArea;
-        double mIn = P.throttleCd * area * P.pAtm / std::sqrt(P.rGas * P.tIntake) * flowFunction(pMan / P.pAtm);
+        double mIn = P.throttleCd * area * pUp / std::sqrt(P.rGas * P.tIntake) * flowFunction(pMan / pUp);
         double mOut = volEff(r) * pMan * vDispTotal * std::fabs(omega) / (4.0 * 3.14159265358979323846) / (P.rGas * P.tIntake);
-        pMan = std::clamp(pMan + P.rGas * P.tIntake / P.vManifold * (mIn - mOut) * dt, 5000.0, P.pAtm);
+        pMan = std::clamp(pMan + P.rGas * P.tIntake / P.vManifold * (mIn - mOut) * dt, 5000.0, pUp);
         throttleFlow = mIn;
+        if (P.turbo.on) stepTurbo(dt, mIn, mOut, pWant);
         if (!standalone) drive.integrate(dt, pedal);
 
         // record cylinder 1 for the p-V diagram, filling any degrees skipped this step
@@ -920,6 +958,35 @@ struct engineSim {
         pvLast = idx;
 
         brakeAvg += (gasTorque - frictionTorque - brakeAvg) * std::min(1.0, dt / 0.25);
+    }
+
+    // the turbo, one step: exhaust manifold filling, shaft power balance, compressor pressure,
+    // wastegate. mAir: air through the compressor (= the throttle); mCyl: what the cylinders breathe
+    void stepTurbo(double dt, double mAir, double mCyl, double pWant) {
+        const turboParams &T = P.turbo;
+        const double CP = 1005.0, CP_EX = 1150.0, R_EX = 290.0, G_EX = 1.33;
+        bool burning = ignition && !stalled && !fuelCut && !revCut && !qsCut;
+        double mExh = mCyl * (burning ? 1.0 + 1.0 / P.afr : 1.0);
+        double load = std::clamp((pMan - 30e3) / (T.boostMap - 30e3), 0.0, 1.0);
+        double tExh = burning ? T.tExhLight + (T.tExhFull - T.tExhLight) * load : 450.0;
+        // exhaust manifold: gas in from the cylinders, out through the turbine and the wastegate
+        double aT = T.turbineArea, aW = T.wastegateArea * wastegate;
+        double mOut = (aT + aW) * pExh / std::sqrt(R_EX * tExh) * flowFunction(P.pAtm / pExh);
+        pExh = std::clamp(pExh + R_EX * tExh / T.vExhaust * (mExh - mOut) * dt, P.pAtm, 4.0e5);
+        double mTurb = mOut * aT / (aT + aW);
+        // shaft: turbine power against the compressor's and the bearings'
+        turbinePower = T.etaT * mTurb * CP_EX * tExh * (1.0 - std::pow(P.pAtm / pExh, (G_EX - 1.0) / G_EX));
+        double pr = 1.0 + (T.prRef - 1.0) * std::pow(turboOmega / (T.rpmRef / 60.0 * 2.0 * 3.14159265358979323846), 2.0);
+        compressorPower = mAir * CP * P.tIntake * (std::pow(pr, 0.4 / 1.4) - 1.0) / T.etaC;
+        double net = turbinePower - compressorPower - T.bearingLoss * turboOmega * turboOmega;
+        turboOmega += net / (T.inertia * std::max(turboOmega, 200.0)) * dt;
+        turboOmega = std::clamp(turboOmega, 0.0, T.maxRpm / 60.0 * 2.0 * 3.14159265358979323846);
+        pBoost = P.pAtm * pr;  // the charge pipes and intercooler are small next to the shaft's lag
+        // wastegate: opens while the compressor makes more than the pedal asks for (never aiming
+        // below atmospheric), shuts when it makes less
+        double err = (pBoost - std::max(P.pAtm, pWant)) / 1e5;  // bar over the target
+        wgInt = std::clamp(wgInt + T.wgKi * err * dt, 0.0, 1.0);
+        wastegate = std::clamp(wgInt + T.wgKp * err, 0.0, 1.0);
     }
 
     // stroke name for cylinder c

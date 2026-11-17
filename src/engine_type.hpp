@@ -51,6 +51,7 @@ struct engineType {
     engineParams (*engine)() = nullptr;    // engine physics and sound
     drivetrainParams (*drive)() = nullptr; // clutch, gearbox and vehicle
     int (*physTest)(const engineModel &, const engineType &) = nullptr;  // --phystest
+    int (*physTestTurbo)(const engineModel &, const engineType &) = nullptr;  // --turbo yes --phystest
     bikeSpec (*spec)() = nullptr;          // bikes: --phystest targets
     // bike gearbox drawing (src/bike_gearbox.hpp): where the crank's primary gear sits along the crank,
     // which side of the crank the box goes (+1 toward +x, -1 toward -x) and the primary gear module

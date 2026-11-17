@@ -132,10 +132,25 @@ compressor draws through a cone filter and blows into a charge pipe that runs fo
 - **See-through.** The compressor, centre and turbine housings, flanges, clamps and bolts are drawn
   like the engine block, so the compressor wheel, shaft, bearing and turbine wheel show through.
   `G` hides them with the block.
-- **Spool.** The shaft speed follows the exhaust gas flow (revs × manifold pressure) with spool lag,
-  up to 160k rpm; the HUD shows it. The wheels are drawn turning at a readable speed in proportion
-  to it, since the real speed would just strobe.
-- **Drawn only.** The engine physics has no boost: power, torque and sound are the same as without it.
+- **Boost.** The turbo is part of the engine physics (`engineSim::stepTurbo`, a mean-value model):
+  - the exhaust gas fills the exhaust manifold and leaves through the turbine and the wastegate, so
+    the back pressure on the exhaust stroke rises with the flow;
+  - the turbine's power spins the shaft against the compressor's and the bearings', so it spools
+    up with lag;
+  - the compressor's pressure ratio rises with the shaft speed and feeds the throttle instead of
+    the atmosphere;
+  - full pedal asks for 0.6 bar, and the ECU works the wastegate (PI) to hold it. Part pedal asks
+    for less, and the throttle shuts as usual;
+  - the spark backs off 8° per bar of boost against knock, and the clutch is made 1.5× stronger.
+- **What it does (sim).** Boost comes in at ~3000 rpm and is held at 0.58 bar to the limiter:
+  345 N·m at 4000 rpm, 207 kW at 7000 rpm (203 N·m / 110 kW without). Floored at 3000 rpm, it reaches
+  90% boost in 2.5 s. 0–100 km/h takes 5.0 s (7.7 s without); the car model has no wheelspin. The
+  HUD shows the boost, wastegate, back pressure and shaft speed (~100k rpm at full boost). The
+  wheels are drawn turning at a readable speed in proportion to the shaft, since the real speed
+  would just strobe. `./engine_sim --turbo yes --phystest` checks all this.
+- **Not modelled.** The intercooler (the charge goes in at 300 K), compressor surge and the blow-off
+  valve, and the turbo's sound (whistle, blow-off): it sounds like the engine without it, apart
+  from the extra power and back pressure.
 
 `engines/inline4_fit/build_turbo.py` splits the model (`engines/inline4_fit/turbocharger/`) into
 housing, rotor and bearing by geometry and writes `turbo.mesh`. `make` builds it when the model is
@@ -179,7 +194,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
 | `--grade pct --reverse --sport --no-wheelie` | Starting conditions |
-| `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4's exhaust (default `no`; see below) |
+| `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below). With `--phystest`, runs the turbo checks |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 
 ## Project layout

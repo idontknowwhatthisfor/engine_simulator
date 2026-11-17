@@ -141,6 +141,7 @@ const engineType &inline4FitType() {
         t.engine = inline4FitParams;
         t.drive = inline4FitDriveParams;
         t.physTest = physicsTestInline4;
+        t.physTestTurbo = physicsTestInline4Turbo;
         t.exhaust = inline4FitExhaust;
         t.exhaustTurbo = inline4FitTurboExhaust;
         t.turboMeshFile = "engines/inline4_fit/turbo.mesh";

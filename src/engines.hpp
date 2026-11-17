@@ -24,10 +24,12 @@ const engineType *findEngineType(std::string name) {
 }
 
 // load the engine's parameter sets, then init. stand: a bike engine on a stand, nothing downstream
-// of the crank (manual, neutral)
-void setupSim(engineSim &sim, const engineModel &e, const engineType &type, double theta1, bool stand = false) {
+// of the crank (manual, neutral). turbo: --turbo yes (the clutch gets a stronger spring for the boost)
+void setupSim(engineSim &sim, const engineModel &e, const engineType &type, double theta1, bool stand = false, bool turbo = false) {
     sim.P = type.engine();
     sim.drive.P = type.drive();
+    sim.P.turbo.on = turbo;
+    if (turbo) sim.drive.P.clutchCapacity *= 1.5;
     if (type.bike) {
         sim.drive.P.qsMaxRpm = sim.P.revLimit;
         sim.standalone = stand;

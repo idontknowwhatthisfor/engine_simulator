@@ -1,8 +1,7 @@
 // the turbocharger (--turbo yes): the Sketchfab "Car Turbocharger" model, split by
 // engines/inline4_fit/build_turbo.py into turbo.mesh. The housings are drawn see-through like the
 // engine block (hidden with it, G), so the compressor wheel, shaft, bearing and turbine wheel show.
-// The rotor spins up from the exhaust gas: the shaft speed follows the gas flow (revs x manifold
-// pressure) with spool lag. It is drawn only; the engine physics has no boost.
+// The rotor turns at the shaft speed of the physics' turbo (engineSim::stepTurbo), which makes the boost.
 #pragma once
 #include "exhaust.hpp"
 
@@ -18,12 +17,9 @@ struct turboModel {
     mat4 place = identity();       // turbo frame -> mesh space
     vec3 lo{1e9f, 1e9f, 1e9f}, hi{-1e9f, -1e9f, -1e9f};  // mesh-space bounds
 
-    double shaftRpm = 0.0;         // simulated turbo shaft speed
     double angle = 0.0;            // drawn rotor angle, rad
     double lastTime = -1.0;
 
-    static constexpr double MAX_RPM = 160000.0;
-    static constexpr double IDLE_RPM = 12000.0;
     // the drawn rotor turns at most this fast: the real 100k+ rpm would just strobe at the frame rate
     static constexpr double DRAW_MAX_REV_S = 12.0;
 
@@ -68,19 +64,12 @@ struct turboModel {
         }
     }
 
-    // spool: the shaft speed chases a target set by the exhaust gas flow (revs and manifold
-    // pressure), quicker to spin up than to run down
+    // the shaft speed comes from the engine physics (engineSim::stepTurbo); drawn in proportion to
+    // it, at full drawn speed from 80k rpm, so spool-up shows
     void update(const engineSim &sim) {
-        bool first = lastTime < 0.0;
-        double dt = first ? 0.0 : std::clamp(sim.time - lastTime, 0.0, 0.5);
+        double dt = lastTime < 0.0 ? 0.0 : std::clamp(sim.time - lastTime, 0.0, 0.5);
         lastTime = sim.time;
-        double flow = std::clamp(std::fabs(sim.rpm()) / sim.P.revLimit, 0.0, 1.0) * std::clamp(sim.pMan / sim.P.pAtm, 0.0, 1.2);
-        double want = std::fabs(sim.rpm()) < 100.0 ? 0.0 : IDLE_RPM + (MAX_RPM - IDLE_RPM) * std::pow(std::min(flow * 1.25, 1.0), 1.6);
-        if (first) shaftRpm = sim.time > 1.0 ? want : 0.0;  // after a headless --simtime run: start spooled
-        double tau = want > shaftRpm ? 0.7 : 1.8;
-        shaftRpm += (want - shaftRpm) * (1.0 - std::exp(-dt / tau));
-        // drawn speed in proportion to the real one (full drawn speed from half the top shaft speed), so spool-up shows
-        double revS = DRAW_MAX_REV_S * std::min(1.0, shaftRpm / (0.5 * MAX_RPM));
+        double revS = DRAW_MAX_REV_S * std::min(1.0, sim.turboRpm() / 80000.0);
         angle = std::fmod(angle + 2.0 * PI * revS * dt, 2.0 * PI);
     }
 
