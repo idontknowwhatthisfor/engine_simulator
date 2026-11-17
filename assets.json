@@ -1,5 +1,5 @@
 {
-  "_comment": "Large files kept out of git, stored as assets on a GitHub release. Upload with: gh release create assets-v1 <file> --repo <repo>",
+  "_comment": "Large files kept out of git, stored as assets on GitHub releases. A file's own \"tag\" overrides the default one; \"optional\" files may be missing without failing the fetch. Upload with: gh release create <tag> <file> --repo <repo>",
   "repo": "idontknowwhatthisfor/engine_simulator",
   "tag": "Assets-1",
   "files": [
@@ -8,6 +8,14 @@
       "asset": "scene.bin",
       "sha256": "b59b7fcc1964459bf20389a2e8d2de0403817164915d093732d5ea94ef28d7f1",
       "size": 6230232
+    },
+    {
+      "path": "engines/inline4_fit/turbocharger/scene.bin",
+      "asset": "turbocharger_scene.bin",
+      "tag": "Assets-2",
+      "sha256": "1d89b79df289bbf6f712dacc8f7ad88458436d8c4c818d37e31fec11bdee8949",
+      "size": 13920816,
+      "optional": true
     }
   ]
 }

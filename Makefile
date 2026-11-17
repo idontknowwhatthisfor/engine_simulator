@@ -18,6 +18,9 @@ I4   = engines/inline4_fit
 V4   = engines/ducati_v4
 BMW  = engines/bmw_s1000rr
 MESHES = $(I4)/engine.mesh $(V4)/v4.mesh $(BMW)/s1000rr.mesh
+# the turbocharger (--turbo yes); its scene.bin is an optional release asset (assets.json)
+TURBO_BIN = $(I4)/turbocharger/scene.bin
+MESHES += $(I4)/turbo.mesh
 
 # one translation unit: engine_sim.cpp includes src/ and engines/*/ headers
 HEADERS = $(wildcard src/*.hpp) $(wildcard engines/*/*.hpp)
@@ -32,6 +35,12 @@ $(I4)/scene.bin: assets.json scripts/fetch_assets.py
 
 $(I4)/engine.mesh: $(I4)/extract_parts.py $(I4)/scene.gltf $(I4)/scene.bin
 	python3 -I $(I4)/extract_parts.py
+
+# skipped (and retried by the next make) while the turbo model is not downloaded
+$(I4)/turbo.mesh: $(I4)/build_turbo.py $(I4)/turbocharger/scene.gltf assets.json $(wildcard $(TURBO_BIN))
+	@test -f $(TURBO_BIN) || python3 -I scripts/fetch_assets.py
+	@if [ -f $(TURBO_BIN) ]; then python3 -I $(I4)/build_turbo.py; \
+	else echo "turbo model not downloaded: --turbo yes is unavailable (see assets.json)"; fi
 
 $(V4)/v4.mesh: $(V4)/build_v4.py tools/meshlib.py $(I4)/engine.mesh
 	python3 -I $(V4)/build_v4.py

@@ -10,4 +10,5 @@ __pycache__/
 
 # large assets: downloaded by scripts/fetch_assets.py (see assets.json)
 engines/inline4_fit/scene.bin
+engines/inline4_fit/turbocharger/scene.bin
 *.part

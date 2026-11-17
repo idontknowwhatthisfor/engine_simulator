@@ -14,6 +14,7 @@
 #include "src/wav.hpp"
 #include "src/test_bike.hpp"
 #include "src/bike_gearbox.hpp"
+#include "src/turbo.hpp"
 
 // ---------------------------------------------------------------------------------------------
 // command line, for scripted test runs
@@ -37,6 +38,7 @@ struct options {
     float grade = 0.f;       // road grade in percent
     bool reverse = false;    // start in reverse (automatic)
     bool sport = false;      // automatic sport mode
+    bool turbo = false;      // --turbo yes: a turbocharger in the exhaust (inline-4)
     std::string wav;         // --wav out.wav: render a scripted run to a file and quit
     bool selftest = false, phystest = false;
     std::string cmpA, cmpB;
@@ -73,6 +75,12 @@ options parseArgs(int argc, char **argv) {
         else if (a == "--grade") o.grade = std::stof(next());
         else if (a == "--reverse") o.reverse = true;
         else if (a == "--sport") o.sport = true;
+        else if (a == "--turbo" || a.rfind("--turbo=", 0) == 0) {
+            std::string v = a == "--turbo" ? next() : a.substr(8);
+            if (v == "yes") o.turbo = true;
+            else if (v == "no") o.turbo = false;
+            else throw std::runtime_error("--turbo takes yes or no, not \"" + v + "\"");
+        }
         else if (a == "--wav") o.wav = next();
         else if (a == "--selftest") o.selftest = true;
         else if (a == "--phystest") o.phystest = true;
@@ -99,6 +107,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type inline4|v4|s1000rr] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
                              "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--no-wheelie]\n"
+                             "                  [--turbo yes|no]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
                              "       engine_sim --engine-type list\n", ex.what());
@@ -117,6 +126,10 @@ int main(int argc, char **argv) {
         return 1;
     }
     const engineType &type = *typePtr;
+    if (opt.turbo && !type.exhaustTurbo) {
+        std::fprintf(stderr, "--turbo yes: the %s has no turbo layout (only inline4 has one)\n", type.name);
+        return 1;
+    }
 
     engineModel eng;
     try {
@@ -192,15 +205,28 @@ int main(int argc, char **argv) {
     }
     // the exhaust runs from the ports to the tailpipe, outside the engine: make room for it too
     exhaustModel exhaust;
+    turboModel turbo;
     bool showExhaust = !opt.engineOnly && type.exhaust;
+    bool showTurbo = showExhaust && opt.turbo;
     if (showExhaust) {
+        exhaustLayout layout;
         try {
-            exhaust.build(type.exhaust(eng));
+            layout = showTurbo ? type.exhaustTurbo(eng) : type.exhaust(eng);
+            exhaust.build(layout);
         } catch (const std::exception &ex) {
             std::fprintf(stderr, "%s\n", ex.what());
             return 1;
         }
         exhaust.growBounds(eng);
+        if (showTurbo) {
+            try {
+                turbo.load(type.turboMeshFile, layout.turbo);
+            } catch (const std::exception &ex) {
+                std::fprintf(stderr, "%s (run: %s, or make)\n", ex.what(), type.turboBuildHint);
+                return 1;
+            }
+            turbo.growBounds(eng);
+        }
     }
     renderer ren;
     // the road runs along the vehicle: the car's crank points along the car (front at world +z), the
@@ -233,6 +259,10 @@ int main(int argc, char **argv) {
     if (showExhaust) {
         exhaust.upload(ren);
         exhaust.update(sim);  // after a --simtime run the pipes start at their settled heat
+        if (showTurbo) {
+            turbo.upload(ren);
+            turbo.update(sim);
+        }
     }
     std::vector<drawItem> extras;
 
@@ -278,7 +308,7 @@ int main(int argc, char **argv) {
                                  "T: auto/manual  Z: sport  E/Q: shift up/down (Q at a stop: R)  C: clutch  H/J: hill up/down  L: cargo\n"
                                  "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: p-V  X: shake  P: pause  R: reset", 14);
     help.setFillColor(sf::Color(150, 150, 160));
-    sf::Text credit(font, type.credit, 12);
+    sf::Text credit(font, std::string(type.credit) + (showTurbo ? "\nturbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0" : ""), 12);
     credit.setFillColor(sf::Color(110, 110, 120));
 
     std::vector<mat4> modelOf;
@@ -468,7 +498,8 @@ int main(int argc, char **argv) {
                       "\n hill " + (dv.grade >= 0 ? "+" : "") + f0(dv.grade * 100.0) + "%  mass " +
                       f0(dv.mass()) + " kg" + (dv.cargo > 0 ? (bike ? " (passenger)" : " (cargo)") : "") +
                       (showExhaust ? "\n exhaust: headers ~" + std::to_string(exhaust.headerC()) + " C" +
-                                         (exhaust.flapAt.on ? "  valve " + f0(exhaust.flap * 100.0) + "% open" : "")
+                                         (exhaust.flapAt.on ? "  valve " + f0(exhaust.flap * 100.0) + "% open" : "") +
+                                         (showTurbo ? "  turbo " + f0(turbo.shaftRpm / 1000.0) + "k rpm" : "")
                                    : std::string()) +
                       (flags.empty() ? "" : "\n" + flags) +
                       "\n shake 1st " + numToStr(static_cast<float>(sim.shake1() / 1000.0), 2) + " kN  2nd " +
@@ -552,6 +583,10 @@ int main(int argc, char **argv) {
             if (showExhaust) {
                 exhaust.update(sim, snd.popCount, snd.popLastAmp);
                 exhaust.items(sim, mountW * eng.root, extras);
+                if (showTurbo) {
+                    turbo.update(sim);
+                    turbo.items(mountW * eng.root, ghost, extras);
+                }
             }
         }
         ren.draw(eng, modelOf, view, proj, ghost, fx, extras);

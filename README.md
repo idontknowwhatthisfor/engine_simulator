@@ -35,7 +35,9 @@ make
 The 6 MB model data (`engines/inline4_fit/scene.bin`) is not in git. `make` downloads it from this
 repo's GitHub release (`Assets-1`) on first run, verified by checksum, using only the Python
 standard library. To fetch it by hand: `make assets`. If the repo is private, export a token first:
-`export GITHUB_TOKEN=$(gh auth token)`. The file list lives in `assets.json`.
+`export GITHUB_TOKEN=$(gh auth token)`. The file list lives in `assets.json`. The turbocharger's
+14 MB `engines/inline4_fit/turbocharger/scene.bin` comes the same way from release `Assets-2`; it is
+optional, so without it everything builds and only `--turbo yes` is unavailable.
 
 ```bash
 ./engine_sim --engine-type s1000rr
@@ -116,6 +118,29 @@ built from the engine's layout (`src/exhaust.hpp`), and they move with the engin
   under gravity. They run on simulated time, so slow motion slows them too. The car makes no pops, so
   it has no flames.
 
+### Turbocharger (`--turbo yes`, inline-4)
+
+```bash
+./engine_sim --turbo yes
+```
+
+The inline-4's exhaust then feeds a turbocharger (the Sketchfab "Car Turbocharger" model) hung beside
+the block with its shaft along the car. The two header pairs merge above the turbine inlet, the
+downpipe leaves the turbine forward and turns back under the turbo to the catalyst, and the
+compressor draws through a cone filter and blows into a charge pipe that runs forward.
+
+- **See-through.** The compressor, centre and turbine housings, flanges, clamps and bolts are drawn
+  like the engine block, so the compressor wheel, shaft, bearing and turbine wheel show through.
+  `G` hides them with the block.
+- **Spool.** The shaft speed follows the exhaust gas flow (revs × manifold pressure) with spool lag,
+  up to 160k rpm; the HUD shows it. The wheels are drawn turning at a readable speed in proportion
+  to it, since the real speed would just strobe.
+- **Drawn only.** The engine physics has no boost: power, torque and sound are the same as without it.
+
+`engines/inline4_fit/build_turbo.py` splits the model (`engines/inline4_fit/turbocharger/`) into
+housing, rotor and bearing by geometry and writes `turbo.mesh`. `make` builds it when the model is
+there.
+
 **Estimates.** These values are not published: the V4 rod length; the S 1000 RR bore spacing (92 mm);
 and the crank inertia, reciprocating mass, friction and cam timing of both bikes. They are estimates,
 calibrated so that the published torque and power come out of the physics.
@@ -154,6 +179,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
 | `--grade pct --reverse --sport --no-wheelie` | Starting conditions |
+| `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4's exhaust (default `no`; see below) |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 
 ## Project layout
@@ -165,6 +191,7 @@ src/
   model.hpp                 mesh loading (v1 and banked v2), slider-crank kinematics, --selftest
   render.hpp                OpenGL 2.1 renderer, combustion glow, motion blur, gear meshes
   exhaust.hpp               exhaust systems (3D): swept tubes from each engine's layout, heat, gas pulses, valve, crackle fire
+  turbo.hpp                 the turbocharger (--turbo yes): see-through housings, spinning rotor, spool
   physics.hpp               engine model, ECU, drivetrain, vehicle (parameter structs + engineSim)
   engine_type.hpp           engineType: what an engine provides (params, mesh, labels, tests, demo)
   engines.hpp               registry for --engine-type, setupSim()
@@ -174,7 +201,8 @@ src/
 engines/
   inline4_fit/              inline4_fit.hpp (engine + Honda Fit gearing + type), gearbox_5mt.hpp (3D car
                             gearbox), test_inline4.hpp, extract_parts.py, scene.gltf/.bin, license.txt,
-                            engine.mesh, tests/ (pixel baselines)
+                            engine.mesh, tests/ (pixel baselines), build_turbo.py, turbocharger/
+                            (turbo model), turbo.mesh
   ducati_v4/                ducati_v4.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_v4.py, v4.mesh
   bmw_s1000rr/              bmw_s1000rr.hpp (engine, sound, gearing, test targets, demo ride, type),
@@ -215,6 +243,9 @@ sit behind the crank.
 
 The 3D model is ["Inline-4 Engine" by rafaelaraujo55](engines/inline4_fit/license.txt), licensed
 CC-BY-4.0. The credit line is shown on screen. The V4 and S 1000 RR are built from its parts.
+
+The turbocharger is ["Car Turbocharger" by ml-design](engines/inline4_fit/turbocharger/license.txt),
+licensed CC-BY-4.0; its credit line is shown on screen with `--turbo yes`.
 
 Published figures come from Ducati, BMW Motorrad (technical data and press material) and Honda's 2010
 Fit specifications. This is a simulation, not manufacturer data.

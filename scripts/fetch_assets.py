@@ -60,9 +60,11 @@ def main():
     force = "--force" in sys.argv
     with open(os.path.join(ROOT, "assets.json")) as f:
         manifest = json.load(f)
-    repo, tag = manifest["repo"], manifest["tag"]
+    repo = manifest["repo"]
     failed = False
     for a in manifest["files"]:
+        tag = a.get("tag", manifest["tag"])  # a file can live on its own release
+        optional = a.get("optional", False)  # e.g. the turbo model: missing only disables --turbo yes
         dest = os.path.join(ROOT, a["path"])
         if not force and os.path.exists(dest) and sha256(dest) == a["sha256"]:
             print(f"ok       {a['path']}")
@@ -74,17 +76,17 @@ def main():
             download(repo, tag, a["asset"], tmp)
         except urllib.error.HTTPError as e:
             hint = "" if TOKEN else " (private repo? set GITHUB_TOKEN)" if e.code == 404 else ""
-            print(f"error    {a['path']}: HTTP {e.code}{hint}")
-            failed = True
+            print(f"{'skipped ' if optional else 'error   '} {a['path']}: HTTP {e.code}{hint}")
+            failed |= not optional
             continue
         except (urllib.error.URLError, OSError) as e:
-            print(f"error    {a['path']}: {e}")
-            failed = True
+            print(f"{'skipped ' if optional else 'error   '} {a['path']}: {e}")
+            failed |= not optional
             continue
         if sha256(tmp) != a["sha256"]:
             os.remove(tmp)
-            print(f"error    {a['path']}: checksum mismatch")
-            failed = True
+            print(f"{'skipped ' if optional else 'error   '} {a['path']}: checksum mismatch")
+            failed |= not optional
             continue
         os.replace(tmp, dest)
         print(f"done     {a['path']}")

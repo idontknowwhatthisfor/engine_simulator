@@ -49,11 +49,20 @@ struct outletSpec {
     float r = 20.f;
 };
 
+// a turbocharger (src/turbo.hpp) in the exhaust: where its frame sits in mesh space. The turbo's own
+// frame has the shaft along +x from the turbine outlet face (x = 0) toward the compressor
+struct turboSpec {
+    bool on = false;
+    vec3 at{};                                                  // turbine outlet face, on the shaft
+    vec3 x{0.f, 0.f, 1.f}, y{0.f, 1.f, 0.f}, z{-1.f, 0.f, 0.f};  // the turbo's axes in mesh space (a rotation)
+};
+
 struct exhaustLayout {
     std::vector<pipeSpec> pipes;
     std::vector<boxSpec> boxes;
     std::vector<outletSpec> outlets;
     flapSpec flap;
+    turboSpec turbo;
 };
 
 // a point / direction in cylinder c's own frame (bore toward -y, x across the head) in mesh space

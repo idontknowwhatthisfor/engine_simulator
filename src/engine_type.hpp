@@ -57,5 +57,9 @@ struct engineType {
     float zPrimary = 119.f, gearboxSide = 1.f, primaryModule = 2.6f;
     // the exhaust system (src/exhaust.hpp): headers from the ports to the tailpipe, in mesh space
     exhaustLayout (*exhaust)(const engineModel &) = nullptr;
+    // --turbo yes: the exhaust with a turbocharger in it (its turboSpec places src/turbo.hpp's model)
+    exhaustLayout (*exhaustTurbo)(const engineModel &) = nullptr;
+    const char *turboMeshFile = "";        // relative to the project root
+    const char *turboBuildHint = "";
     std::vector<rideStep> ride;            // bikes: the --wav demo ride (empty: the stand script)
 };
