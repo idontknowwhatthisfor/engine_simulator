@@ -95,6 +95,8 @@ struct drawItem {
     mat4 model;
     float rgba[4];
     float roughness, metallic;
+    float glow[3] = {0.f, 0.f, 0.f};  // emissive colour over the whole part (hot exhaust), linear
+    int additive = 0;                  // 0 lit; light added on top: 1 flat (sparks), 2 soft flame volume
 };
 
 mat4 scale(vec3 s) {
@@ -202,6 +204,11 @@ struct renderer {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
+    // which way the vehicle faces in world space: along z (the car, crank along the car) or along x
+    // (the bikes, crank across the bike), and the sign of "forward" on that axis
+    bool travelX = false;
+    float travelSign = 1.f;
+
     // grid lines; the ones across the direction of travel slide back with the road
     void updateGrid(float scroll) {
         float y = floorY + 0.5f, half = floorHalf, cx = floorCx, cz = floorCz;
@@ -209,15 +216,19 @@ struct renderer {
         float spacing = 2.f * half / LINES;
         std::vector<float> grid;
         auto seg = [&](vec3 a, vec3 b) { grid.insert(grid.end(), {a.x, a.y, a.z, 0.f, 1.f, 0.f, b.x, b.y, b.z, 0.f, 1.f, 0.f}); };
+        // a point `along` the travel axis and `across` it, from the floor centre
+        auto at = [&](float along, float across) {
+            return travelX ? vec3{cx + along, y, cz + across} : vec3{cx + across, y, cz + along};
+        };
         for (int k = 1; k < LINES; k++) {
             float t = -half + spacing * k;
-            seg({cx + t, y, cz - half}, {cx + t, y, cz + half});
+            seg(at(-half, t), at(half, t));
         }
         float off = std::fmod(scroll, spacing);
         if (off < 0.f) off += spacing;
         for (int k = 0; k <= LINES; k++) {
-            float t = -half + spacing * k - off;
-            if (t > -half + 0.5f && t < half - 0.5f) seg({cx - half, y, cz + t}, {cx + half, y, cz + t});
+            float t = -half + spacing * k - travelSign * off;  // the road runs backward under the vehicle
+            if (t > -half + 0.5f && t < half - 0.5f) seg(at(t, -half), at(t, half));
         }
         gridVerts = static_cast<int>(grid.size() / 6);
         glBindBuffer(GL_ARRAY_BUFFER, gridVbo);
@@ -383,12 +394,21 @@ struct renderer {
             setColor(it.rgba[0], it.rgba[1], it.rgba[2], it.rgba[3]);
             glUniform1f(uRoughness, it.roughness);
             glUniform1f(uMetallic, it.metallic);
+            bool hot = it.glow[0] > 0.f || it.glow[1] > 0.f || it.glow[2] > 0.f;
+            if (hot) {
+                glUniform3f(uGlow, it.glow[0], it.glow[1], it.glow[2]);
+                glUniform1f(uCrownY, 1e9f);  // the crown fade is then 1 everywhere: the whole part glows
+            }
             bindVerts(it.mesh->vbo);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, it.mesh->ibo);
             glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(it.mesh->i.size()), GL_UNSIGNED_INT, nullptr);
+            if (hot) {
+                glUniform3f(uGlow, 0.f, 0.f, 0.f);
+                glUniform1f(uCrownY, 0.f);
+            }
         };
         for (const drawItem &it : extras)
-            if (it.rgba[3] >= 1.f) drawItemNow(it);
+            if (it.rgba[3] >= 1.f && !it.additive) drawItemNow(it);
 
         // motion blur: faded copies of the moving parts at earlier poses within this frame
         if (!fx.ghostPoses.empty()) {
@@ -426,6 +446,28 @@ struct renderer {
             glDisable(GL_BLEND);
         }
 
+        // exhaust fire and sparks: light added on top, tested against the solid parts but not hiding anything
+        bool anyAdd = false;
+        for (const drawItem &it : extras) anyAdd |= it.additive != 0;
+        if (anyAdd) {
+            glEnable(GL_BLEND);
+            glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
+            glDepthMask(GL_FALSE);
+            for (const drawItem &it : extras) {
+                if (!it.additive) continue;
+                glUniform1f(uUnlit, it.additive == 2 ? 2.f : 1.f);
+                mat4 mv = view * it.model;
+                glUniformMatrix4fv(uModelView, 1, GL_FALSE, mv.m.data());
+                setColor(it.rgba[0], it.rgba[1], it.rgba[2], 1.f);
+                bindVerts(it.mesh->vbo);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, it.mesh->ibo);
+                glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(it.mesh->i.size()), GL_UNSIGNED_INT, nullptr);
+            }
+            glUniform1f(uUnlit, 0.f);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
+        }
+
         // then the see-through block: no depth writes so the internals stay visible, back faces culled
         // so each wall is blended once
         if (ghost == 0) {
@@ -437,7 +479,7 @@ struct renderer {
             for (std::size_t k = 0; k < e.groups.size(); k++)
                 if (e.mats[e.groups[k].mat].blend) drawGroup(k, modelOf[k], -1.f);
             for (const drawItem &it : extras)
-                if (it.rgba[3] < 1.f) drawItemNow(it);
+                if (it.rgba[3] < 1.f && !it.additive) drawItemNow(it);
             glDisable(GL_CULL_FACE);
             glDepthMask(GL_TRUE);
             glDisable(GL_BLEND);

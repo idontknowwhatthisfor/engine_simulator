@@ -49,6 +49,8 @@ struct engineSound {
     double lastTube = 0.0;
     std::array<int, 4> lastRegion{};  // to spot each exhaust valve opening
     double popEnv = 0.0, popAmp = 0.0, tickEnv = 0.0;
+    int popCount = 0;                 // crackles so far (the exhaust draws a flame and sparks for each)
+    double popLastAmp = 0.0;
     biquad tickBand;
     double sinceLift = 1e9;           // s since the throttle was snapped shut
     bool lastQs = false;
@@ -225,6 +227,8 @@ private:
     void trigger(double amp) {
         popEnv = 1.0;
         popAmp = amp;
+        popCount++;
+        popLastAmp = amp;
     }
 
     double starterWhine(const engineSim &sim) {

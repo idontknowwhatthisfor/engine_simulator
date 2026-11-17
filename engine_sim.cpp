@@ -190,7 +190,23 @@ int main(int argc, char **argv) {
         eng.lo.y = std::min(eng.lo.y, -bbox.maxY() - 5.f);
         eng.lo.z = std::min(eng.lo.z, -bbox.maxZ() - 5.f);
     }
+    // the exhaust runs from the ports to the tailpipe, outside the engine: make room for it too
+    exhaustModel exhaust;
+    bool showExhaust = !opt.engineOnly && type.exhaust;
+    if (showExhaust) {
+        try {
+            exhaust.build(type.exhaust(eng));
+        } catch (const std::exception &ex) {
+            std::fprintf(stderr, "%s\n", ex.what());
+            return 1;
+        }
+        exhaust.growBounds(eng);
+    }
     renderer ren;
+    // the road runs along the vehicle: the car's crank points along the car (front at world +z), the
+    // bikes' crank lies across the bike, so they face along x (the gearbox sits behind the crank)
+    ren.travelX = type.bike;
+    ren.travelSign = type.bike ? -type.gearboxSide : 1.f;
     try {
         ren.init(eng);
     } catch (const std::exception &ex) {
@@ -213,6 +229,10 @@ int main(int argc, char **argv) {
         } else {
             gbox.build(eng, sim.drive.P, ren);
         }
+    }
+    if (showExhaust) {
+        exhaust.upload(ren);
+        exhaust.update(sim);  // after a --simtime run the pipes start at their settled heat
     }
     std::vector<drawItem> extras;
 
@@ -378,7 +398,8 @@ int main(int argc, char **argv) {
             physAccum += dt * TIME_SCALES[scaleIdx];
             while (physAccum >= PHYS_DT) {
                 sim.step(PHYS_DT);
-                if (audio) audio->ring.push(snd.sample(sim));
+                float smp = snd.sample(sim);  // always: its crackles also light the tailpipe flames
+                if (audio) audio->ring.push(smp);
                 physAccum -= PHYS_DT;
             }
         }
@@ -446,6 +467,9 @@ int main(int argc, char **argv) {
                       (bike ? "\n clutch lever " : "\n clutch pedal ") + f0((1.0 - dv.clutch) * 100.0) + "%  slip " + f0(slipRpm) + " rpm" +
                       "\n hill " + (dv.grade >= 0 ? "+" : "") + f0(dv.grade * 100.0) + "%  mass " +
                       f0(dv.mass()) + " kg" + (dv.cargo > 0 ? (bike ? " (passenger)" : " (cargo)") : "") +
+                      (showExhaust ? "\n exhaust: headers ~" + std::to_string(exhaust.headerC()) + " C" +
+                                         (exhaust.flapAt.on ? "  valve " + f0(exhaust.flap * 100.0) + "% open" : "")
+                                   : std::string()) +
                       (flags.empty() ? "" : "\n" + flags) +
                       "\n shake 1st " + numToStr(static_cast<float>(sim.shake1() / 1000.0), 2) + " kN  2nd " +
                       numToStr(static_cast<float>(sim.shake2() / 1000.0), 2) + " kN  roll +-" + f0(sim.rollAmp()) + " N m" +
@@ -518,6 +542,11 @@ int main(int argc, char **argv) {
             if (!opt.engineOnly) {
                 if (type.bike) bbox.items(sim, delta, mountW * eng.root, ghost, extras);
                 else gbox.items(sim, delta, mountW * eng.root, ghost, extras);
+            }
+            // the exhaust hangs off the heads, so it moves with the engine too
+            if (showExhaust) {
+                exhaust.update(sim, snd.popCount, snd.popLastAmp);
+                exhaust.items(sim, mountW * eng.root, extras);
             }
         }
         ren.draw(eng, modelOf, view, proj, ghost, fx, extras);
