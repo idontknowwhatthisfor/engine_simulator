@@ -488,8 +488,13 @@ int main(int argc, char **argv) {
         float fovY = 2.f * std::atan((HEIGHT / 2.f) / FOCAL);
         mat4 proj = perspective(fovY, aspect, 5.f, half * 40.f);
         mat4 view = viewMatrix(cam, centre);
-        // the road (and everything on it) tilts with the grade: the front (+z) goes up a hill
-        view = view * translate(centre) * rotateX(-static_cast<float>(std::atan(sim.drive.grade))) * translate(centre * -1.f);
+        // the road (and everything on it) pitches with the grade about the axis across the vehicle, so
+        // the front goes up a hill: the car faces world +z, the bikes face +x or -x (see ren.travelX)
+        {
+            float pitch = static_cast<float>(std::atan(sim.drive.grade)) * ren.travelSign;
+            mat4 tilt = ren.travelX ? rotateZ(pitch) : rotateX(-pitch);
+            view = view * translate(centre) * tilt * translate(centre * -1.f);
+        }
         fx.gridScroll = static_cast<float>(sim.drive.distance * 1000.0);
         float delta = static_cast<float>(sim.theta - eng.cyls[0].theta0);
         poseEngine(eng, delta, modelOf);
