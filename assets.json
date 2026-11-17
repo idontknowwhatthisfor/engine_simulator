@@ -1,0 +1,13 @@
+{
+  "_comment": "Large files kept out of git, stored as assets on a GitHub release. Upload with: gh release create assets-v1 <file> --repo <repo>",
+  "repo": "idontknowwhatthisfor/engine_simulator",
+  "tag": "Assets-1",
+  "files": [
+    {
+      "path": "engines/inline4_fit/scene.bin",
+      "asset": "scene.bin",
+      "sha256": "b59b7fcc1964459bf20389a2e8d2de0403817164915d093732d5ea94ef28d7f1",
+      "size": 6230232
+    }
+  ]
+}

@@ -27,6 +27,9 @@ all: engine_sim $(MESHES)
 engine_sim: engine_sim.cpp $(HEADERS)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 
+$(I4)/scene.bin: assets.json scripts/fetch_assets.py
+	python3 -I scripts/fetch_assets.py
+
 $(I4)/engine.mesh: $(I4)/extract_parts.py $(I4)/scene.gltf $(I4)/scene.bin
 	python3 -I $(I4)/extract_parts.py
 
@@ -56,3 +59,8 @@ clean:
 	rm -f engine_sim
 
 .PHONY: all run run-v4 run-s1000rr test clean
+
+assets:
+	python3 -I scripts/fetch_assets.py
+
+.PHONY: assets

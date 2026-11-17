@@ -32,6 +32,11 @@ C++20 compiler and Python 3. The mesh builders use only the standard library.
 make
 ```
 
+The 6 MB model data (`engines/inline4_fit/scene.bin`) is not in git. `make` downloads it from this
+repo's GitHub release (`Assets-1`) on first run, verified by checksum, using only the Python
+standard library. To fetch it by hand: `make assets`. If the repo is private, export a token first:
+`export GITHUB_TOKEN=$(gh auth token)`. The file list lives in `assets.json`.
+
 ```bash
 ./engine_sim --engine-type s1000rr
 ```
