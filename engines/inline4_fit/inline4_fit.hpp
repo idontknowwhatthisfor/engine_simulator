@@ -55,7 +55,8 @@ drivetrainParams inline4FitDriveParams() {
 // With --turbo yes the two pairs merge above a turbocharger hung beside the block, shaft along the car:
 // the turbine inlet faces up into the merge, the turbine outlet faces forward and the downpipe turns
 // down and back under the turbo to the catalyst. The compressor (rear) draws through a cone filter
-// and blows out sideways into a charge pipe that runs forward to where the intercooler would be.
+// and blows out sideways into a charge pipe that runs forward to a front-mounted intercooler; the
+// cooled charge comes back up the other side toward the (unmodelled) throttle body.
 exhaustLayout inline4FitExhaustWith(const engineModel &e, bool turbo) {
     exhaustLayout L;
     const std::array<float, 4> STEEL{0.50f, 0.48f, 0.45f, 1.f}, ALU{0.62f, 0.62f, 0.60f, 1.f}, CHROME{0.80f, 0.80f, 0.82f, 1.f};
@@ -111,8 +112,19 @@ exhaustLayout inline4FitExhaustWith(const engineModel &e, bool turbo) {
         int filt = pipe({{CIN.x, CIN.y, CIN.z + 36.f}, {CIN.x, CIN.y, CIN.z + 150.f}}, 52.f, 64.f, {}, FILTER, true);
         L.pipes[hose].rough = L.pipes[filt].rough = 0.9f;
         L.pipes[hose].metal = L.pipes[filt].metal = 0.f;
+        // front-mounted intercooler ahead of the crank snout: a finned core between two end tanks
+        const float IC_Z0 = -430.f, IC_Z1 = -375.f, IC_Y0 = 40.f, IC_Y1 = 240.f, IC_L = -230.f, IC_R = 470.f;
+        const std::array<float, 4> CORE{0.10f, 0.10f, 0.11f, 1.f};
+        L.boxes.push_back({{IC_L + 40.f, IC_Y0, IC_Z0 + 5.f}, {IC_R - 40.f, IC_Y1, IC_Z1 - 5.f}, CORE, 0.8f, 0.4f});
+        L.boxes.push_back({{IC_R - 40.f, IC_Y0 - 10.f, IC_Z0}, {IC_R, IC_Y1 + 10.f, IC_Z1}, ALU, 0.4f, 0.7f});
+        L.boxes.push_back({{IC_L, IC_Y0 - 10.f, IC_Z0}, {IC_L + 40.f, IC_Y1 + 10.f, IC_Z1}, ALU, 0.4f, 0.7f});
+        // hot side: compressor outlet forward into the right end tank
         pipe({{COUT.x - 4.f, COUT.y, COUT.z}, {COUT.x + 30.f, COUT.y, COUT.z}, {COUT.x + 50.f, COUT.y - 5.f, COUT.z - 40.f},
-              {COUT.x + 50.f, COUT.y - 20.f, -60.f}, {COUT.x + 50.f, COUT.y - 20.f, -130.f}}, 30.f, 30.f, {}, ALU, true);
+              {COUT.x + 50.f, COUT.y - 20.f, -60.f}, {COUT.x + 50.f, COUT.y - 20.f, -300.f}, {IC_R - 20.f, 150.f, IC_Z1 + 30.f},
+              {IC_R - 20.f, 150.f, IC_Z1 - 10.f}}, 30.f, 30.f, {}, ALU);
+        // cold side: out of the left end tank and up the intake side of the block
+        pipe({{IC_L + 20.f, 150.f, IC_Z1 - 10.f}, {IC_L + 20.f, 150.f, IC_Z1 + 40.f}, {IC_L + 30.f, 40.f, -300.f},
+              {IC_L + 40.f, -120.f, -240.f}, {IC_L + 45.f, -200.f, -200.f}}, 30.f, 30.f, {}, ALU, true);
     }
     int cat = pipe({{240.f, lineY, 200.f}, {240.f, lineY, 360.f}}, 55.f, 55.f, {col}, ALU, true);
     int mid = pipe({{240.f, lineY, 355.f}, {240.f, lineY, 480.f}}, 25.f, 25.f, {cat}, ALU);

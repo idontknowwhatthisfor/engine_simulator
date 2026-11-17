@@ -51,25 +51,49 @@ struct soundParams {
     double burbleFadeFrom = 0.0, burbleFadeSpan = 0.0, burbleHigh = 1.0;
     double tick = 0.0;              // valvetrain: a click as each cam lobe snaps a valve shut
     double tickHz = 3200.0;         // ... centred here (a Desmo's rocker clatter sits lower)
+    double turboGain = 1.0;         // the turbo's whistle, whoosh, blow-off and flutter (--turbo yes)
 };
 
-// turbocharger (--turbo yes), a mean-value model: the exhaust gas fills the exhaust manifold and
-// leaves through the turbine and the wastegate; the turbine's power spins the shaft against the
-// compressor's and the bearings'; the compressor's pressure ratio rises with the shaft speed and
-// feeds the throttle. The ECU works the wastegate to hold the boost the pedal asks for.
+// turbocharger (--turbo yes), a mean-value model:
+//   - exhaust: the gas fills the exhaust manifold and leaves through the turbine and the wastegate;
+//     the turbine's power spins the shaft against the compressor's and the bearings'
+//   - compressor (Greitzer): the air in the inlet duct has inertia and is pushed by the pressure
+//     rise of the compressor map, which falls off on both sides of its peak. Right of the peak it
+//     is stable; when the throttle shuts on boost the flow drops left of the peak and the
+//     compressor surges: the flow stalls and reverses in bursts (the "flutter")
+//   - charge pipes and intercooler: a volume between the compressor and the throttle, with a
+//     pressure drop across the intercooler core. The compressor heats the air; the intercooler
+//     takes out a share of that heat (more with air flowing through it at speed), and the warmer
+//     charge fills the cylinders with less air
+//   - blow-off valve: a diaphragm valve on the charge pipe, opened by manifold vacuum, that vents
+//     the boost when the throttle shuts so the compressor does not surge
+// The ECU works the wastegate to hold the boost the pedal asks for.
 struct turboParams {
     bool on = false;
+    bool bov = true;                // blow-off valve fitted (F toggles it, --bov no takes it off)
     double inertia = 2.0e-5;        // kg m^2, shaft + both wheels
     double maxRpm = 175000.0;       // overspeed: the shaft is held here
-    double prRef = 2.4, rpmRef = 160000.0;  // compressor pressure ratio at rpmRef (rises with speed^2)
+    double prRef = 2.4, rpmRef = 160000.0;  // compressor peak pressure ratio at rpmRef (rises with speed^2)
+    double flowPeakRef = 0.116;     // kg/s at the peak of the map at rpmRef (scales with speed): the surge line
+    double shutoffHead = 0.6;       // pressure rise at zero flow, share of the peak
+    double chokeFall = 0.15;        // how fast the pressure rise falls right of the peak
+    double ductLA = 0.6 / 1.6e-3;   // 1/m, inlet duct length / area (the air column's inertia)
+    double vCharge = 5.0e-3;        // m^3, charge pipes + intercooler
+    double icDrop = 2.0e5;          // Pa per (kg/s)^2: ~0.08 bar across the core at 0.2 kg/s
+    double icEffStill = 0.5, icEffMoving = 0.8;  // intercooler effectiveness standing / from 30 m/s
+    double icTau = 6.0;             // s, the core's heat soak
+    double bovArea = 3.5e-4;        // m^2, blow-off valve open (21 mm)
+    double bovCrack = 25e3;         // Pa: opens when the charge is this far over the manifold
+    double bovSpan = 20e3;          // Pa more for fully open
     double etaC = 0.72, etaT = 0.68;  // compressor / turbine efficiency
-    double turbineArea = 0.75e-3;   // m^2, effective flow area of the turbine nozzle (small: early spool)
+    double turbineArea = 0.68e-3;   // m^2, effective flow area of the turbine nozzle (small: early spool)
     double wastegateArea = 3.0e-3;  // m^2, wastegate fully open
     double vExhaust = 2.0e-3;       // m^3, exhaust manifold + turbine housing
     double bearingLoss = 1.4e-6;    // W per (rad/s)^2: ~150 W at 100k rpm
     double boostMap = 160e3;        // Pa, manifold pressure at full pedal (~0.6 bar boost)
     double wgKp = 2.0, wgKi = 10.0;  // wastegate PI: travel per bar over the target, per bar second
     double knockRetard = 8.0;       // deg of spark taken out per bar over atmospheric
+    double knockRetardHot = 0.1;    // deg more per K of charge over 320 K
     double tExhLight = 850.0, tExhFull = 1150.0;  // K, exhaust gas at light and full load
 };
 
@@ -585,7 +609,14 @@ struct engineSim {
     double blip = 0.0;          // rev-match throttle the gearbox asks for on a sport downshift, 0..1
     // turbo (P.turbo.on); without it pExh stays at P.pExhaust and pBoost at P.pAtm
     double pExh = 105000.0;     // Pa, exhaust manifold (back pressure on the exhaust stroke)
-    double pBoost = 101325.0;   // Pa, compressor outlet = throttle inlet
+    double pBoost = 101325.0;   // Pa, throttle inlet (after the intercooler)
+    double pCharge = 101325.0;  // Pa, compressor outlet (charge pipes)
+    double compFlow = 0.0;      // kg/s through the compressor (negative: surge backflow)
+    double airFlowFilt = 0.0;   // kg/s through the throttle, averaged over ~5 ms (it chatters step to step at WOT)
+    double bovOpen = 0.0, bovFlow = 0.0;  // blow-off valve 0..1, kg/s vented
+    double surge = 0.0;         // 0..1, how hard the compressor is surging (decays after each stall)
+    double tComp = 300.0;       // K, compressor outlet
+    double tCharge = 300.0;     // K, after the intercooler: what the cylinders breathe (P.tIntake without the turbo)
     double turboOmega = 0.0;    // rad/s, turbo shaft
     double wastegate = 0.0;     // 0 shut .. 1 open
     double wgInt = 0.0;         // wastegate PI integral
@@ -633,7 +664,9 @@ struct engineSim {
         omega = 0.0;
         pMan = P.pAtm;
         pExh = P.pExhaust;
-        pBoost = P.pAtm;
+        pBoost = pCharge = P.pAtm;
+        compFlow = airFlowFilt = bovOpen = bovFlow = surge = 0.0;
+        tComp = tCharge = P.tIntake;
         turboOmega = wastegate = wgInt = turbinePower = compressorPower = 0.0;
         idleArea = P.idleBase;
         idleInt = 0.0;
@@ -696,7 +729,7 @@ struct engineSim {
     double volEff(double r) const { return onLowCam(r) ? volEffLow(r) : volEffHigh(r); }
 
     double trappedAir(const cylinderState &s, double r) const {
-        return volEff(r) * pMan * s.vDisp / (P.rGas * P.tIntake);
+        return volEff(r) * pMan * s.vDisp / (P.rGas * tCharge);
     }
 
     double sparkAdvance(double r) const {
@@ -705,7 +738,8 @@ struct engineSim {
         if (idleActive)
             return std::clamp(P.idleSparkBase + P.idleSparkGain * (P.idleRpm - rpmFilt), -5.0, 25.0) * DEGR;
         double adv = P.sparkLow + (P.sparkHigh - P.sparkLow) * std::clamp((r - P.sparkFrom) / P.sparkSpan, 0.0, 1.0);
-        if (P.turbo.on) adv -= P.turbo.knockRetard * std::max(0.0, pMan - P.pAtm) / 1e5;  // boost: back off for knock
+        if (P.turbo.on)  // boost and a hot charge: back off for knock
+            adv -= P.turbo.knockRetard * std::max(0.0, pMan - P.pAtm) / 1e5 + P.turbo.knockRetardHot * std::max(0.0, tCharge - 320.0);
         return adv * DEGR;
     }
 
@@ -930,14 +964,14 @@ struct engineSim {
         // with the turbo, full pedal asks for the boost target and the throttle is fed from the compressor
         double pUp = P.turbo.on ? pBoost : P.pAtm;
         double pWant = P.mapMin + demand * ((P.turbo.on ? P.turbo.boostMap : P.pAtm) - P.mapMin);
-        double flowWant = volEff(r) * pWant * vDispTotal * std::fabs(omega) / (4.0 * 3.14159265358979323846) / (P.rGas * P.tIntake);
-        double flux = P.throttleCd * pUp / std::sqrt(P.rGas * P.tIntake) * flowFunction(std::min(pWant / pUp, 0.995));
+        double flowWant = volEff(r) * pWant * vDispTotal * std::fabs(omega) / (4.0 * 3.14159265358979323846) / (P.rGas * tCharge);
+        double flux = P.throttleCd * pUp / std::sqrt(P.rGas * tCharge) * flowFunction(std::min(pWant / pUp, 0.995));
         double etc = demand > 0.001 ? std::min(P.throttleArea, flowWant / flux) : 0.0;
         throttleOpen = std::max(etc, P.throttleArea * demand * demand * demand) / P.throttleArea;
         double area = P.throttleArea * throttleOpen + idleArea;
-        double mIn = P.throttleCd * area * pUp / std::sqrt(P.rGas * P.tIntake) * flowFunction(pMan / pUp);
-        double mOut = volEff(r) * pMan * vDispTotal * std::fabs(omega) / (4.0 * 3.14159265358979323846) / (P.rGas * P.tIntake);
-        pMan = std::clamp(pMan + P.rGas * P.tIntake / P.vManifold * (mIn - mOut) * dt, 5000.0, pUp);
+        double mIn = P.throttleCd * area * pUp / std::sqrt(P.rGas * tCharge) * flowFunction(pMan / pUp);
+        double mOut = volEff(r) * pMan * vDispTotal * std::fabs(omega) / (4.0 * 3.14159265358979323846) / (P.rGas * tCharge);
+        pMan = std::clamp(pMan + P.rGas * tCharge / P.vManifold * (mIn - mOut) * dt, 5000.0, pUp);
         throttleFlow = mIn;
         if (P.turbo.on) stepTurbo(dt, mIn, mOut, pWant);
         if (!standalone) drive.integrate(dt, pedal);
@@ -960,11 +994,27 @@ struct engineSim {
         brakeAvg += (gasTorque - frictionTorque - brakeAvg) * std::min(1.0, dt / 0.25);
     }
 
-    // the turbo, one step: exhaust manifold filling, shaft power balance, compressor pressure,
-    // wastegate. mAir: air through the compressor (= the throttle); mCyl: what the cylinders breathe
+    // compressor map: pressure rise (Pa) at shaft speed w (rad/s) and flow m (kg/s). Peak at the surge
+    // line; falls to the shut-off head at zero flow, rises again for backflow (the wheel acts like a
+    // throttle against it) and falls slowly toward choke on the right
+    double compressorRise(double w, double m) const {
+        const turboParams &T = P.turbo;
+        double x = w / (T.rpmRef / 60.0 * 2.0 * 3.14159265358979323846);
+        double peak = P.pAtm * (T.prRef - 1.0) * x * x;
+        double mPk = std::max(1e-4, T.flowPeakRef * x);
+        double phi = m / mPk, shape;
+        if (phi < 0.0) shape = T.shutoffHead + 1.5 * phi * phi;
+        else if (phi < 1.0) shape = 1.0 - (1.0 - T.shutoffHead) * (1.0 - phi) * (1.0 - phi);
+        else shape = 1.0 - T.chokeFall * (phi - 1.0) * (phi - 1.0);
+        return peak * shape;
+    }
+
+    // the turbo, one step: exhaust manifold filling, shaft power balance, compressor duct and charge
+    // pipes (surge), blow-off valve, intercooler, wastegate. mAir: air through the throttle;
+    // mCyl: what the cylinders breathe
     void stepTurbo(double dt, double mAir, double mCyl, double pWant) {
         const turboParams &T = P.turbo;
-        const double CP = 1005.0, CP_EX = 1150.0, R_EX = 290.0, G_EX = 1.33;
+        const double CP = 1005.0, CP_EX = 1150.0, R_EX = 290.0, G_EX = 1.33, K = 0.4 / 1.4;
         bool burning = ignition && !stalled && !fuelCut && !revCut && !qsCut;
         double mExh = mCyl * (burning ? 1.0 + 1.0 / P.afr : 1.0);
         double load = std::clamp((pMan - 30e3) / (T.boostMap - 30e3), 0.0, 1.0);
@@ -974,16 +1024,42 @@ struct engineSim {
         double mOut = (aT + aW) * pExh / std::sqrt(R_EX * tExh) * flowFunction(P.pAtm / pExh);
         pExh = std::clamp(pExh + R_EX * tExh / T.vExhaust * (mExh - mOut) * dt, P.pAtm, 4.0e5);
         double mTurb = mOut * aT / (aT + aW);
-        // shaft: turbine power against the compressor's and the bearings'
+
+        // compressor duct (the air column accelerates on the pressure difference), then the charge
+        // pipes fill with the new flow (semi-implicit, so the duct-plenum ringing stays bounded)
+        compFlow += (P.pAtm + compressorRise(turboOmega, compFlow) - pCharge) / T.ductLA * dt;
+        compFlow = std::clamp(compFlow, -0.3, 0.6);
+        double pr = std::max(1.0, pCharge / P.pAtm);
+        tComp = P.tIntake * (1.0 + (std::pow(pr, K) - 1.0) / T.etaC);
+        // blow-off valve: its diaphragm sees the charge pressure against the manifold's
+        double bovWant = T.bov ? std::clamp((pCharge - pMan - T.bovCrack) / T.bovSpan, 0.0, 1.0) : 0.0;
+        bovOpen += (bovWant - bovOpen) * std::min(1.0, dt / (bovWant > bovOpen ? 0.015 : 0.06));
+        bovFlow = pCharge > P.pAtm ? 0.8 * T.bovArea * bovOpen * pCharge / std::sqrt(P.rGas * tComp) * flowFunction(P.pAtm / pCharge) : 0.0;
+        airFlowFilt += (mAir - airFlowFilt) * std::min(1.0, dt / 0.005);
+        pCharge += 1.4 * P.rGas * tComp / T.vCharge * (compFlow - airFlowFilt - bovFlow) * dt;
+        pCharge = std::clamp(pCharge, 0.5 * P.pAtm, 4.0e5);
+        // the throttle sees the charge less the drop across the intercooler core
+        pBoost = std::max(0.3 * P.pAtm, pCharge - T.icDrop * airFlowFilt * airFlowFilt);
+        // surge: the flow stalls left of the map's peak and reverses; each backflow burst kicks it up
+        if (compFlow < 0.0) surge = std::max(surge, std::min(1.0, -compFlow / 0.03));
+        surge *= std::exp(-dt / 0.15);
+
+        // intercooler: takes out a share of the compressor's heat (more with the car moving), the core
+        // soaking up and giving back heat slowly
+        double eff = T.icEffStill + (T.icEffMoving - T.icEffStill) * std::clamp(std::fabs(drive.v) / 30.0, 0.0, 1.0);
+        double tWant = tComp - eff * (tComp - P.tIntake);
+        tCharge += (tWant - tCharge) * std::min(1.0, dt / T.icTau);
+
+        // shaft: turbine power against the compressor's (it works on the air either way through it)
+        // and the bearings'
         turbinePower = T.etaT * mTurb * CP_EX * tExh * (1.0 - std::pow(P.pAtm / pExh, (G_EX - 1.0) / G_EX));
-        double pr = 1.0 + (T.prRef - 1.0) * std::pow(turboOmega / (T.rpmRef / 60.0 * 2.0 * 3.14159265358979323846), 2.0);
-        compressorPower = mAir * CP * P.tIntake * (std::pow(pr, 0.4 / 1.4) - 1.0) / T.etaC;
+        compressorPower = std::fabs(compFlow) * CP * P.tIntake * (std::pow(pr, K) - 1.0) / T.etaC;
         double net = turbinePower - compressorPower - T.bearingLoss * turboOmega * turboOmega;
         turboOmega += net / (T.inertia * std::max(turboOmega, 200.0)) * dt;
         turboOmega = std::clamp(turboOmega, 0.0, T.maxRpm / 60.0 * 2.0 * 3.14159265358979323846);
-        pBoost = P.pAtm * pr;  // the charge pipes and intercooler are small next to the shaft's lag
-        // wastegate: opens while the compressor makes more than the pedal asks for (never aiming
-        // below atmospheric), shuts when it makes less
+
+        // wastegate: opens while there is more boost than the pedal asks for (never aiming below
+        // atmospheric), shuts when there is less
         double err = (pBoost - std::max(P.pAtm, pWant)) / 1e5;  // bar over the target
         wgInt = std::clamp(wgInt + T.wgKi * err * dt, 0.0, 1.0);
         wastegate = std::clamp(wgInt + T.wgKp * err, 0.0, 1.0);

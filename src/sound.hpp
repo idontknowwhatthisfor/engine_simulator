@@ -55,6 +55,9 @@ struct engineSound {
     double sinceLift = 1e9;           // s since the throttle was snapped shut
     bool lastQs = false;
     double primaryPhase = 0.0, gearMeshPhase = 0.0;
+    // turbo (--turbo yes): compressor whistle, intake whoosh, blow-off valve, surge flutter
+    biquad whoosh, bovBand, bovHigh, flutterBand, flutterThump;
+    double whistlePhase = 0.0, splitterPhase = 0.0;
 
     engineSound(double sampleRate, const soundParams &p = soundParams()) : fs(sampleRate), sp(p) {
         dcBlock = biquad::make(biquad::HIGHPASS, fs, 15.0, 0.707);  // below the 26.7 Hz idle firing rate
@@ -64,6 +67,11 @@ struct engineSound {
         intake = biquad::make(biquad::BANDPASS, fs, 350.0, 1.5);
         clatter = biquad::make(biquad::HIGHPASS, fs, 2500.0, 0.707);
         master = biquad::make(biquad::LOWPASS, fs, sp.masterHz, 0.707);
+        whoosh = biquad::make(biquad::BANDPASS, fs, 2500.0, 0.8);
+        bovBand = biquad::make(biquad::BANDPASS, fs, 3200.0, 0.6);
+        bovHigh = biquad::make(biquad::HIGHPASS, fs, 1200.0, 0.707);
+        flutterBand = biquad::make(biquad::BANDPASS, fs, 900.0, 1.2);
+        flutterThump = biquad::make(biquad::LOWPASS, fs, 160.0, 0.707);
         if (sp.superbike) {
             // the quarter-wave pipe: one round trip (2L / c) of delay with an inverting, lossy
             // reflection at the open end
@@ -143,7 +151,7 @@ struct engineSound {
             double rasp = 0.6 * turbulence.run(noise() * exhaust);
             double induction = intake.run(0.4 * intakeFlow + 3.0 * sim.throttleFlow * noise());
             double knock = 0.15 * clatter.run(noise() * std::min(1.0, heat / 5e6));
-            double mix = master.run(body + rasp + induction + knock + starterWhine(sim));
+            double mix = master.run(body + rasp + induction + knock + starterWhine(sim)) + turboVoice(sim);
             return static_cast<float>(0.8 * std::tanh(sp.drive * mix));
         }
 
@@ -213,11 +221,38 @@ struct engineSound {
         if (opened) tickEnv = 1.0;
         double ticks = sp.tick * tickBand.run(noise() * tickEnv);
         tickEnv *= std::exp(-1.0 / (0.0015 * fs));
-        double mix = master.run(exhaustOut + induction + pops + whine + knock + ticks + starterWhine(sim));
+        double mix = master.run(exhaustOut + induction + pops + whine + knock + ticks + starterWhine(sim)) + turboVoice(sim);
         return static_cast<float>(0.8 * std::tanh(sp.drive * mix));
     }
 
 private:
+    // the turbo's own sounds, after the master low-pass so the whistle and the hiss stay bright:
+    //   - whistle: the compressor's blade pass (6 full blades, 6 splitters) at the shaft speed,
+    //     louder with the air it moves
+    //   - whoosh: broadband rush of the intake air through the compressor
+    //   - blow-off valve: the vented charge hisses out ("pssh"), following the flow through it
+    //   - surge flutter: each backflow burst through the stalled compressor chuffs ("stu-tu-tu")
+    double turboVoice(const engineSim &sim) {
+        if (!sim.P.turbo.on) return 0.0;
+        const double TWO_PI = 2.0 * 3.14159265358979323846;
+        double shaftHz = sim.turboOmega / TWO_PI;
+        double flow = std::clamp(sim.compFlow / 0.15, 0.0, 1.5);
+        double spin = std::clamp(sim.turboRpm() / 60000.0, 0.0, 1.0);
+        double whistle = 0.0;
+        whistlePhase = std::fmod(whistlePhase + TWO_PI * shaftHz * 6.0 / fs, TWO_PI);
+        splitterPhase = std::fmod(splitterPhase + TWO_PI * shaftHz * 12.0 / fs, TWO_PI);
+        if (shaftHz * 6.0 < 0.45 * fs) whistle += std::sin(whistlePhase);
+        if (shaftHz * 12.0 < 0.45 * fs) whistle += 0.35 * std::sin(splitterPhase);
+        whistle *= 0.035 * spin * (0.25 + flow);
+        double pr = std::max(0.0, sim.pCharge / sim.P.pAtm - 1.0);
+        double rush = 0.35 * whoosh.run(noise() * flow * (0.3 + pr));
+        double vent = std::pow(std::clamp(sim.bovFlow / 0.05, 0.0, 1.5), 1.5);  // a trickle at idle vacuum is near silent
+        double pssh = 0.9 * bovHigh.run(bovBand.run(noise() * vent));
+        double back = std::clamp(-sim.compFlow / 0.03, 0.0, 1.5);
+        double flutter = sim.surge * (0.8 * flutterBand.run(noise() * back) + 2.0 * flutterThump.run(back));
+        return sp.turboGain * (whistle + rush + pssh + flutter);
+    }
+
     double burbleGain(double rpm) const {
         if (sp.burbleFadeSpan <= 0.0) return sp.burble;
         double u = std::clamp((rpm - sp.burbleFadeFrom) / sp.burbleFadeSpan, 0.0, 1.0);

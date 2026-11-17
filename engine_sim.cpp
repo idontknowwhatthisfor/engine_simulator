@@ -39,6 +39,7 @@ struct options {
     bool reverse = false;    // start in reverse (automatic)
     bool sport = false;      // automatic sport mode
     bool turbo = false;      // --turbo yes: a turbocharger in the exhaust (inline-4)
+    bool bov = true;         // --bov no: the turbo without its blow-off valve (it surges on lift-off)
     std::string wav;         // --wav out.wav: render a scripted run to a file and quit
     bool selftest = false, phystest = false;
     std::string cmpA, cmpB;
@@ -81,6 +82,12 @@ options parseArgs(int argc, char **argv) {
             else if (v == "no") o.turbo = false;
             else throw std::runtime_error("--turbo takes yes or no, not \"" + v + "\"");
         }
+        else if (a == "--bov" || a.rfind("--bov=", 0) == 0) {
+            std::string v = a == "--bov" ? next() : a.substr(6);
+            if (v == "yes") o.bov = true;
+            else if (v == "no") o.bov = false;
+            else throw std::runtime_error("--bov takes yes or no, not \"" + v + "\"");
+        }
         else if (a == "--wav") o.wav = next();
         else if (a == "--selftest") o.selftest = true;
         else if (a == "--phystest") o.phystest = true;
@@ -107,7 +114,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type inline4|v4|s1000rr] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
                              "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--no-wheelie]\n"
-                             "                  [--turbo yes|no]\n"
+                             "                  [--turbo yes|no] [--bov yes|no]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
                              "       engine_sim --engine-type list\n", ex.what());
@@ -140,12 +147,13 @@ int main(int argc, char **argv) {
     }
     if (opt.selftest) return selfTest(eng, type.name);
     if (opt.phystest) return opt.turbo ? type.physTestTurbo(eng, type) : type.physTest(eng, type);
-    if (!opt.wav.empty()) return renderWav(eng, type, opt.wav);
+    if (!opt.wav.empty()) return renderWav(eng, type, opt.wav, opt.turbo, opt.bov);
 
     // engine state; theta of cylinder 1 starts at the model's rest pose unless --crank says otherwise
     const double THETA0 = opt.crankDeg < 0.f ? eng.cyls[0].theta0 : opt.crankDeg * DEGR;
     engineSim sim;
     setupSim(sim, eng, type, THETA0, type.bike && opt.engineOnly, opt.turbo);
+    sim.P.turbo.bov = opt.bov;
     double latchedThrottle = opt.throttle;
     sim.drive.wheelieControl = opt.wheelie;
     sim.drive.grade = opt.grade / 100.0;
@@ -305,7 +313,8 @@ int main(int argc, char **argv) {
                               "T: auto/manual  Z: sport  E/Q: shift  N: neutral  C: clutch  V: wheelie ctrl  H/J: hill  L: passenger\n"
                               "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: p-V  X: shake  P: pause  R: reset"
                                : "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  S: brake  I: ignition\n"
-                                 "T: auto/manual  Z: sport  E/Q: shift up/down (Q at a stop: R)  C: clutch  H/J: hill up/down  L: cargo\n"
+                                 "T: auto/manual  Z: sport  E/Q: shift up/down (Q at a stop: R)  C: clutch  H/J: hill up/down  L: cargo" +
+                                 std::string(opt.turbo ? "  F: BOV" : "") + "\n"
                                  "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: p-V  X: shake  P: pause  R: reset", 14);
     help.setFillColor(sf::Color(150, 150, 160));
     sf::Text credit(font, std::string(type.credit) + (showTurbo ? "\nturbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0" : ""), 12);
@@ -365,6 +374,11 @@ int main(int argc, char **argv) {
                 if (e->code == K::Escape) window.close();
                 if (e->code == K::G) ghost = (ghost + 1) % 2;
                 if (e->code == K::B) blur = !blur;
+                if (e->code == K::F && sim.P.turbo.on) {
+                    sim.P.turbo.bov = !sim.P.turbo.bov;
+                    sim.drive.message = sim.P.turbo.bov ? "blow-off valve fitted" : "blow-off valve removed: lift off on boost to hear it surge";
+                    sim.drive.messageTime = sim.time;
+                }
                 if (e->code == K::M && audio) audio->muted = !audio->muted.load();
                 if (e->code == K::D) showPV = !showPV;
                 if (e->code == K::X) shakeIdx = (shakeIdx + 1) % 3;
@@ -492,7 +506,10 @@ int main(int argc, char **argv) {
                       (bike ? "\n twist grip " : "\n pedal ") + f0(sim.pedal * 100.0) + "%  throttle " + f0(sim.throttleOpen * 100.0) +
                       "%  manifold " + f0(sim.pMan / 1000.0) + " kPa" +
                       (sim.P.turbo.on ? "\n boost " + std::string(sim.boostBar() >= 0.0 ? "+" : "") + numToStr(static_cast<float>(sim.boostBar()), 2) +
-                                            " bar  wastegate " + f0(sim.wastegate * 100.0) + "%  back pressure " + f0(sim.pExh / 1000.0) + " kPa"
+                                            " bar  wastegate " + f0(sim.wastegate * 100.0) + "%  back pressure " + f0(sim.pExh / 1000.0) + " kPa" +
+                                            "\n charge " + f0(sim.tCharge - 273.15) + " C (compressor " + f0(sim.tComp - 273.15) + " C)  blow-off valve " +
+                                            (!sim.P.turbo.bov ? "removed" : sim.bovOpen > 0.05 ? "VENTING" : "shut") +
+                                            (sim.surge > 0.2 ? "  SURGE" : "")
                                       : std::string()) +
                       "\n torque " + numToStr(static_cast<float>(sim.brakeAvg), 1) + " N m  power " +
                       numToStr(static_cast<float>(std::max(kw, 0.0)), 1) + " kW  wheels " +

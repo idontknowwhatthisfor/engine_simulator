@@ -384,7 +384,8 @@ int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
 
     // 2. WOT dyno sweep, speed locked, turbo settled at each speed
     std::printf("\n  WOT dyno sweep (speed locked, 3 s to spool)\n"
-                "     rpm   torque Nm   power kW   boost bar   turbo krpm   wastegate   back kPa   peak cyl bar\n");
+                "     rpm   torque Nm   power kW   boost bar   turbo krpm   wastegate   back kPa   peak cyl bar"
+                "   charge kPa   comp kg/s   charge C\n");
     double peakT = 0.0, peakTRpm = 0.0, peakP = 0.0, peakPRpm = 0.0, boostAt[15] = {};
     double maxCyl = 0.0, maxTurbo = 0.0;
     for (int k = 0; k <= 12; k++) {
@@ -406,8 +407,9 @@ int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
         boostAt[k] = sim.boostBar();
         maxCyl = std::max(maxCyl, pk);
         maxTurbo = std::max(maxTurbo, sim.turboRpm());
-        std::printf("    %5.0f   %8.1f   %8.1f   %9.2f   %10.0f   %8.0f%%   %8.1f   %12.1f\n", rr, t, kw, sim.boostBar(),
-                    sim.turboRpm() / 1000.0, sim.wastegate * 100.0, sim.pExh / 1000.0, pk / 1e5);
+        std::printf("    %5.0f   %8.1f   %8.1f   %9.2f   %10.0f   %8.0f%%   %8.1f   %12.1f   %10.1f   %9.3f   %8.0f\n", rr, t, kw,
+                    sim.boostBar(), sim.turboRpm() / 1000.0, sim.wastegate * 100.0, sim.pExh / 1000.0, pk / 1e5,
+                    sim.pCharge / 1000.0, sim.compFlow, sim.tCharge - 273.15);
         if (t > peakT) { peakT = t; peakTRpm = rr; }
         if (kw > peakP) { peakP = kw; peakPRpm = rr; }
     }
@@ -443,6 +445,11 @@ int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
     check("3000 rpm floored: time to 90% boost", t90, 0.8, 3.5, "s");
     check("boost overshoot over the target", over - TARGET, -0.05, 0.12, "bar");
     check("boost after 6 s (wastegate holds it)", sim.boostBar(), TARGET - 0.08, TARGET + 0.05, "bar");
+    // intercooler, standing still (half effective): the compressor heats the air, the core takes
+    // half of that back out
+    check("compressor outlet temperature", sim.tComp - 273.15, 70, 120, "C");
+    check("charge temperature after the intercooler", sim.tCharge - 273.15, 35, 75, "C");
+    check("pressure drop across the intercooler", (sim.pCharge - sim.pBoost) / 1000.0, 0.5, 12, "kPa");
 
     // 4. lift off at 3000 rpm: boost and shaft fall away
     sim.pedalTarget = 0.0;
@@ -450,7 +457,51 @@ int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
     check("2 s after lifting off: boost (vacuum)", sim.boostBar(), -1.0, -0.3, "bar");
     check("2 s after lifting off: turbo shaft", sim.turboRpm() / 1000.0, 10, 80, "krpm");
 
-    // 5. the car: 0-100 km/h in the automatic
+    // 5. throttle snapped shut on full boost at 4000 rpm, with the blow-off valve and without it.
+    // With it the valve vents the charge and the compressor keeps flowing; without it the trapped
+    // charge pushes back through the compressor and it surges (flow reverses in bursts)
+    auto snap = [&](bool bov, double &surgeMax, int &bursts, double &bovPeak, double &shaftAfter, double &chargePeak) {
+        sim.reset(0.0);
+        sim.P.turbo.bov = bov;
+        sim.lockSpeed = true;
+        sim.omega = 4000.0 / 60.0 * TWO_PI;
+        sim.pedal = sim.pedalTarget = 1.0;
+        run(3.0, none);
+        sim.pedalTarget = 0.0;
+        surgeMax = bovPeak = chargePeak = 0.0;
+        bursts = 0;
+        bool back = false;
+        std::FILE *trace = std::getenv("SURGE_TRACE") ? std::fopen(bov ? "surge_bov.csv" : "surge_nobov.csv", "w") : nullptr;
+        int k = 0;
+        run(1.0, [&] {
+            surgeMax = std::max(surgeMax, sim.surge);
+            bovPeak = std::max(bovPeak, sim.bovFlow);
+            chargePeak = std::max(chargePeak, sim.pCharge);
+            if (!back && sim.compFlow < -0.002) bursts++;
+            back = sim.compFlow < -0.002 ? true : sim.compFlow > 0.0 ? false : back;
+            if (trace && k++ % 20 == 0)
+                std::fprintf(trace, "%.4f,%.4f,%.1f,%.1f,%.0f,%.3f\n", sim.time, sim.compFlow, sim.pCharge / 1000.0, sim.pMan / 1000.0,
+                             sim.turboRpm(), sim.bovOpen);
+        });
+        if (trace) std::fclose(trace);
+        shaftAfter = sim.turboRpm();
+        sim.P.turbo.bov = true;
+    };
+    {
+        double sB, bB, cB, sN, bN, cN, hB, hN;
+        int nB, nN;
+        snap(true, sB, nB, bB, hB, cB);
+        snap(false, sN, nN, bN, hN, cN);
+        std::printf("  lift-off on boost at 4000 rpm      surge   backflow bursts   BOV peak kg/s   charge peak kPa   shaft after 1 s\n");
+        std::printf("    with the blow-off valve        %6.2f   %15d   %13.3f   %15.1f   %11.0f krpm\n", sB, nB, bB, cB / 1000.0, hB / 1000.0);
+        std::printf("    without it                     %6.2f   %15d   %13.3f   %15.1f   %11.0f krpm\n", sN, nN, bN, cN / 1000.0, hN / 1000.0);
+        check("BOV: vents the charge (peak flow)", bB, 0.02, 0.2, "kg/s");
+        check("BOV: no surge", sB, 0.0, 0.1, "");
+        check("no BOV: surges", sN, 0.5, 1.0, "");
+        check("no BOV: backflow bursts in 1 s (flutter)", nN, 5, 60, "");
+    }
+
+    // 6. the car: 0-100 km/h in the automatic
     sim.lockSpeed = false;
     sim.P.revLimit = 6800.0;
     sim.reset(e.cyls[0].theta0);

@@ -127,7 +127,8 @@ built from the engine's layout (`src/exhaust.hpp`), and they move with the engin
 The inline-4's exhaust then feeds a turbocharger (the Sketchfab "Car Turbocharger" model) hung beside
 the block with its shaft along the car. The two header pairs merge above the turbine inlet, the
 downpipe leaves the turbine forward and turns back under the turbo to the catalyst, and the
-compressor draws through a cone filter and blows into a charge pipe that runs forward.
+compressor draws through a cone filter and blows through a charge pipe into a front-mounted
+intercooler ahead of the crank snout; the cooled charge comes back up the intake side.
 
 - **See-through.** The compressor, centre and turbine housings, flanges, clamps and bolts are drawn
   like the engine block, so the compressor wheel, shaft, bearing and turbine wheel show through.
@@ -137,20 +138,38 @@ compressor draws through a cone filter and blows into a charge pipe that runs fo
     the back pressure on the exhaust stroke rises with the flow;
   - the turbine's power spins the shaft against the compressor's and the bearings', so it spools
     up with lag;
-  - the compressor's pressure ratio rises with the shaft speed and feeds the throttle instead of
-    the atmosphere;
   - full pedal asks for 0.6 bar, and the ECU works the wastegate (PI) to hold it. Part pedal asks
     for less, and the throttle shuts as usual;
-  - the spark backs off 8° per bar of boost against knock, and the clutch is made 1.5× stronger.
+  - the spark backs off 8° per bar of boost, and 0.1° per K of charge over 320 K, against knock;
+    the clutch is made 1.5× stronger.
+- **Compressor and surge.** The air in the compressor's inlet duct has inertia and is pushed by
+  the compressor map (a Greitzer model): the pressure rise peaks at the surge line and falls away
+  on both sides. In normal running the compressor sits right of the peak and is stable. Shut the
+  throttle on boost without a way out for the charge, and the flow drops left of the peak: the
+  compressor stalls, the charge pushes back through it, it recovers, and it stalls again, about
+  20 times a second (the "flutter").
+- **Blow-off valve.** A diaphragm valve on the charge pipe, opened by manifold vacuum: when the
+  throttle shuts on boost it vents the charge to the air, so the compressor keeps flowing and does
+  not surge. `F` takes it off and puts it back while driving; `--bov no` starts without it. With
+  the valve the compressor keeps working against the open valve, so the shaft actually slows a
+  little faster than in surge (25k vs 42k rpm one second after a lift-off at 4000 rpm).
+- **Intercooler.** The compressor heats the air (to ~90 °C at full boost). The charge pipes and
+  intercooler are a 5 L volume between the compressor and the throttle, with a pressure drop
+  across the core. The core takes out half of the compressor's heat standing still and 80% from
+  30 m/s of air through it, and soaks heat over a few seconds. The cylinders fill with fewer
+  kilograms of the warmer charge.
+- **Sound.** On top of the engine's voice: the compressor whistle (its 6 blades and 6 splitters
+  at the shaft speed, louder with the air it moves), the rush of air through it, the blow-off
+  valve's hiss on each lift-off, and the surge flutter's chuffs without it. `SND_TURBO` scales them
+  when rendering a WAV. `--turbo yes --wav out.wav` drives the car through two full-throttle pulls
+  with lift-offs (add `--bov no` to hear the flutter).
 - **What it does (sim).** Boost comes in at ~3000 rpm and is held at 0.58 bar to the limiter:
-  345 N·m at 4000 rpm, 207 kW at 7000 rpm (203 N·m / 110 kW without). Floored at 3000 rpm, it reaches
-  90% boost in 2.5 s. 0–100 km/h takes 5.0 s (7.7 s without); the car model has no wheelspin. The
-  HUD shows the boost, wastegate, back pressure and shaft speed (~100k rpm at full boost). The
+  331 N·m at 3500–4000 rpm, 196 kW at 7000 rpm (203 N·m / 110 kW without). Floored at 3000 rpm, it
+  reaches 90% boost in 1.2 s. 0–100 km/h takes 5.1 s (7.7 s without); the car model has no
+  wheelspin. The HUD shows the boost, wastegate, back pressure, charge and compressor-outlet
+  temperatures, the blow-off valve and surge, and the shaft speed (~105–125k rpm on boost). The
   wheels are drawn turning at a readable speed in proportion to the shaft, since the real speed
   would just strobe. `./engine_sim --turbo yes --phystest` checks all this.
-- **Not modelled.** The intercooler (the charge goes in at 300 K), compressor surge and the blow-off
-  valve, and the turbo's sound (whistle, blow-off): it sounds like the engine without it, apart
-  from the extra power and back pressure.
 
 `engines/inline4_fit/build_turbo.py` splits the model (`engines/inline4_fit/turbocharger/`) into
 housing, rotor and bearing by geometry and writes `turbo.mesh`. `make` builds it when the model is
@@ -177,6 +196,7 @@ calibrated so that the published torque and power come out of the physics.
 | V | Wheelie control on/off (bikes) |
 | H / J | Hill up / down |
 | L | Cargo (car) / passenger (bikes) |
+| F | Blow-off valve on/off (`--turbo yes`) |
 | `[` / `]` | Slow motion / back toward real time (×1 … ×0.01) |
 | `,` / `.` | When paused: step the crank by 1° |
 | G / B / M / D / X | See-through block / motion blur / mute / p-V diagram / shake view (×1, ×20, ×100) |
@@ -194,7 +214,8 @@ calibrated so that the published torque and power come out of the physics.
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
 | `--grade pct --reverse --sport --no-wheelie` | Starting conditions |
-| `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below). With `--phystest`, runs the turbo checks |
+| `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below). With `--phystest`, runs the turbo checks; with `--wav`, plays the turbo drive |
+| `--bov yes\|no` | With the turbo: fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 
 ## Project layout
