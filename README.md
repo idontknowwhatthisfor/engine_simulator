@@ -70,6 +70,7 @@ Built from the inline-4's piston and rod, scaled, on a new procedural crank and 
 | Vehicle | 278 kg with rider, CdA 0.32 |
 | Rider aids | Sequential 1-N-2-…-6 box, up/down quickshifter (rev-matched downshifts), slipper clutch, launch control, wheelie control |
 | Results (sim) | 0–100 km/h 3.3 s, 0–200 km/h 6.8 s, top speed ~289 km/h |
+| Sound | Its own Ducati voice. The Twin Pulse firing comes from the physics: pulses arrive in pairs, so the howl sits at the crank rate (rpm/60), an octave below an even-firing inline-4, with a loping, off-beat idle. On top of that:<br>• longer headers from both banks (lower, darker pipe modes)<br>• an idle burble that gives way to the radiated howl as the revs rise<br>• exhaust valve, airbox honk<br>• more overrun crackle than the BMW<br>• Desmo valvetrain clatter |
 
 ### `s1000rr`: BMW S 1000 RR (2023-, K67 ShiftCam engine)
 
@@ -86,7 +87,7 @@ crank.
 | Vehicle | 197 kg wet + 80 kg rider, CdA 0.31 |
 | Rider aids | Same as the V4: quickshifter with rev-matched downshifts, slipper clutch, launch control, wheelie control |
 | Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 6.9 s, 307 km/h in 6th |
-| Sound | Its own voice (the others share the original one):<br>• radiated exhaust (brightens with revs) through a 4-2-1 quarter-wave pipe<br>• exhaust flap, shut at idle and open from ~5000 rpm or under throttle<br>• airbox honk at full throttle<br>• overrun crackle that fades out<br>• quickshifter bark<br>• straight-cut gear whine<br>• valvetrain tick |
+| Sound | Its own voice (the inline-4 keeps the original one):<br>• radiated exhaust (brightens with revs) through a 4-2-1 quarter-wave pipe<br>• exhaust flap, shut at idle and open from ~5000 rpm or under throttle<br>• airbox honk at full throttle<br>• overrun crackle that fades out<br>• quickshifter bark<br>• straight-cut gear whine<br>• valvetrain tick |
 
 **Estimates.** These values are not published: the V4 rod length; the S 1000 RR bore spacing (92 mm);
 and the crank inertia, reciprocating mass, friction and cam timing of both bikes. They are estimates,
@@ -122,7 +123,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
-| `--wav out.wav` | Render a scripted run to a WAV file. The S 1000 RR plays a ride: start, blips, limiter, launch through the gears, braking with rev-matched downshifts. The others play a start / rev / lift-off script. |
+| `--wav out.wav` | Render a scripted run to a WAV file. The bikes play a ride: start, blips, limiter, launch through the gears, braking with rev-matched downshifts. The inline-4 plays a start / rev / lift-off script. |
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
 | `--grade pct --reverse --sport --no-wheelie` | Starting conditions |
@@ -146,7 +147,8 @@ engines/
   inline4_fit/              inline4_fit.hpp (engine + Honda Fit gearing + type), gearbox_5mt.hpp (3D car
                             gearbox), test_inline4.hpp, extract_parts.py, scene.gltf/.bin, license.txt,
                             engine.mesh, tests/ (pixel baselines)
-  ducati_v4/                ducati_v4.hpp (engine, gearing, test targets, type), build_v4.py, v4.mesh
+  ducati_v4/                ducati_v4.hpp (engine, sound, gearing, test targets, demo ride, type),
+                            build_v4.py, v4.mesh
   bmw_s1000rr/              bmw_s1000rr.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_s1000rr.py, s1000rr.mesh
 tools/meshlib.py            mesh helpers shared by build_v4.py and build_s1000rr.py

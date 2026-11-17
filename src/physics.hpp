@@ -46,7 +46,11 @@ struct soundParams {
     // radiateHz is the frequency where the derivative has unity gain
     double radiateHz = 0.0;         // 0 = off (the original voice)
     double burble = 0.0;            // the low exhaust body under 300 Hz (the idle burble), heard directly
+    // the burble fades to burbleHigh of itself from burbleFadeFrom over burbleFadeSpan rpm, so the
+    // radiated howl carries the top end (0 span = no fade)
+    double burbleFadeFrom = 0.0, burbleFadeSpan = 0.0, burbleHigh = 1.0;
     double tick = 0.0;              // valvetrain: a click as each cam lobe snaps a valve shut
+    double tickHz = 3200.0;         // ... centred here (a Desmo's rocker clatter sits lower)
 };
 
 struct engineParams {

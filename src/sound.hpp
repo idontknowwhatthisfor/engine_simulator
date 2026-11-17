@@ -77,7 +77,7 @@ struct engineSound {
             popThump = biquad::make(biquad::LOWPASS, fs, 180.0, 0.707);
             whineBand = biquad::make(biquad::HIGHPASS, fs, 400.0, 0.707);
             burbleLow = biquad::make(biquad::LOWPASS, fs, 300.0, 0.707);
-            tickBand = biquad::make(biquad::BANDPASS, fs, 3200.0, 1.5);
+            tickBand = biquad::make(biquad::BANDPASS, fs, sp.tickHz, 1.5);
             lastRegion.fill(-1);
         }
     }
@@ -157,7 +157,7 @@ struct engineSound {
         double tube = pipe(ex);
         double radiated = (tube - lastTube) * fs / (2.0 * 3.14159265358979323846 * sp.radiateHz);
         lastTube = tube;
-        double body = pipeLow.run(radiated) + sp.pipeResGain * pipeRes.run(tube) + sp.burble * burbleLow.run(tube);
+        double body = pipeLow.run(radiated) + sp.pipeResGain * pipeRes.run(tube) + burbleGain(rpm) * burbleLow.run(tube);
         // turbulent rasp rides on the gas flow, brighter as the revs climb
         // turbulence noise climbs steeply with the gas speed (jet noise goes as a high power of it), so it
         // follows the outflow squared: a full charge at high revs roars, the thin overrun flow barely hisses
@@ -216,6 +216,12 @@ struct engineSound {
     }
 
 private:
+    double burbleGain(double rpm) const {
+        if (sp.burbleFadeSpan <= 0.0) return sp.burble;
+        double u = std::clamp((rpm - sp.burbleFadeFrom) / sp.burbleFadeSpan, 0.0, 1.0);
+        return sp.burble * (1.0 + (sp.burbleHigh - 1.0) * u);
+    }
+
     void trigger(double amp) {
         popEnv = 1.0;
         popAmp = amp;

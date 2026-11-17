@@ -34,6 +34,7 @@ engineParams bmwS1000rrParams() {
     P.blockMass = 58.0; P.blockRollInertia = 1.1;
     // the S 1000 RR's voice: 4-2-1 titanium header into a short silencer with an exhaust flap,
     // airbox honk at full throttle, crackle on the overrun, straight-cut gearbox whine
+    P.sound = soundParams();        // its own voice from scratch, not the Ducati's
     soundParams &S = P.sound;
     S.superbike = true;
     S.pipeLowHz = 2600.0; S.pipeResHz = 220.0; S.pipeResGain = 0.6;

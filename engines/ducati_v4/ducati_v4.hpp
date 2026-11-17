@@ -37,6 +37,27 @@ engineParams ducatiV4Params() {
     P.mountFreqY = 18.0; P.mountFreqRoll = 14.0;
     P.counterweight = 0.5;
     P.fuelCutRpm = 2500.0;
+    // the Panigale V4's voice. The Twin Pulse firing (two cylinders 90 deg apart, then a long gap)
+    // comes from the physics and gives the off-beat, MotoGP-like rumble; the settings shape it:
+    // longer headers from both banks (lower, darker pipe modes), a bigger bass body, an exhaust
+    // valve, the airbox under the tank, crackle on the overrun and the Desmo valvetrain's clatter
+    soundParams &S = P.sound;
+    S.superbike = true;
+    S.pipeLength = 1.45;            // front and rear bank headers merge under the engine, ~1.45 m to the tail
+    S.pipeReflect = 0.6; S.pipeDampHz = 2800.0;
+    S.pipeLowHz = 4500.0; S.pipeResHz = 150.0; S.pipeResGain = 0.2;
+    S.radiateHz = 280.0;
+    // the lumpy, loping idle; it gives way to the radiated howl as the revs rise, or the Twin Pulse's
+    // strong cycle-rate (rpm/120) content would boom over the top end
+    S.burble = 3.0;
+    S.burbleFadeFrom = 2500.0; S.burbleFadeSpan = 4000.0; S.burbleHigh = 0.05;
+    S.flapOpenRpm = 4500.0; S.flapShutHz = 1300.0; S.flapOpenHz = 7500.0;
+    S.airboxHz = 160.0; S.intakeHowlHz = 650.0; S.intakeGain = 1.1;
+    S.popRpm = 3000.0; S.popChance = 0.4;
+    S.whineGain = 0.012;
+    S.tick = 0.7; S.tickHz = 2400.0;  // Desmo rocker clatter
+    S.masterHz = 10000.0;
+    S.drive = 0.21;
     return P;
 }
 
@@ -109,6 +130,21 @@ const engineType &ducatiV4Type() {
         t.zPrimary = 119.f;        // build_v4.py: the crank's primary gear hub
         t.gearboxSide = 1.f;       // counter-rotating crank, front at -x: the box sits toward +x
         t.primaryModule = 2.6f;
+        // --wav: start-up and blips in neutral, the limiter, a launch up the box with the quickshifter,
+        // braking with rev-matched quickshift downshifts, then back on the throttle
+        t.ride = {
+            {1.0, true, 0.0, 0, "starter"},          {3.0, false, 0.0, 0, "idle (Twin Pulse lope, valve shut)"},
+            {3.25, false, 0.45, 0, "blip"},          {4.3, false, 0.0, 0, "idle"},
+            {4.5, false, 1.0, 0, "big blip"},        {5.6, false, 0.0, 0, "falling back, crackle"},
+            {7.0, false, 1.0, 0, "full throttle in N, limiter"}, {10.5, false, 0.0, 0, "lift off, back to idle"},
+            {11.0, false, 0.0, 1, "into 1st"},       {20.0, false, 1.0, 0, "launch, quickshifts up the box"},
+            {20.6, false, 0.0, 0, "lift off, braking", true},
+            {21.4, false, 0.0, -1, "quickshift down, rev-matched", true},
+            {22.2, false, 0.0, -1, "quickshift down, rev-matched", true},
+            {23.0, false, 0.0, -1, "quickshift down, rev-matched", true},
+            {24.0, false, 0.0, 0, "brakes off, overrun", false},
+            {27.0, false, 0.6, 0, "back on the throttle", false},
+        };
         return t;
     }();
     return T;

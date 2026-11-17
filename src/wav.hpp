@@ -11,7 +11,7 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
     auto env = [](const char *name, double &v) { if (const char *s = std::getenv(name)) v = std::atof(s); };
     env("SND_LOW", sim.P.sound.pipeLowHz); env("SND_OPEN", sim.P.sound.flapOpenHz); env("SND_DRIVE", sim.P.sound.drive);
     env("SND_REFLECT", sim.P.sound.pipeReflect); env("SND_DAMP", sim.P.sound.pipeDampHz); env("SND_LEN", sim.P.sound.pipeLength);
-    env("SND_INTAKE", sim.P.sound.intakeGain); env("SND_RES", sim.P.sound.pipeResGain); env("SND_RAD", sim.P.sound.radiateHz); env("SND_BURBLE", sim.P.sound.burble); env("SND_TICK", sim.P.sound.tick);
+    env("SND_INTAKE", sim.P.sound.intakeGain); env("SND_RES", sim.P.sound.pipeResGain); env("SND_RAD", sim.P.sound.radiateHz); env("SND_BURBLE", sim.P.sound.burble); env("SND_BFROM", sim.P.sound.burbleFadeFrom); env("SND_BSPAN", sim.P.sound.burbleFadeSpan); env("SND_BHIGH", sim.P.sound.burbleHigh); env("SND_TICK", sim.P.sound.tick);
     env("SND_WHINE", sim.P.sound.whineGain); env("SND_POP", sim.P.sound.popChance);
     engineSound snd(1.0 / PHYS_DT, sim.P.sound);
     std::vector<float> raw;
