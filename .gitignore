@@ -12,3 +12,6 @@ __pycache__/
 engines/inline4_fit/scene.bin
 engines/inline4_fit/turbocharger/scene.bin
 *.part
+
+# scripts/regress.sh output
+regress/
