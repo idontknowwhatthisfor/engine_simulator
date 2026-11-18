@@ -34,7 +34,7 @@ struct soundParams {
     // silencer flap: shut at idle and light load (muffled), open from ~5000 rpm or with the throttle up
     double flapOpenRpm = 5000.0, flapSpan = 1500.0;
     double flapShutHz = 1600.0, flapOpenHz = 6500.0, flapShutGain = 0.55;
-    // airbox: tonal honk from the four intake pulses, loud at full throttle
+    // airbox: tonal honk from the intake pulses, loud at full throttle
     double airboxHz = 190.0, intakeHowlHz = 750.0, intakeGain = 0.0;
     // overrun crackle (lift-off above popRpm), quickshifter bark, limiter crackle
     double popRpm = 3500.0, popChance = 0.0;
@@ -621,9 +621,12 @@ struct drivetrain {
 
 struct engineSim {
     engineParams P;
-    std::array<cylinderState, 4> cyl;
-    std::array<double, 4> lag{};   // firing lag of each cylinder behind cylinder 1, rad
-    std::array<double, 4> bankCos{1, 1, 1, 1}, bankSin{};  // bore direction: up = cos, sideways = sin
+    // one entry per cylinder, sized from the engine mesh by init()
+    cylArray<cylinderState> cyl;
+    cylArray<double> lag;                // firing lag of each cylinder behind cylinder 1, rad
+    cylArray<double> bankCos, bankSin;   // bore direction: up = cos, sideways = sin
+    cylArray<double> dxs, d2xs;          // step() scratch: piston travel derivatives per cylinder
+    int cylCount() const { return static_cast<int>(cyl.size()); }
     bool standalone = false;       // engine on a stand: no clutch, gearbox or vehicle (--v4 --engine-only)
     bool qsCut = false;            // quickshifter ignition cut
     double tcTrim = 1.0;           // wheelie control: share of the fuel the ECU lets burn
@@ -687,7 +690,15 @@ struct engineSim {
     double pitchAmp() const { return std::sqrt(2.0 * pitchVar); }
 
     void init(const engineModel &e, double theta1) {
-        for (int c = 0; c < 4; c++) {
+        const std::size_t n = e.cyls.size();
+        if (n == 0) throw std::runtime_error("the engine has no cylinders");
+        cyl.assign(n, cylinderState{});
+        lag.assign(n, 0.0);
+        bankCos.assign(n, 1.0);
+        bankSin.assign(n, 0.0);
+        dxs.assign(n, 0.0);
+        d2xs.assign(n, 0.0);
+        for (std::size_t c = 0; c < n; c++) {
             cylinderState &s = cyl[c];
             s.r = e.cyls[c].throw_ * 1e-3;
             s.L = e.cyls[c].rodL * 1e-3;
@@ -736,7 +747,7 @@ struct engineSim {
         }
         pvLast = -1;
         drive.reset(drive.automatic);
-        for (int c = 0; c < 4; c++) {
+        for (int c = 0; c < cylCount(); c++) {
             cylinderState &s = cyl[c];
             double phi = phase(c);
             s.region = regionOf(phi);
@@ -880,7 +891,7 @@ struct engineSim {
     void nudge(double dphi) {
         double old = theta;
         theta = wrapCycle(theta + dphi);
-        for (int c = 0; c < 4; c++)
+        for (int c = 0; c < cylCount(); c++)
             advanceCylinder(cyl[c], wrapCycle(old - lag[c]), phase(c), dphi, 0.0, rpm());
     }
 
@@ -940,9 +951,9 @@ struct engineSim {
 
         // torques at the current angle
         double inertia = P.inertia, dInertia = 0.0;
-        double dxs[4], d2xs[4];
+        const int n = cylCount();
         gasTorque = 0.0;
-        for (int c = 0; c < 4; c++) {
+        for (int c = 0; c < n; c++) {
             cylinderState &s = cyl[c];
             double x, dx, d2x;
             geom(phase(c), s.r, s.L, x, dx, d2x);
@@ -970,7 +981,7 @@ struct engineSim {
         // The block also feels the reaction of the torque the pistons put into the crank.
         {
             double fUp = 0.0, recipTorque = 0.0, pitch = 0.0;
-            for (int c = 0; c < 4; c++) {
+            for (int c = 0; c < n; c++) {
                 double a = d2xs[c] * omega * omega + dxs[c] * alpha;  // piston acceleration away from TDC
                 fUp += P.mRecip * a * bankCos[c];  // vertical part (a V engine's bores lean)
                 // counterweight opposite this cylinder's crankpin (pin angle in mesh space = phase + bank)
@@ -1006,7 +1017,7 @@ struct engineSim {
         double dphi = omega * dt;
         double old = theta;
         theta = wrapCycle(theta + dphi);
-        for (int c = 0; c < 4; c++)
+        for (int c = 0; c < n; c++)
             advanceCylinder(cyl[c], wrapCycle(old - lag[c]), phase(c), dphi, dt, r);
 
         // intake manifold filling: throttle + idle valve in, cylinders out

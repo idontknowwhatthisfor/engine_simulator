@@ -156,9 +156,12 @@ engineModel loadEngine(const std::string &path) {
         const std::vector<float> *b = e.metaValues("banked");
         e.banked = b && !b->empty() && (*b)[0] != 0.f;
     }
-    if (e.cyls.size() != 4) throw std::runtime_error("the simulator needs 4 cylinders");
+    if (e.cyls.empty() || e.cyls.size() > MAX_CYLINDERS)
+        throw std::runtime_error("engine mesh: " + std::to_string(e.cyls.size()) + " cylinders (1 to " +
+                                 std::to_string(MAX_CYLINDERS) + " supported)");
     if (!v2 && !v3) {
         // the inline-4 before v3: firing order 1-3-4-2
+        if (e.cyls.size() != 4) throw std::runtime_error("I4ENGv1 mesh: expected 4 cylinders");
         const float LAG[4] = {0.f, 540.f, 180.f, 360.f};
         for (int c = 0; c < 4; c++) e.cyls[c].firingLagDeg = LAG[c];
     }
@@ -173,7 +176,7 @@ engineModel loadEngine(const std::string &path) {
         rd.getArray(g.verts.data(), g.verts.size());
         rd.getArray(g.idx.data(), g.idx.size());
         if (g.mat >= e.mats.size()) throw std::runtime_error("bad material index");
-        if ((g.kind == PISTON || g.kind == ROD) && (g.cyl < 0 || g.cyl >= 4)) throw std::runtime_error("bad cylinder index");
+        if ((g.kind == PISTON || g.kind == ROD) && (g.cyl < 0 || g.cyl >= static_cast<int>(e.cyls.size()))) throw std::runtime_error("bad cylinder index");
         mat4 toWorld = e.root;
         if (g.kind == PISTON || g.kind == ROD) toWorld = e.root * bankMatrix(e, g.cyl);
         for (std::uint32_t k = 0; k < nv; k++) {
@@ -336,7 +339,7 @@ int selfTest(const engineModel &e, const char *name, const std::vector<double> &
             }
     float worstSkirt = -1e9f;  // > 0 means the crank pokes into a piston's footprint below the skirt
 
-    bool inline4 = true;  // all bores in one bank (the S 1000 RR's leans forward, still inline)
+    bool inline4 = e.cyls.size() == 4;  // four bores in one bank (the S 1000 RR's leans forward, still inline)
     for (const cylinderGeom &cg : e.cyls) inline4 &= cg.bank == e.cyls[0].bank;
 
     for (int step = 0; step <= 1440; step++) {

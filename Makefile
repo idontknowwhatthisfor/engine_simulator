@@ -65,7 +65,9 @@ run-s1000rr: all
 run-h2: all
 	./engine_sim --engine-type h2
 
-# kinematics and physics checks for every engine (headless)
+# kinematics and physics checks for every engine (headless), plus synthetic inline engines of these
+# cylinder counts built in memory (--synthtest N)
+SYNTH_CYLINDERS = 1 2 3 4 6 8
 test: all
 	@for t in inline4 v4 s1000rr h2; do \
 		printf "%-8s selftest " $$t; ./engine_sim --engine-type $$t --selftest | tail -1; \
@@ -73,6 +75,9 @@ test: all
 	done
 	@printf "%-8s phystest " "h2 tuned"; ./engine_sim --engine-type h2 --tuned yes --phystest | tail -1
 	@if [ -f $(I4)/turbo.mesh ]; then printf "%-8s phystest " "turbo"; ./engine_sim --turbo yes --phystest | tail -1; fi
+	@for n in $(SYNTH_CYLINDERS); do \
+		printf "%-8s synthtest " "$$n cyl"; ./engine_sim --synthtest $$n | tail -1; \
+	done
 
 clean:
 	rm -f engine_sim

@@ -18,6 +18,7 @@
 #include "src/turbo.hpp"
 #include "src/dyno.hpp"
 #include "src/dump_params.hpp"
+#include "src/test_synth.hpp"
 
 // ---------------------------------------------------------------------------------------------
 // command line, for scripted test runs
@@ -47,6 +48,7 @@ struct options {
     std::string wav;         // --wav out.wav: render a scripted run to a file and quit
     bool selftest = false, phystest = false;
     bool dumpParams = false; // --dump-params (hidden): print every parameter and quit (scripts/regress.sh)
+    int synthTest = -1;      // --synthtest N (hidden): test an N-cylinder engine built in memory, then quit
     std::string cmpA, cmpB;
 };
 
@@ -103,6 +105,7 @@ options parseArgs(int argc, char **argv) {
         else if (a == "--selftest") o.selftest = true;
         else if (a == "--phystest") o.phystest = true;
         else if (a == "--dump-params") o.dumpParams = true;
+        else if (a == "--synthtest") o.synthTest = std::stoi(next());
         else if (a == "--compare") {
             o.cmpA = next();
             o.cmpB = next();
@@ -134,6 +137,7 @@ int main(int argc, char **argv) {
     }
 
     if (!opt.cmpA.empty()) return compareImages(opt.cmpA, opt.cmpB);
+    if (opt.synthTest >= 0) return synthTest(opt.synthTest);
     if (opt.engineType == "list") {
         listEngineTypes(stdout);
         return 0;
@@ -174,7 +178,7 @@ int main(int argc, char **argv) {
     if (opt.dumpParams) return dumpParams(eng, type, opt.turbo, opt.bov);
     if (opt.selftest) {
         std::vector<double> pattern;  // the published firing intervals the mesh must give (bikes)
-        if (type.spec) for (double d : type.spec().pattern) pattern.push_back(d);
+        if (type.spec) pattern = type.spec().pattern;
         return selfTest(eng, type.name, pattern);
     }
     if (opt.phystest) return opt.turbo ? type.physTestTurbo(eng, type) : type.physTest(eng, type);
@@ -212,8 +216,7 @@ int main(int argc, char **argv) {
     }
 
     // piston crown tops in mesh space, for the combustion effects
-    std::array<float, 4> crownY;
-    crownY.fill(1e9f);
+    std::vector<float> crownY(eng.cyls.size(), 1e9f);
     for (const group &g : eng.groups)
         for (std::size_t v = 0; v < g.verts.size(); v += 6)
             if (g.kind == PISTON) crownY[g.cyl] = std::min(crownY[g.cyl], g.verts[v + 1]);
@@ -255,7 +258,7 @@ int main(int argc, char **argv) {
         exhaustLayout layout;
         try {
             layout = opt.turbo ? type.exhaustTurbo(eng) : type.exhaust(eng);
-            exhaust.build(layout);
+            exhaust.build(layout, static_cast<int>(eng.cyls.size()));
         } catch (const std::exception &ex) {
             std::fprintf(stderr, "%s\n", ex.what());
             return 1;
@@ -497,7 +500,8 @@ int main(int argc, char **argv) {
             firstFrame = false;
             double kw = sim.brakeAvg * sim.omega / 1000.0;
             std::string strokes;
-            std::array<int, 4> order{0, 1, 2, 3};
+            std::vector<int> order(sim.cyl.size());
+            for (std::size_t c = 0; c < order.size(); c++) order[c] = static_cast<int>(c);
             std::sort(order.begin(), order.end(), [&](int a, int b) { return sim.lag[a] < sim.lag[b]; });
             for (int c : order) {  // firing order
                 std::string name = sim.stroke(c);
@@ -592,7 +596,12 @@ int main(int argc, char **argv) {
         poseEngine(eng, delta, modelOf);
 
         // combustion glow and flame per cylinder
-        for (int c = 0; c < 4; c++) {
+        const std::size_t nCyl = eng.cyls.size();
+        fx.glow.resize(nCyl);
+        fx.flame.resize(nCyl);
+        fx.crownY.resize(nCyl);
+        fx.flameModel.resize(nCyl);
+        for (int c = 0; c < static_cast<int>(nCyl); c++) {
             float t = static_cast<float>(sim.glow(c));
             fx.glow[c] = fx.flame[c] = t;
             fx.crownY[c] = crownY[c];

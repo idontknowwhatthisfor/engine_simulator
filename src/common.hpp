@@ -23,6 +23,31 @@
 #include <string>
 #include <vector>
 
+// the most cylinders an engine may have. The simulation keeps its per-cylinder state in cylArray
+// (below) rather than std::vector: measured on the inline-4 --phystest, vectors made the physics step
+// about 5% slower, a fixed capacity about 1%.
+const std::size_t MAX_CYLINDERS = 16;
+
+// per-cylinder storage for the hot loops: room for MAX_CYLINDERS, `size()` of them in use
+template <class T> struct cylArray {
+    std::array<T, MAX_CYLINDERS> d{};
+    std::size_t n = 0;
+    void assign(std::size_t count, const T &v) {
+        if (count > MAX_CYLINDERS)
+            throw std::runtime_error(std::to_string(count) + " cylinders: at most " + std::to_string(MAX_CYLINDERS) + " supported");
+        n = count;
+        std::fill(d.begin(), d.begin() + count, v);
+    }
+    std::size_t size() const { return n; }
+    bool empty() const { return n == 0; }
+    T &operator[](std::size_t i) { return d[i]; }
+    const T &operator[](std::size_t i) const { return d[i]; }
+    T *begin() { return d.data(); }
+    T *end() { return d.data() + n; }
+    const T *begin() const { return d.data(); }
+    const T *end() const { return d.data() + n; }
+};
+
 // config
 const float WIDTH = 1000.f;
 const float HEIGHT = 800.f;

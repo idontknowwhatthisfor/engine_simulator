@@ -6,7 +6,7 @@
 // engine sound: synthesised from the simulation at the physics rate
 // ---------------------------------------------------------------------------------------------
 // The main voice is exhaust blowdown: when an exhaust valve opens, gas rushes out at a rate that
-// grows with the cylinder pressure, giving one pulse per firing (2 per revolution). Those pulses
+// grows with the cylinder pressure, giving one pulse per firing (half the cylinder count per revolution). Those pulses
 // go through a crude exhaust pipe (resonance + low-pass) with flow turbulence on top. Intake
 // pulsing, throttle hiss, combustion clatter and the starter's gear whine are mixed in quietly.
 
@@ -47,7 +47,7 @@ struct engineSound {
     biquad flapShut, flapOpen, airbox, howl, popBand, popThump, whineBand, burbleLow;
     double flap = 0.0;                // 0 shut .. 1 open, follows rpm and throttle with a servo lag
     double lastTube = 0.0;
-    std::array<int, 4> lastRegion{};  // to spot each exhaust valve opening
+    cylArray<int> lastRegion;         // per cylinder, to spot each exhaust valve opening (-1: not seen yet)
     double popEnv = 0.0, popAmp = 0.0, tickEnv = 0.0;
     int popCount = 0;                 // crackles so far (the exhaust draws a flame and sparks for each)
     double popLastAmp = 0.0;
@@ -88,7 +88,6 @@ struct engineSound {
             whineBand = biquad::make(biquad::HIGHPASS, fs, 400.0, 0.707);
             burbleLow = biquad::make(biquad::LOWPASS, fs, 300.0, 0.707);
             tickBand = biquad::make(biquad::BANDPASS, fs, sp.tickHz, 1.5);
-            lastRegion.fill(-1);
         }
     }
 
@@ -116,7 +115,8 @@ struct engineSound {
         const double TWO_PI = 2.0 * 3.14159265358979323846;
         double exhaust = 0.0, intakeFlow = 0.0, heat = 0.0;
         int opened = 0;  // exhaust valves that opened this sample
-        for (int c = 0; c < 4; c++) {
+        if (sp.superbike && lastRegion.size() != sim.cyl.size()) lastRegion.assign(sim.cyl.size(), -1);
+        for (int c = 0; c < sim.cylCount(); c++) {
             const cylinderState &s = sim.cyl[c];
             double x, dx, d2x;
             engineSim::geom(sim.phase(c), s.r, s.L, x, dx, d2x);

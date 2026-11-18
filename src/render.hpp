@@ -6,10 +6,11 @@
 // renderer
 // ---------------------------------------------------------------------------------------------
 struct frameEffects {
-    std::array<float, 4> glow{};       // piston crown glow 0..1 per cylinder
-    std::array<float, 4> crownY{};     // mesh-space crown top y per cylinder (rest pose)
-    std::array<float, 4> flame{};      // flame volume brightness 0..1
-    std::array<mat4, 4> flameModel{};  // unit cylinder -> world, spanning crown to deck
+    // per cylinder (sized to the engine's cylinder count)
+    std::vector<float> glow;           // piston crown glow 0..1
+    std::vector<float> crownY;         // mesh-space crown top y (rest pose)
+    std::vector<float> flame;          // flame volume brightness 0..1
+    std::vector<mat4> flameModel;      // unit cylinder -> world, spanning crown to deck
     std::vector<std::vector<mat4>> ghostPoses;  // motion blur poses, oldest first
     std::vector<float> ghostAlpha;
     float gridScroll = 0.f;            // road distance in mm, scrolls the floor grid

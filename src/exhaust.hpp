@@ -95,7 +95,7 @@ struct exhaustModel {
         pipeSpec spec;
         std::vector<segment> segs;
         float length = 0.f;       // mm along the centreline
-        std::array<float, 4> dist{-1.f, -1.f, -1.f, -1.f};  // mm from cylinder c's port to this pipe's start (-1: not fed)
+        std::vector<float> dist;  // per cylinder: mm from cylinder c's port to this pipe's start (-1: not fed)
     };
     std::vector<pipe> pipes;
     flapSpec flapAt;
@@ -103,7 +103,7 @@ struct exhaustModel {
     std::vector<boxSpec> boxSpecs;
     std::vector<meshBuf> boxes;
     vec3 lo{1e9f, 1e9f, 1e9f}, hi{-1e9f, -1e9f, -1e9f};  // mesh-space bounds
-    std::array<float, 4> runnerR{20.f, 20.f, 20.f, 20.f};  // runner radius per cylinder, mm
+    std::vector<float> runnerR;  // runner radius per cylinder, mm (20 unless a header says otherwise)
 
     // crackle: flame at the outlets, sparks thrown out of them
     std::vector<outletSpec> outlets;
@@ -124,7 +124,7 @@ struct exhaustModel {
     }
 
     // animated state
-    std::array<double, 4> heat{};  // 0..1 per cylinder's gas path
+    std::vector<double> heat;      // 0..1 per cylinder's gas path
     double flap = 0.0;              // 0 shut .. 1 open
     double lastTime = -1.0;
 
@@ -216,11 +216,17 @@ struct exhaustModel {
         }
     }
 
-    void build(const exhaustLayout &L) {
+    // nCyl: the engine's cylinder count (the headers' pipeSpec::cyl index them)
+    void build(const exhaustLayout &L, int nCyl) {
         pipes.clear();
+        runnerR.assign(nCyl, 20.f);
+        heat.assign(nCyl, 0.0);
         for (std::size_t k = 0; k < L.pipes.size(); k++) {
             pipe pp;
             pp.spec = L.pipes[k];
+            if (pp.spec.cyl >= nCyl) throw std::runtime_error("exhaust: a header names cylinder " + std::to_string(pp.spec.cyl + 1) +
+                                                              " of a " + std::to_string(nCyl) + "-cylinder engine");
+            pp.dist.assign(nCyl, -1.f);
             sweep(pp);
             if (pp.spec.cyl >= 0) {
                 pp.dist[pp.spec.cyl] = 0.f;
@@ -229,7 +235,7 @@ struct exhaustModel {
             for (int f : pp.spec.from) {
                 if (f < 0 || f >= static_cast<int>(k)) throw std::runtime_error("exhaust: a pipe must come after the pipes feeding it");
                 const pipe &up = pipes[f];
-                for (int c = 0; c < 4; c++)
+                for (int c = 0; c < nCyl; c++)
                     if (up.dist[c] >= 0.f) pp.dist[c] = std::max(pp.dist[c], up.dist[c] + up.length);
             }
             for (const segment &sg : pp.segs)
@@ -311,7 +317,8 @@ struct exhaustModel {
         double dt = first ? 0.0 : std::clamp(sim.time - lastTime, 0.0, 0.5);
         lastTime = sim.time;
         if (first && sim.time > 1.0) dt = 1e3;  // after a headless --simtime run: start settled
-        for (int c = 0; c < 4; c++) {
+        if (heat.size() != sim.cyl.size()) heat.assign(sim.cyl.size(), 0.0);
+        for (int c = 0; c < sim.cylCount(); c++) {
             double want = heatTarget(sim, c);
             double tau = want > heat[c] ? 4.0 : 10.0;  // heats in seconds, cools slower
             heat[c] += (want - heat[c]) * (1.0 - std::exp(-dt / tau));
@@ -363,7 +370,7 @@ struct exhaustModel {
 
     // a rough header temperature for the HUD, deg C (the hottest runner, at the port)
     int headerC() const {
-        double h = *std::max_element(heat.begin(), heat.end());
+        double h = heat.empty() ? 0.0 : *std::max_element(heat.begin(), heat.end());
         return static_cast<int>(std::lround(40.0 + 860.0 * h));
     }
 
@@ -386,14 +393,15 @@ struct exhaustModel {
     }
 
     void items(const engineSim &sim, const mat4 &world, std::vector<drawItem> &out) const {
-        std::array<double, 4> front{}, amp{};
-        for (int c = 0; c < 4; c++) pulse(sim, c, front[c], amp[c]);
+        const int n = static_cast<int>(heat.size());  // build() sized it from the engine
+        std::vector<double> front(n), amp(n);
+        for (int c = 0; c < n; c++) pulse(sim, c, front[c], amp[c]);
         for (const pipe &pp : pipes) {
             for (const segment &sg : pp.segs) {
                 double hot = 0.0, flash = 0.0;
                 // the slug thins out where the pipe gets wider (collector, silencer)
                 double spread = std::min(1.0, std::pow(runnerR[0] / (0.5 * (pp.spec.r0 + pp.spec.r1)), 2.0));
-                for (int c = 0; c < 4; c++) {
+                for (int c = 0; c < n; c++) {
                     if (pp.dist[c] < 0.f) continue;
                     double d = pp.dist[c] + sg.s;                     // mm from the port
                     hot = std::max(hot, heat[c] * std::exp(-d / 1400.0));  // cools along the pipe

@@ -143,7 +143,8 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
         sim.ignition = false;
         sim.omega = 10000.0 / 60.0 * TWO_PI;
         run(1.5, none);
-        double unbalanced = 2.0 * sim.P.mRecip * sim.cyl[0].r * sim.omega * sim.omega;  // two pairs, no counterweight
+        // reference: half the pistons moving together (a 4-cylinder's two pairs), no counterweight
+        double unbalanced = 0.5 * sim.cylCount() * sim.P.mRecip * sim.cyl[0].r * sim.omega * sim.omega;
         std::printf("  shaking at 10000 rpm: 1st %.0f N (%.0f N without counterweights), 2nd %.0f N\n",
                     sim.shake1(), unbalanced, sim.shake2());
         check("1st-order vertical force / unbalanced", sim.shake1() / unbalanced, 0.0, 0.05, "");
@@ -159,25 +160,25 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
         sim.omega = 3000.0 / 60.0 * TWO_PI;
         run(0.2, none);
         std::vector<double> fires;
-        std::array<bool, 4> was{};
-        for (int c = 0; c < 4; c++) was[c] = sim.cyl[c].sparked;
+        std::vector<bool> was(sim.cyl.size());
+        for (int c = 0; c < sim.cylCount(); c++) was[c] = sim.cyl[c].sparked;
         double crank = 0.0;
         run(0.2, [&] {
             crank += sim.omega * PHYS_DT;
-            for (int c = 0; c < 4; c++) {
+            for (int c = 0; c < sim.cylCount(); c++) {
                 if (sim.cyl[c].sparked && !was[c]) fires.push_back(crank / DEGR);
                 was[c] = sim.cyl[c].sparked;
             }
         });
         std::printf("  firing intervals (deg):");
         double worst = 0.0;
-        const std::array<double, 4> &PATTERN = S.pattern;
+        const std::vector<double> &PATTERN = S.pattern;
         int start = -1;
         for (std::size_t k = 1; k < fires.size(); k++) {
             double d = fires[k] - fires[k - 1];
             if (k < 9) std::printf(" %.0f", d);
-            if (start < 0 && std::fabs(d - PATTERN[0]) < 2.0 && k + 1 < fires.size() && std::fabs(fires[k + 1] - fires[k] - PATTERN[1]) < 2.0) start = static_cast<int>(k);
-            if (start >= 0) worst = std::max(worst, std::fabs(d - PATTERN[(k - start) % 4]));
+            if (start < 0 && std::fabs(d - PATTERN[0]) < 2.0 && k + 1 < fires.size() && std::fabs(fires[k + 1] - fires[k] - PATTERN[1 % PATTERN.size()]) < 2.0) start = static_cast<int>(k);
+            if (start >= 0) worst = std::max(worst, std::fabs(d - PATTERN[(k - start) % PATTERN.size()]));
         }
         std::printf("\n");
         check(S.patternWhat, start < 0 ? 999.0 : worst, 0.0, 1.0, "deg");

@@ -14,7 +14,7 @@ struct bikeSpec {
     double torqueLo, torqueHi, torqueRpmLo, torqueRpmHi;
     double powerLo, powerHi, powerRpmLo, powerRpmHi;
     double sweepTo;                        // dyno sweep top, rpm
-    std::array<double, 4> pattern;         // firing intervals, deg
+    std::vector<double> pattern;           // firing intervals, deg, one per cylinder (they add up to 720)
     const char *patternWhat;
     const char *bikeWhat;
     double upshiftLo, upshiftHi;           // rpm at the 1 -> 2 upshift, full throttle

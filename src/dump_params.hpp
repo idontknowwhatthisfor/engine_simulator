@@ -33,7 +33,7 @@ static_assert(sizeof(soundParams) == 232, "soundParams changed: update dumpSound
 static_assert(sizeof(turboParams) == 296, "turboParams changed: update dumpTurbo()");
 static_assert(sizeof(engineParams) == 1032, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 440, "drivetrainParams changed: update dumpDrive()");
-static_assert(sizeof(bikeSpec) == 248, "bikeSpec changed: update dumpBikeSpec()");
+static_assert(sizeof(bikeSpec) == 240, "bikeSpec changed: update dumpBikeSpec()");
 
 void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, pipeLowHz); DUMP(d, S, pipeResHz); DUMP(d, S, pipeResGain); DUMP(d, S, masterHz);
