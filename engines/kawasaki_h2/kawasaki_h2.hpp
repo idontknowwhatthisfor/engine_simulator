@@ -205,7 +205,51 @@ engineParams kawasakiH2TunedParams() {
     S.flapShutGain = 1.0;
     S.popChance = 0.5;
     S.drive = 0.32;
+    S.pipeLength = 1.1;             // the short race can (kawasakiH2TunedExhaust): a shorter pipe, a higher note
+    S.pipeResHz = 230.0;
     return P;
+}
+
+// the race exhaust: a full titanium 4-2-1 system with no exhaust valve. The headers are a size up
+// (41 mm instead of 38) and heat-blued; the stock route (under the engine, collector, link pipe) is
+// kept, but the big black-chrome silencer gives way to a short, steeper titanium race can with a
+// carbon end cap and a wide-open outlet.
+exhaustLayout kawasakiH2TunedExhaust(const engineModel &e) {
+    exhaustLayout L = kawasakiH2Exhaust(e);
+    const std::array<float, 4> BLUED{0.45f, 0.42f, 0.55f, 1.f}, TI{0.62f, 0.60f, 0.56f, 1.f},
+        CARBON{0.10f, 0.10f, 0.11f, 1.f};
+    // the stock layout ends with the silencer and its end cap; everything before them is the pipework
+    L.pipes.resize(L.pipes.size() - 2);
+    int link = static_cast<int>(L.pipes.size()) - 1;
+    for (pipeSpec &p : L.pipes) {
+        if (p.cyl >= 0) { p.r0 = 20.5f; p.r1 = 20.5f; p.rgba = BLUED; }  // headers
+        else p.rgba = TI;
+        p.rough = 0.25f; p.metal = 0.95f;
+    }
+    pipeSpec can;
+    can.pts = {{-250.f, 205.f, 140.f}, {-345.f, 135.f, 158.f}};
+    can.r0 = 46.f; can.r1 = 42.f;
+    can.from = {link};
+    can.rgba = TI; can.rough = 0.25f; can.metal = 0.95f;
+    can.capStart = can.capEnd = true;
+    L.pipes.push_back(can);
+    pipeSpec cap;
+    cap.pts = {{-340.f, 139.f, 158.f}, {-362.f, 123.f, 161.f}};
+    cap.r0 = 42.f; cap.r1 = 30.f;
+    cap.from = {static_cast<int>(L.pipes.size()) - 1};
+    cap.rgba = CARBON; cap.rough = 0.5f; cap.metal = 0.2f;
+    cap.capStart = true;
+    L.pipes.push_back(cap);
+    pipeSpec tip;
+    tip.pts = {{-360.f, 125.f, 161.f}, {-372.f, 116.f, 163.f}};
+    tip.r0 = 26.f; tip.r1 = 26.f;
+    tip.from = {static_cast<int>(L.pipes.size()) - 1};
+    tip.rgba = TI; tip.rough = 0.25f; tip.metal = 0.95f;
+    tip.capStart = true;
+    L.pipes.push_back(tip);
+    L.outlets = {{{-372.f, 116.f, 163.f}, {-12.f, -9.f, 2.f}, 26.f}};
+    L.flap.on = false;              // valve deleted
+    return L;
 }
 
 drivetrainParams kawasakiH2TunedDriveParams() {
@@ -243,6 +287,7 @@ const engineType &kawasakiH2TunedType() {
         t.engine = kawasakiH2TunedParams;
         t.drive = kawasakiH2TunedDriveParams;
         t.spec = kawasakiH2TunedSpec;
+        t.exhaust = kawasakiH2TunedExhaust;
         t.tuned = nullptr;
         return t;
     }();

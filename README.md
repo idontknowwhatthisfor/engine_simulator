@@ -144,7 +144,9 @@ gearing and limiter stay stock; the changes are estimates of a race kit, not a p
 - the exhaust opens 10° earlier, so it blows down in time at 14000 rpm;
 - a stiffer spring in the plenum relief valve: about +1.2 bar at the top instead of +1.0;
 - race fuel: less spark taken out for boost and for the hot charge;
-- an open exhaust (louder, ~3 dB, with more crackle), the exhaust valve always open;
+- its own race exhaust: a full titanium 4-2-1 with heat-blued headers a size up (41 mm), no
+  exhaust valve, and a short titanium can with a carbon end cap in place of the stock silencer.
+  It's louder (~3 dB), with more crackle and a higher, shorter-pipe note;
 - the full-throttle upshift moved to ~13800 rpm.
 
 | | Stock | Tuned (sim) |
