@@ -96,8 +96,14 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     while (sim.rpm() > 30.0 && sim.time - t0 < 20.0) run(0.001, none);
     check("coast down 8000 rpm -> stop, ignition off", sim.time - t0, 0.5, 6.0, "s");
 
-    // 7. full-throttle dyno sweep
-    std::printf("\n  WOT dyno sweep (speed locked)\n     rpm   torque Nm   power kW   power hp   BMEP bar   manifold kPa   peak cyl bar\n");
+    // 7. full-throttle dyno sweep. Boosted charge: measured as hot as it gets in a long pull, like the
+    // D chart (src/dyno.hpp): the charge cooler's heat soak (icTau, seconds) would otherwise leave the
+    // charge at the intake temperature for the short settle at each point, and the dyno's fan gives
+    // the cooler moving-air cooling. Restored after the sweep. Without a turbo tCharge stays at tIntake.
+    const double icTauWas = sim.P.turbo.icTau, icEffStillWas = sim.P.turbo.icEffStill;
+    sim.P.turbo.icTau = 0.02;
+    sim.P.turbo.icEffStill = sim.P.turbo.icEffMoving;
+    std::printf("\n  WOT dyno sweep (speed locked)\n     rpm   torque Nm   power kW   power hp   BMEP bar   manifold kPa   peak cyl bar   charge C\n");
     double peakT = 0.0, peakTRpm = 0.0, peakP = 0.0, peakPRpm = 0.0;
     for (double rr = 2000.0; rr <= S.sweepTo; rr += rr < 10000.0 ? 1000.0 : 500.0) {
         sim.reset(0.0);
@@ -117,10 +123,13 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
         });
         double t = sum / n, kw = t * sim.omega / 1000.0;
         double bmep = t * 2.0 * TWO_PI / sim.vDispTotal / 1e5;
-        std::printf("    %5.0f   %8.1f   %8.1f   %8.1f   %8.2f   %12.1f   %12.1f\n", rr, t, kw, kw * 1.341, bmep, sim.pMan / 1000.0, pk / 1e5);
+        std::printf("    %5.0f   %8.1f   %8.1f   %8.1f   %8.2f   %12.1f   %12.1f   %8.0f\n", rr, t, kw, kw * 1.341, bmep, sim.pMan / 1000.0, pk / 1e5,
+                    sim.tCharge - 273.15);
         if (t > peakT) { peakT = t; peakTRpm = rr; }
         if (kw > peakP) { peakP = kw; peakPRpm = rr; }
     }
+    sim.P.turbo.icTau = icTauWas;
+    sim.P.turbo.icEffStill = icEffStillWas;
     std::printf("\n");
     check(S.torqueWhat, peakT, S.torqueLo, S.torqueHi, "N m");
     check(S.torqueRpmWhat, peakTRpm, S.torqueRpmLo, S.torqueRpmHi, "rpm");
