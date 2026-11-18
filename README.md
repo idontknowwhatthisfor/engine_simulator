@@ -199,7 +199,7 @@ calibrated so that the published torque and power come out of the physics.
 | F | Blow-off valve on/off (`--turbo yes`) |
 | `[` / `]` | Slow motion / back toward real time (×1 … ×0.01) |
 | `,` / `.` | When paused: step the crank by 1° |
-| G / B / M / D / X | See-through block / motion blur / mute / p-V diagram / shake view (×1, ×20, ×100) |
+| G / B / M / D / X | See-through block / motion blur / mute / full-throttle dyno chart / shake view (×1, ×20, ×100) |
 | P / R / Esc | Pause / reset / quit |
 
 ## Command-line options

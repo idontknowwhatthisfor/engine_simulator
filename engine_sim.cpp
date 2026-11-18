@@ -15,6 +15,7 @@
 #include "src/test_bike.hpp"
 #include "src/bike_gearbox.hpp"
 #include "src/turbo.hpp"
+#include "src/dyno.hpp"
 
 // ---------------------------------------------------------------------------------------------
 // command line, for scripted test runs
@@ -154,6 +155,10 @@ int main(int argc, char **argv) {
     engineSim sim;
     setupSim(sim, eng, type, THETA0, type.bike && opt.engineOnly, opt.turbo);
     sim.P.turbo.bov = opt.bov;
+    // the full-throttle dyno curve (D), measured in the background on a copy of the engine
+    dynoSweep dyno;
+    dyno.start(sim);
+    if (!opt.screenshot.empty() && dyno.worker.joinable()) dyno.worker.join();  // scripted shots show the whole curve
     double latchedThrottle = opt.throttle;
     sim.drive.wheelieControl = opt.wheelie;
     sim.drive.grade = opt.grade / 100.0;
@@ -281,7 +286,7 @@ int main(int argc, char **argv) {
         audio = std::make_unique<engineAudio>();
         audio->play();
     }
-    bool showPV = true;
+    bool showDyno = true;
     const float SHAKE_VIEWS[] = {1.f, 20.f, 100.f};
     int shakeIdx = 0;
 
@@ -307,15 +312,15 @@ int main(int argc, char **argv) {
     sf::Text text(font, textStr, 16);
     sf::Text help(font, type.bike && opt.engineOnly
                             ? "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  I: ignition\n"
-                              "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: p-V  X: shake  P: pause  R: reset"
+                              "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset"
                             : type.bike
                             ? "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  S: brake  I: ignition\n"
                               "T: auto/manual  Z: sport  E/Q: shift  N: neutral  C: clutch  V: wheelie ctrl  H/J: hill  L: passenger\n"
-                              "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: p-V  X: shake  P: pause  R: reset"
+                              "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset"
                                : "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  S: brake  I: ignition\n"
                                  "T: auto/manual  Z: sport  E/Q: shift up/down (Q at a stop: R)  C: clutch  H/J: hill up/down  L: cargo" +
                                  std::string(opt.turbo ? "  F: BOV" : "") + "\n"
-                                 "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: p-V  X: shake  P: pause  R: reset", 14);
+                                 "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset", 14);
     help.setFillColor(sf::Color(150, 150, 160));
     sf::Text credit(font, std::string(type.credit) + (showTurbo ? "\nturbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0" : ""), 12);
     credit.setFillColor(sf::Color(110, 110, 120));
@@ -380,7 +385,7 @@ int main(int argc, char **argv) {
                     sim.drive.messageTime = sim.time;
                 }
                 if (e->code == K::M && audio) audio->muted = !audio->muted.load();
-                if (e->code == K::D) showPV = !showPV;
+                if (e->code == K::D) showDyno = !showDyno;
                 if (e->code == K::X) shakeIdx = (shakeIdx + 1) % 3;
                 if (e->code == K::P) paused = !paused;
                 if (e->code == K::R) {
@@ -651,12 +656,12 @@ int main(int argc, char **argv) {
         if (!sim.drive.message.empty() && age < 2.5 * TIME_SCALES[scaleIdx]) {
             sf::Text msg(font, sim.drive.message, 20);
             msg.setFillColor(sf::Color(240, 210, 80));
-            msg.setPosition({14.f, barY + 52.f});  // under the bars, clear of the stats and the p-V panel
+            msg.setPosition({14.f, barY + 52.f});  // under the bars, clear of the stats and the dyno panel
             window.draw(msg);
         }
 
-        // cylinder 1 p-V diagram over the last cycle, coloured by stroke
-        if (showPV) {
+        // full-throttle dyno chart: torque and power against rpm, with where the engine is right now
+        if (showDyno) {
             const float PW = 330.f, PH = 230.f;
             const float px = float(winSize.x) - PW - 12.f, py = float(winSize.y) - PH - 78.f;
             sf::RectangleShape panel({PW, PH});
@@ -666,70 +671,96 @@ int main(int argc, char **argv) {
             panel.setOutlineThickness(1.f);
             window.draw(panel);
 
-            float vMin = 1e9f, vMax = -1e9f, pMax = 2e5f;
-            for (int d = 0; d < 720; d++) {
-                vMin = std::min(vMin, sim.pvV[d]);
-                vMax = std::max(vMax, sim.pvV[d]);
-                pMax = std::max(pMax, sim.pvP[d] * 1.08f);
+            const sf::Color TQ_COL(245, 150, 60), KW_COL(80, 200, 120), AXIS(90, 95, 115), GRID(45, 50, 62),
+                LABEL(150, 150, 160);
+            const int n = dyno.done.load(std::memory_order_acquire);
+            const float rMin = dyno.rpm.front(), rMax = dyno.rpm.back();
+            float tMax = 10.f, kMax = 10.f, peakT = 0.f, peakTRpm = 0.f, peakK = 0.f, peakKRpm = 0.f;
+            for (int k = 0; k < n; k++) {
+                if (dyno.torque[k] > peakT) { peakT = dyno.torque[k]; peakTRpm = dyno.rpm[k]; }
+                if (dyno.kw[k] > peakK) { peakK = dyno.kw[k]; peakKRpm = dyno.rpm[k]; }
             }
-            const float L = px + 46.f, R = px + PW - 12.f, T = py + 30.f, B = py + PH - 26.f;
-            auto toScreen = [&](float v, float pr) {
-                return sf::Vector2f{L + (v - vMin) / (vMax - vMin) * (R - L), B - pr / pMax * (B - T)};
+            // round the scales up to a tidy number so the gridlines land on round values
+            auto nice = [](float v) {
+                float m = std::pow(10.f, std::floor(std::log10(v)));
+                for (float f : {1.f, 2.f, 2.5f, 5.f, 10.f})
+                    if (f * m >= v) return f * m;
+                return 10.f * m;
             };
-            // axes, 1 bar reference line
-            sf::Vertex axes[] = {{{L, T}, sf::Color(90, 95, 115)}, {{L, B}, sf::Color(90, 95, 115)},
-                                 {{L, B}, sf::Color(90, 95, 115)}, {{R, B}, sf::Color(90, 95, 115)},
-                                 {toScreen(vMin, 1e5f), sf::Color(55, 60, 75)}, {toScreen(vMax, 1e5f), sf::Color(55, 60, 75)}};
-            window.draw(axes, 6, sf::PrimitiveType::Lines);
+            tMax = nice(std::max(tMax, peakT * 1.1f));
+            kMax = nice(std::max(kMax, peakK * 1.1f));
 
-            const sf::Color STROKE_COL[] = {sf::Color(80, 140, 240), sf::Color(80, 200, 120),
-                                            sf::Color(245, 150, 60), sf::Color(150, 150, 160)};
-            sf::VertexArray loop(sf::PrimitiveType::LineStrip);
-            double work = 0.0;
-            for (int d = 0; d <= 720; d++) {
-                int j = d % 720, k = (d + 1) % 720;
-                // degrees not yet reached this cycle still hold the previous cycle: draw them dim
-                sf::Color col = STROKE_COL[j / 180];
-                if (j > sim.pvLast) col.a = 70;
-                loop.append({toScreen(sim.pvV[j], sim.pvP[j]), col});
-                if (d < 720) work += 0.5 * (double(sim.pvP[j]) + sim.pvP[k]) * (double(sim.pvV[k]) - sim.pvV[j]);
+            const float L = px + 40.f, R = px + PW - 40.f, T = py + 40.f, B = py + PH - 26.f;
+            auto xOf = [&](float r) { return L + (r - rMin) / (rMax - rMin) * (R - L); };
+            auto yOf = [&](float v, float vMax) { return B - std::clamp(v / vMax, -0.05f, 1.02f) * (B - T); };
+            auto label = [&](const std::string &s, float x, float y, sf::Color c, bool right = false) {
+                sf::Text t(font, s, 11);
+                t.setFillColor(c);
+                t.setPosition({right ? x - t.getLocalBounds().size.x : x, y});
+                window.draw(t);
+            };
+
+            // grid: every 1000 rpm (2000 on a high-revving engine), quarters of the vertical scales
+            sf::VertexArray grid(sf::PrimitiveType::Lines);
+            float rStep = rMax > 9000.f ? 2000.f : 1000.f;
+            for (float r = std::ceil(rMin / rStep) * rStep; r <= rMax + 1.f; r += rStep) {
+                grid.append({{xOf(r), T}, GRID});
+                grid.append({{xOf(r), B}, GRID});
+                label(numToStr(r / 1000.f, 0) + "k", xOf(r) - 6.f, B + 4.f, LABEL);
             }
-            window.draw(loop);
-            // where cylinder 1 is right now
-            sf::CircleShape dot(4.f);
-            dot.setOrigin({4.f, 4.f});
-            dot.setPosition(toScreen(static_cast<float>(sim.volume(sim.cyl[0], sim.phase(0))), static_cast<float>(sim.cyl[0].p)));
-            dot.setFillColor(sf::Color::White);
-            window.draw(dot);
+            for (int q = 1; q <= 4; q++) {
+                float y = B - q / 4.f * (B - T);
+                grid.append({{L, y}, GRID});
+                grid.append({{R, y}, GRID});
+            }
+            window.draw(grid);
+            sf::Vertex axes[] = {{{L, T}, AXIS}, {{L, B}, AXIS}, {{L, B}, AXIS}, {{R, B}, AXIS}, {{R, B}, AXIS}, {{R, T}, AXIS}};
+            window.draw(axes, 6, sf::PrimitiveType::Lines);
+            label(numToStr(tMax, 0), L - 4.f, T - 7.f, TQ_COL, true);
+            label("N m", L - 4.f, B - 14.f, TQ_COL, true);
+            label(numToStr(kMax, 0), R + 4.f, T - 7.f, KW_COL);
+            label("kW", R + 4.f, B - 14.f, KW_COL);
 
-            double imep = work / sim.cyl[0].vDisp / 1e5;
-            sf::Text title(font, "cylinder 1  p-V      IMEP " + numToStr(static_cast<float>(imep), 1) + " bar", 13);
+            // the curves (thickened by drawing each twice, a pixel apart)
+            for (float off : {0.f, 1.f}) {
+                sf::VertexArray tq(sf::PrimitiveType::LineStrip), pw(sf::PrimitiveType::LineStrip);
+                for (int k = 0; k < n; k++) {
+                    tq.append({{xOf(dyno.rpm[k]), yOf(dyno.torque[k], tMax) + off}, TQ_COL});
+                    pw.append({{xOf(dyno.rpm[k]), yOf(dyno.kw[k], kMax) + off}, KW_COL});
+                }
+                window.draw(tq);
+                window.draw(pw);
+            }
+
+            // where the engine is right now: a cursor at its rpm, dots at its smoothed torque and power
+            float rNow = static_cast<float>(sim.rpm());
+            if (rNow > rMin * 0.5f) {
+                float x = std::clamp(xOf(rNow), L, R);
+                sf::Vertex cursor[] = {{{x, T}, sf::Color(200, 200, 210, 90)}, {{x, B}, sf::Color(200, 200, 210, 90)}};
+                window.draw(cursor, 2, sf::PrimitiveType::Lines);
+                float tNow = static_cast<float>(sim.brakeAvg), kNow = static_cast<float>(sim.brakeAvg * sim.omega / 1000.0);
+                for (auto [v, vMax, col] : {std::tuple{tNow, tMax, TQ_COL}, std::tuple{kNow, kMax, KW_COL}}) {
+                    sf::CircleShape dot(4.f);
+                    dot.setOrigin({4.f, 4.f});
+                    dot.setPosition({x, yOf(v, vMax)});
+                    dot.setFillColor(col);
+                    dot.setOutlineColor(sf::Color::White);
+                    dot.setOutlineThickness(1.f);
+                    window.draw(dot);
+                }
+            }
+
+            sf::Text title(font, "WOT dyno", 13);
             title.setPosition({px + 10.f, py + 6.f});
             title.setFillColor(sf::Color(200, 200, 210));
             window.draw(title);
-            sf::Text pLabel(font, numToStr(pMax / 1e5f, 0) + " bar", 11);
-            pLabel.setPosition({px + 6.f, T - 6.f});
-            pLabel.setFillColor(sf::Color(150, 150, 160));
-            window.draw(pLabel);
-            // legend: volume axis, stroke colours, and what the dim part means
-            const char *NAMES[] = {"intake", "comp", "power", "exhaust"};
-            float lx = px + 10.f;
-            sf::Text vLabel(font, "V", 11);
-            vLabel.setPosition({lx, B + 6.f});
-            vLabel.setFillColor(sf::Color(150, 150, 160));
-            window.draw(vLabel);
-            lx += 22.f;
-            for (int k = 0; k < 4; k++) {
-                sf::Text t(font, NAMES[k], 11);
-                t.setPosition({lx, B + 6.f});
-                t.setFillColor(STROKE_COL[k]);
-                window.draw(t);
-                lx += t.getLocalBounds().size.x + 10.f;
+            if (n < static_cast<int>(dyno.rpm.size()))
+                label("measuring " + numToStr(dyno.rpm[n], 0) + " rpm...", px + PW - 10.f, py + 8.f, LABEL, true);
+            else {
+                label(numToStr(peakT, 0) + " N m @ " + numToStr(peakTRpm, 0), px + PW - 10.f, py + 2.f, TQ_COL, true);
+                label(numToStr(peakK, 0) + " kW (" + numToStr(peakK * 1.341f, 0) + " hp) @ " + numToStr(peakKRpm, 0),
+                      px + PW - 10.f, py + 15.f, KW_COL, true);
             }
-            sf::Text dimLabel(font, "dim: last cycle", 11);
-            dimLabel.setPosition({lx + 4.f, B + 6.f});
-            dimLabel.setFillColor(sf::Color(110, 110, 120));
-            window.draw(dimLabel);
         }
         }
         if (opt.hud) {
