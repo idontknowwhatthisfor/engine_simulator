@@ -68,8 +68,20 @@ struct soundParams {
 //   - blow-off valve: a diaphragm valve on the charge pipe, opened by manifold vacuum, that vents
 //     the boost when the throttle shuts so the compressor does not surge
 // The ECU works the wastegate to hold the boost the pedal asks for.
+// supercharger = true (Kawasaki H2): the same compressor, charge pipes and bypass valve, but the shaft
+// is geared to the crank (driveRatio) instead of driven by a turbine: no exhaust manifold, turbine or
+// wastegate, the boost follows the revs, and the crank pays for the compressor's power (through a
+// gear train of efficiency driveEff). ramGain: share of the dynamic pressure of the oncoming air a
+// ram-air intake recovers at the compressor inlet.
 struct turboParams {
     bool on = false;
+    bool supercharger = false;
+    double driveRatio = 9.2;        // impeller rpm per crank rpm (supercharger)
+    double driveEff = 0.95;         // gear train
+    double ramGain = 0.0;
+    // plenum relief valve (supercharger): a spring valve that vents the charge above reliefP (Pa,
+    // absolute; 0 = none), fully open reliefSpan higher. With no wastegate it is what caps the boost
+    double reliefP = 0.0, reliefSpan = 10e3, reliefArea = 6.0e-4;
     bool bov = true;                // blow-off valve fitted (F toggles it, --bov no takes it off)
     double inertia = 2.0e-5;        // kg m^2, shaft + both wheels
     double maxRpm = 175000.0;       // overspeed: the shaft is held here
@@ -621,6 +633,9 @@ struct engineSim {
     double wastegate = 0.0;     // 0 shut .. 1 open
     double wgInt = 0.0;         // wastegate PI integral
     double turbinePower = 0.0, compressorPower = 0.0;  // W
+    double chargerTorque = 0.0; // N m the crank spends driving the supercharger (P.turbo.supercharger)
+    double pInlet = 101325.0;   // Pa, compressor inlet (above atmospheric with ram air)
+    double reliefOpen = 0.0, reliefFlow = 0.0;  // plenum relief valve 0..1, kg/s vented
     double turboRpm() const { return turboOmega * 60.0 / (2.0 * 3.14159265358979323846); }
     double boostBar() const { return (pMan - P.pAtm) / 1e5; }
 
@@ -667,7 +682,9 @@ struct engineSim {
         pBoost = pCharge = P.pAtm;
         compFlow = airFlowFilt = bovOpen = bovFlow = surge = 0.0;
         tComp = tCharge = P.tIntake;
-        turboOmega = wastegate = wgInt = turbinePower = compressorPower = 0.0;
+        turboOmega = wastegate = wgInt = turbinePower = compressorPower = chargerTorque = 0.0;
+        pInlet = P.pAtm;
+        reliefOpen = reliefFlow = 0.0;
         idleArea = P.idleBase;
         idleInt = 0.0;
         rpmFilt = 0.0;
@@ -907,6 +924,7 @@ struct engineSim {
         }
         double fmep = P.fmepA + P.fmepB * std::fabs(r) / 1000.0 + P.fmepC * r * r / 1e6;
         frictionTorque = fmep * vDispTotal / (4.0 * 3.14159265358979323846) * std::tanh(omega / 1.0);
+        frictionTorque += chargerTorque;  // the supercharger's drive is a parasitic load like friction
         starterTorque = starter ? P.starterTorque * std::clamp(1.0 - r / P.starterMaxRpm, 0.0, 1.0) : 0.0;
         loadTorque = standalone ? 0.0 : drive.clutchTorqueFor(omega, inertia, dt);  // what the clutch takes from the crank
 
@@ -1023,24 +1041,36 @@ struct engineSim {
         double mExh = mCyl * (burning ? 1.0 + 1.0 / P.afr : 1.0);
         double load = std::clamp((pMan - 30e3) / (T.boostMap - 30e3), 0.0, 1.0);
         double tExh = burning ? T.tExhLight + (T.tExhFull - T.tExhLight) * load : 450.0;
-        // exhaust manifold: gas in from the cylinders, out through the turbine and the wastegate
-        double aT = T.turbineArea, aW = T.wastegateArea * wastegate;
-        double mOut = (aT + aW) * pExh / std::sqrt(R_EX * tExh) * flowFunction(P.pAtm / pExh);
-        pExh = std::clamp(pExh + R_EX * tExh / T.vExhaust * (mExh - mOut) * dt, P.pAtm, 4.0e5);
-        double mTurb = mOut * aT / (aT + aW);
+        double mTurb = 0.0;
+        if (!T.supercharger) {
+            // exhaust manifold: gas in from the cylinders, out through the turbine and the wastegate
+            double aT = T.turbineArea, aW = T.wastegateArea * wastegate;
+            double mOut = (aT + aW) * pExh / std::sqrt(R_EX * tExh) * flowFunction(P.pAtm / pExh);
+            pExh = std::clamp(pExh + R_EX * tExh / T.vExhaust * (mExh - mOut) * dt, P.pAtm, 4.0e5);
+            mTurb = mOut * aT / (aT + aW);
+        } else {
+            turboOmega = std::fabs(omega) * T.driveRatio;  // geared to the crank
+        }
+        // ram air: the oncoming air is slowed in the intake duct and raises the inlet pressure
+        double vAir = std::fabs(drive.v);
+        pInlet = P.pAtm + T.ramGain * 0.5 * 1.2 * vAir * vAir;
+        double inScale = pInlet / P.pAtm;
 
         // compressor duct (the air column accelerates on the pressure difference), then the charge
         // pipes fill with the new flow (semi-implicit, so the duct-plenum ringing stays bounded)
-        compFlow += (P.pAtm + compressorRise(turboOmega, compFlow) - pCharge) / T.ductLA * dt;
+        compFlow += (pInlet + inScale * compressorRise(turboOmega, compFlow) - pCharge) / T.ductLA * dt;
         compFlow = std::clamp(compFlow, -0.3, 0.6);
-        double pr = std::max(1.0, pCharge / P.pAtm);
+        double pr = std::max(1.0, pCharge / pInlet);
         tComp = P.tIntake * (1.0 + (std::pow(pr, K) - 1.0) / T.etaC);
         // blow-off valve: its diaphragm sees the charge pressure against the manifold's
         double bovWant = T.bov ? std::clamp((pCharge - pMan - T.bovCrack) / T.bovSpan, 0.0, 1.0) : 0.0;
         bovOpen += (bovWant - bovOpen) * std::min(1.0, dt / (bovWant > bovOpen ? 0.015 : 0.06));
         bovFlow = pCharge > P.pAtm ? 0.8 * T.bovArea * bovOpen * pCharge / std::sqrt(P.rGas * tComp) * flowFunction(P.pAtm / pCharge) : 0.0;
+        double reliefWant = T.reliefP > 0.0 ? std::clamp((pCharge - T.reliefP) / T.reliefSpan, 0.0, 1.0) : 0.0;
+        reliefOpen += (reliefWant - reliefOpen) * std::min(1.0, dt / 0.01);
+        reliefFlow = pCharge > P.pAtm ? 0.8 * T.reliefArea * reliefOpen * pCharge / std::sqrt(P.rGas * tComp) * flowFunction(P.pAtm / pCharge) : 0.0;
         airFlowFilt += (mAir - airFlowFilt) * std::min(1.0, dt / 0.005);
-        pCharge += 1.4 * P.rGas * tComp / T.vCharge * (compFlow - airFlowFilt - bovFlow) * dt;
+        pCharge += 1.4 * P.rGas * tComp / T.vCharge * (compFlow - airFlowFilt - bovFlow - reliefFlow) * dt;
         pCharge = std::clamp(pCharge, 0.5 * P.pAtm, 4.0e5);
         // the throttle sees the charge less the drop across the intercooler core
         pBoost = std::max(0.3 * P.pAtm, pCharge - T.icDrop * airFlowFilt * airFlowFilt);
@@ -1058,6 +1088,11 @@ struct engineSim {
         // and the bearings'
         turbinePower = T.etaT * mTurb * CP_EX * tExh * (1.0 - std::pow(P.pAtm / pExh, (G_EX - 1.0) / G_EX));
         compressorPower = std::fabs(compFlow) * CP * P.tIntake * (std::pow(pr, K) - 1.0) / T.etaC;
+        if (T.supercharger) {
+            // the crank pays for it (next step's friction); no turbine, no wastegate
+            chargerTorque = compressorPower / T.driveEff / std::max(std::fabs(omega), 50.0) * (omega >= 0.0 ? 1.0 : -1.0);
+            return;
+        }
         double net = turbinePower - compressorPower - T.bearingLoss * turboOmega * turboOmega;
         turboOmega += net / (T.inertia * std::max(turboOmega, 200.0)) * dt;
         turboOmega = std::clamp(turboOmega, 0.0, T.maxRpm / 60.0 * 2.0 * 3.14159265358979323846);

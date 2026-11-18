@@ -18,6 +18,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     env("VE_BASE", sim.P.veBase); env("VE_PEAK", sim.P.vePeak); env("VE_RPM", sim.P.veRpm); env("VE_WIDTH", sim.P.veWidth);
     env("FMEP_A", sim.P.fmepA); env("FMEP_B", sim.P.fmepB); env("FMEP_C", sim.P.fmepC);
     env("RESID", sim.P.residualMin); env("ETA", sim.P.etaHeat); env("STARTER", sim.P.starterTorque);
+    env("SC_PR", sim.P.turbo.prRef); env("SC_FLOW", sim.P.turbo.flowPeakRef); env("SC_CHOKE", sim.P.turbo.chokeFall); env("SC_RELIEF", sim.P.turbo.reliefP); env("INERTIA", sim.P.inertia);  // supercharger
     env("IDLE_BASE", sim.P.idleBase); env("IDLE_SPARK", sim.P.idleSparkBase); env("IDLE_MIN", sim.P.idleMin);
     auto run = [&](double seconds, auto &&each) {
         int n = static_cast<int>(seconds / PHYS_DT);
