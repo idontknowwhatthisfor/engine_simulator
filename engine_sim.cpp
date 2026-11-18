@@ -17,6 +17,7 @@
 #include "src/bike_gearbox.hpp"
 #include "src/turbo.hpp"
 #include "src/dyno.hpp"
+#include "src/dump_params.hpp"
 
 // ---------------------------------------------------------------------------------------------
 // command line, for scripted test runs
@@ -45,6 +46,7 @@ struct options {
     bool tuned = false;      // --tuned yes: the engine's tuned version (h2)
     std::string wav;         // --wav out.wav: render a scripted run to a file and quit
     bool selftest = false, phystest = false;
+    bool dumpParams = false; // --dump-params (hidden): print every parameter and quit (scripts/regress.sh)
     std::string cmpA, cmpB;
 };
 
@@ -100,6 +102,7 @@ options parseArgs(int argc, char **argv) {
         else if (a == "--wav") o.wav = next();
         else if (a == "--selftest") o.selftest = true;
         else if (a == "--phystest") o.phystest = true;
+        else if (a == "--dump-params") o.dumpParams = true;
         else if (a == "--compare") {
             o.cmpA = next();
             o.cmpB = next();
@@ -162,6 +165,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s (run: %s, or make)\n", ex.what(), type.buildHint);
         return 1;
     }
+    if (opt.dumpParams) return dumpParams(eng, type, opt.turbo, opt.bov);
     if (opt.selftest) return selfTest(eng, type.name);
     if (opt.phystest) return opt.turbo ? type.physTestTurbo(eng, type) : type.physTest(eng, type);
     if (!opt.wav.empty()) return renderWav(eng, type, opt.wav, opt.turbo, opt.bov);
