@@ -1,0 +1,31 @@
+// calibration overrides: environment variables that replace engine parameters while you calibrate an
+// engine, for any engine type. Read by every --phystest and by --wav (not by the interactive window).
+// Unset variables leave the parameter alone, so without them nothing changes.
+#pragma once
+#include "physics.hpp"
+
+void applyCalibrationEnv(engineParams &P) {
+    auto env = [](const char *name, double &v) {
+        if (const char *s = std::getenv(name)) v = std::atof(s);
+    };
+    // breathing: the main VE curve, and the low-cam lobe (BMW ShiftCam)
+    env("VE_BASE", P.veBase); env("VE_PEAK", P.vePeak); env("VE_RPM", P.veRpm); env("VE_WIDTH", P.veWidth);
+    env("VEL_BASE", P.veLowBase); env("VEL_PEAK", P.veLowPeak); env("VEL_RPM", P.veLowRpm); env("VEL_WIDTH", P.veLowWidth);
+    // friction, combustion, crank, starter
+    env("FMEP_A", P.fmepA); env("FMEP_B", P.fmepB); env("FMEP_C", P.fmepC);
+    env("RESID", P.residualMin); env("ETA", P.etaHeat); env("INERTIA", P.inertia); env("STARTER", P.starterTorque);
+    // idle control
+    env("IDLE_KP", P.idleKp); env("IDLE_KI", P.idleKi); env("IDLE_SG", P.idleSparkGain);
+    env("IDLE_BASE", P.idleBase); env("IDLE_SPARK", P.idleSparkBase); env("IDLE_MIN", P.idleMin);
+    // supercharger / turbo compressor map and relief valve
+    env("SC_PR", P.turbo.prRef); env("SC_FLOW", P.turbo.flowPeakRef); env("SC_CHOKE", P.turbo.chokeFall);
+    env("SC_RELIEF", P.turbo.reliefP);
+    // sound (heard in --wav)
+    soundParams &S = P.sound;
+    env("SND_LOW", S.pipeLowHz); env("SND_OPEN", S.flapOpenHz); env("SND_DRIVE", S.drive);
+    env("SND_REFLECT", S.pipeReflect); env("SND_DAMP", S.pipeDampHz); env("SND_LEN", S.pipeLength);
+    env("SND_INTAKE", S.intakeGain); env("SND_RES", S.pipeResGain); env("SND_RAD", S.radiateHz);
+    env("SND_BURBLE", S.burble); env("SND_BFROM", S.burbleFadeFrom); env("SND_BSPAN", S.burbleFadeSpan);
+    env("SND_BHIGH", S.burbleHigh); env("SND_TICK", S.tick); env("SND_WHINE", S.whineGain);
+    env("SND_POP", S.popChance); env("SND_TURBO", S.turboGain);
+}

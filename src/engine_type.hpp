@@ -22,6 +22,37 @@ struct bikeSpec {
     double topLo, topHi;
     double neutralSettle;                  // s for the revs to fall back to idle after N at speed
     double takeoffMinRpm = 900.0;          // lowest rpm in the gentle (25%) manual take-off
+
+    // The rest have defaults for a 1000 cc superbike (idle ~1250 rpm, limiter ~14000+, 6 gears): an
+    // engine that idles, revs or launches differently sets its own.
+    // on the stand
+    double crankLo = 200.0, crankHi = 500.0;           // cranking speed with the ignition off, mean rpm
+    double catchRpm = 800.0;                           // it has caught once the starter gets it past this
+    double flareLo = 1300.0, flareHi = 3500.0;         // start flare, peak rpm
+    double idleLo = 1150.0, idleHi = 1350.0;           // idle speed, mean rpm
+    double idleMapLo = 25.0, idleMapHi = 60.0;         // idle manifold pressure, kPa
+    double toLimiterLo = 0.25, toLimiterHi = 1.5;      // s from idle to the limiter, full throttle in neutral
+    double closedLo = 1100.0, closedHi = 1500.0;       // rpm 4 s after snapping the throttle shut
+    double coastFromRpm = 8000.0;                      // coast-down (ignition off) starts here
+    double shakeRpm = 10000.0;                         // the balance check runs at this locked speed
+    double shakeMax1st = 0.0;                          // N, most 1st-order vertical force there; 0: 5% of
+                                                       // half the pistons moving together without counterweights
+    double firingRpm = 3000.0;                         // the firing-interval check runs at this locked speed
+    // on the bike
+    double idleGearLo = 1100.0, idleGearHi = 1450.0;   // idling in 1st (automatic), rpm
+    const char *zeroTo100What = "0-100 km/h, full throttle (tests ~3.0-3.4 s)";
+    double zeroTo100Lo = 2.6, zeroTo100Hi = 3.7;       // s
+    const char *zeroTo200What = "0-200 km/h (road tests ~5.5-7 s)";
+    double zeroTo200Lo = 5.0, zeroTo200Hi = 8.0;       // s
+    double launchAccelLo = 0.8, launchAccelHi = 1.15;  // peak smoothed acceleration with wheelie control, g
+    double shiftRpm = 11000.0;                         // manual tests: quickshift up at this rpm (70-80% pedal)
+    double shiftRpmGentle = 10000.0;                   // ... and at this one (50% pedal, up to 4th)
+                                                       // (both must be below the rev limiter)
+    bool stallsOnClutchDump = true;                    // dumping the clutch in 1st at idle stalls it (a light
+                                                       // crank); false: it must pull away without a lurch
+    double neutralRevMin = 8000.0;                     // revving in N at 40% pedal reaches at least this
+    double neutralIdleLo = 1000.0, neutralIdleHi = 2200.0;  // rpm after coasting in N from speed
+    double rejoinLo = 3000.0, rejoinHi = 14000.0;      // rpm once N picks a gear again at speed
 };
 
 // one step of a scripted ride for --wav (bikes): hold these controls until `until` seconds

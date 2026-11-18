@@ -9,17 +9,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     engineSim sim;
     setupSim(sim, e, type, e.cyls[0].theta0, true);  // engine checks on the stand; the bike comes after
     const double REV_LIMIT = sim.P.revLimit;
-    if (const char *v = std::getenv("IDLE_KP")) sim.P.idleKp = std::atof(v);
-    if (const char *v = std::getenv("IDLE_KI")) sim.P.idleKi = std::atof(v);
-    if (const char *v = std::getenv("IDLE_SG")) sim.P.idleSparkGain = std::atof(v);
-    // calibration hooks
-    auto env = [](const char *name, double &v) { if (const char *s = std::getenv(name)) v = std::atof(s); };
-    env("VEL_BASE", sim.P.veLowBase); env("VEL_PEAK", sim.P.veLowPeak); env("VEL_RPM", sim.P.veLowRpm); env("VEL_WIDTH", sim.P.veLowWidth);
-    env("VE_BASE", sim.P.veBase); env("VE_PEAK", sim.P.vePeak); env("VE_RPM", sim.P.veRpm); env("VE_WIDTH", sim.P.veWidth);
-    env("FMEP_A", sim.P.fmepA); env("FMEP_B", sim.P.fmepB); env("FMEP_C", sim.P.fmepC);
-    env("RESID", sim.P.residualMin); env("ETA", sim.P.etaHeat); env("STARTER", sim.P.starterTorque);
-    env("SC_PR", sim.P.turbo.prRef); env("SC_FLOW", sim.P.turbo.flowPeakRef); env("SC_CHOKE", sim.P.turbo.chokeFall); env("SC_RELIEF", sim.P.turbo.reliefP); env("INERTIA", sim.P.inertia);  // supercharger
-    env("IDLE_BASE", sim.P.idleBase); env("IDLE_SPARK", sim.P.idleSparkBase); env("IDLE_MIN", sim.P.idleMin);
+    applyCalibrationEnv(sim.P);
     auto run = [&](double seconds, auto &&each) {
         int n = static_cast<int>(seconds / PHYS_DT);
         for (int k = 0; k < n; k++) {
@@ -36,6 +26,13 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     };
     const double TWO_PI = 2.0 * 3.14159265358979323846;
     std::printf("%s physics test (dt = 1/%.0f s), displacement %.0f cc\n", S.name, 1.0 / PHYS_DT, sim.vDispTotal * 1e6);
+    // the manual tests wait for these: one at or above the limiter would never come
+    for (auto [what, rpm] : {std::pair{"shiftRpm", S.shiftRpm}, std::pair{"shiftRpmGentle", S.shiftRpmGentle}})
+        if (rpm >= REV_LIMIT) {
+            std::printf("FAIL: bikeSpec::%s (%.0f rpm) is not below the rev limiter (%.0f rpm): the test would never reach it\n",
+                        what, rpm, REV_LIMIT);
+            return 1;
+        }
     check("displacement", sim.vDispTotal * 1e6, S.dispLo, S.dispHi, "cc");
 
     // 1. cranking with the ignition off
@@ -45,18 +42,18 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     double cMin = 1e9, cMax = -1e9, cSum = 0.0;
     int cN = 0;
     run(1.0, [&] { cMin = std::min(cMin, sim.rpm()); cMax = std::max(cMax, sim.rpm()); cSum += sim.rpm(); cN++; });
-    check("cranking speed, mean", cSum / cN, 200, 500, "rpm");
+    check("cranking speed, mean", cSum / cN, S.crankLo, S.crankHi, "rpm");
     check("cranking ripple (max - min)", cMax - cMin, 30, 600, "rpm");
 
     // 2. start
     sim.ignition = true;
     double tStart = sim.time;
-    while (sim.rpm() < 800.0 && sim.time - tStart < 3.0) run(0.001, none);
+    while (sim.rpm() < S.catchRpm && sim.time - tStart < 3.0) run(0.001, none);
     check("time to catch with the starter", sim.time - tStart, 0.0, 1.0, "s");
     sim.starter = false;
     double flare = 0.0;
     run(1.5, [&] { flare = std::max(flare, sim.rpm()); });
-    check("start flare (peak rpm)", flare, 1300, 3500, "rpm");
+    check("start flare (peak rpm)", flare, S.flareLo, S.flareHi, "rpm");
 
     // 3. idle
     if (std::getenv("PHYS_TRACE")) {
@@ -71,15 +68,15 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     double iMin = 1e9, iMax = -1e9, iSum = 0.0;
     int iN = 0;
     run(2.0, [&] { iMin = std::min(iMin, sim.rpm()); iMax = std::max(iMax, sim.rpm()); iSum += sim.rpm(); iN++; });
-    check("idle speed, mean", iSum / iN, 1150, 1350, "rpm");
+    check("idle speed, mean", iSum / iN, S.idleLo, S.idleHi, "rpm");
     check("idle ripple (max - min)", iMax - iMin, 5, 300, "rpm");
-    check("idle manifold pressure", sim.pMan / 1000.0, 25, 60, "kPa");
+    check("idle manifold pressure", sim.pMan / 1000.0, S.idleMapLo, S.idleMapHi, "kPa");
 
     // 4. full throttle in neutral: a light crank flies to the limiter
     sim.pedalTarget = 1.0;
     double t0 = sim.time;
     while (sim.rpm() < sim.P.revLimit && sim.time - t0 < 5.0) run(0.0005, none);
-    check("idle -> rev limiter, full throttle in neutral", sim.time - t0, 0.25, 1.5, "s");
+    check("idle -> rev limiter, full throttle in neutral", sim.time - t0, S.toLimiterLo, S.toLimiterHi, "s");
     double limMax = 0.0;
     run(1.0, [&] { limMax = std::max(limMax, sim.rpm()); });
     check("peak rpm on the limiter", limMax, S.limLo, S.limHi, "rpm");
@@ -87,14 +84,18 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     // 5. snap shut: back to idle
     sim.pedalTarget = 0.0;
     run(4.0, none);
-    check("rpm 4 s after closing the throttle", sim.rpm(), 1100, 1500, "rpm");
+    check("rpm 4 s after closing the throttle", sim.rpm(), S.closedLo, S.closedHi, "rpm");
 
-    // 6. ignition off from 8000 rpm
-    sim.omega = 8000.0 / 60.0 * TWO_PI;
+    // 6. ignition off from S.coastFromRpm
+    sim.omega = S.coastFromRpm / 60.0 * TWO_PI;
     sim.ignition = false;
     t0 = sim.time;
     while (sim.rpm() > 30.0 && sim.time - t0 < 20.0) run(0.001, none);
-    check("coast down 8000 rpm -> stop, ignition off", sim.time - t0, 0.5, 6.0, "s");
+    {
+        char what[64];
+        std::snprintf(what, sizeof what, "coast down %.0f rpm -> stop, ignition off", S.coastFromRpm);
+        check(what, sim.time - t0, 0.5, 6.0, "s");
+    }
 
     // 7. full-throttle dyno sweep. Boosted charge: measured as hot as it gets in a long pull, like the
     // D chart (src/dyno.hpp): the charge cooler's heat soak (icTau, seconds) would otherwise leave the
@@ -136,28 +137,29 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     check(S.powerWhat, peakP, S.powerLo, S.powerHi, "kW");
     check(S.powerRpmWhat, peakPRpm, S.powerRpmLo, S.powerRpmHi, "rpm");
 
-    // 8. shaking at a locked 10000 rpm: counterweights cancel the V pairs' 1st order
+    // 8. shaking at a locked speed: counterweights cancel the V pairs' 1st order
     {
         sim.reset(0.0);
         sim.lockSpeed = true;
         sim.ignition = false;
-        sim.omega = 10000.0 / 60.0 * TWO_PI;
+        sim.omega = S.shakeRpm / 60.0 * TWO_PI;
         run(1.5, none);
         // reference: half the pistons moving together (a 4-cylinder's two pairs), no counterweight
         double unbalanced = 0.5 * sim.cylCount() * sim.P.mRecip * sim.cyl[0].r * sim.omega * sim.omega;
-        std::printf("  shaking at 10000 rpm: 1st %.0f N (%.0f N without counterweights), 2nd %.0f N\n",
-                    sim.shake1(), unbalanced, sim.shake2());
-        check("1st-order vertical force / unbalanced", sim.shake1() / unbalanced, 0.0, 0.05, "");
+        std::printf("  shaking at %.0f rpm: 1st %.0f N (%.0f N without counterweights), 2nd %.0f N\n",
+                    S.shakeRpm, sim.shake1(), unbalanced, sim.shake2());
+        if (S.shakeMax1st > 0.0) check("1st-order vertical force", sim.shake1(), 0.0, S.shakeMax1st, "N");
+        else check("1st-order vertical force / unbalanced", sim.shake1() / unbalanced, 0.0, 0.05, "");
     }
 
-    // 9. firing intervals: the Twin Pulse 90-200-90-340 pattern, measured from the spark events
+    // 9. firing intervals (S.pattern, e.g. the Ducati's Twin Pulse 90-200-90-340), measured from the spark events
     {
         sim.reset(0.0);
         sim.lockSpeed = true;
         sim.ignition = true;
         sim.P.revLimit = 1e9;
         sim.pedal = sim.pedalTarget = 0.5;
-        sim.omega = 3000.0 / 60.0 * TWO_PI;
+        sim.omega = S.firingRpm / 60.0 * TWO_PI;
         run(0.2, none);
         std::vector<double> fires;
         std::vector<bool> was(sim.cyl.size());
@@ -201,7 +203,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     };
     std::printf("\n  bike: %s\n", S.bikeWhat);
     startBike(true);
-    check("idling in 1st (automatic), rpm", sim.rpm(), 1100, 1450, "rpm");
+    check("idling in 1st (automatic), rpm", sim.rpm(), S.idleGearLo, S.idleGearHi, "rpm");
     check("  ... not creeping", sim.drive.v * 3.6, 0.0, 1.0, "km/h");
     sim.pedalTarget = 1.0;
     t0 = sim.time;
@@ -221,13 +223,13 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
                         sim.time - t0, sim.drive.v * 3.6, sim.rpm(), sim.drive.gear, sim.drive.clutch,
                         (sim.omega - sim.drive.omegaIn) * 9.549, sim.drive.wheelForce, sim.tcTrim);
     });
-    check("0-100 km/h, full throttle (tests ~3.0-3.4 s)", t100, 2.6, 3.7, "s");
-    check("0-200 km/h (road tests ~5.5-7 s)", t200, 5.0, 8.0, "s");
+    check(S.zeroTo100What, t100, S.zeroTo100Lo, S.zeroTo100Hi, "s");
+    check(S.zeroTo200What, t200, S.zeroTo200Lo, S.zeroTo200Hi, "s");
     check("rpm at the 1 -> 2 upshift", firstShiftRpm, S.upshiftLo, S.upshiftHi, "rpm");
     check("wheelie control cut in (lowest fuel share)", minTrim, 0.3, 0.95, "");
-    check("peak smoothed acceleration", peakAccel / 9.81, 0.8, 1.15, "g");
+    check("peak smoothed acceleration", peakAccel / 9.81, S.launchAccelLo, S.launchAccelHi, "g");
     check(S.topWhat, sim.drive.v * 3.6, S.topLo, S.topHi, "km/h");
-    check("  ... in gear", sim.drive.gear, 6, 6, "");
+    check("  ... in gear", sim.drive.gear, sim.drive.P.gears, sim.drive.P.gears, "");  // top gear
 
     // 11. manual: clutch in, 1st, gentle take-off, quickshift up and down
     startBike(false);
@@ -241,7 +243,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     run(2.5, [&] { minRpm = std::min(minRpm, sim.rpm()); });
     check("manual take-off: lowest rpm (no stall)", minRpm, S.takeoffMinRpm, 5000, "rpm");
     sim.pedalTarget = 0.7;
-    while (sim.rpm() < 11000.0 && sim.time < 60.0) run(0.001, none);
+    while (sim.rpm() < S.shiftRpm && sim.time < 60.0) run(0.001, none);
     double vBefore = sim.drive.v, rpmBefore = sim.rpm();
     sim.drive.requestShift(+1, sim.time);
     bool cut = false;
@@ -284,7 +286,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     // and further up the box: 4th -> 3rd at speed, throttle shut
     sim.pedalTarget = 0.8;
     for (int k = 0; k < 2; k++) {
-        while (sim.rpm() < 11000.0 && sim.time < 200.0) run(0.001, none);
+        while (sim.rpm() < S.shiftRpm && sim.time < 200.0) run(0.001, none);
         sim.drive.requestShift(+1, sim.time);
         run(0.3, none);
     }
@@ -293,15 +295,22 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     std::printf("  quickshift down from %dth at %.0f km/h:\n", sim.drive.gear, sim.drive.v * 3.6);
     downshift(sim.drive.gear - 1);
 
-    // 12. dumping the clutch in 1st at idle stalls a light-crank V4
+    // 12. dumping the clutch in 1st at idle: a light crank (the superbikes) stalls; a heavy one pulls away
     startBike(false);
     sim.drive.clutchPedal = true;
     run(0.3, none);
     sim.drive.requestShift(-1, sim.time);
     sim.drive.clutch = 1.0;  // lever let go at once
     sim.drive.clutchPedal = false;
-    run(1.0, none);
-    check("clutch dump at idle in 1st: rpm after 1 s", std::fabs(sim.rpm()), 0, 150, "rpm");
+    if (S.stallsOnClutchDump) {
+        run(1.0, none);
+        check("clutch dump at idle in 1st: rpm after 1 s", std::fabs(sim.rpm()), 0, 150, "rpm");
+    } else {
+        double dumpMin = 1e9, dumpAccel = 0.0;
+        run(1.0, [&] { dumpMin = std::min(dumpMin, sim.rpm()); dumpAccel = std::max(dumpAccel, std::fabs(sim.drive.accel)); });
+        check("clutch dump at idle in 1st: lowest rpm (no stall)", dumpMin, 0.5 * S.idleLo, 1e9, "rpm");
+        check("  ... no lurch (peak smoothed acceleration)", dumpAccel / 9.81, 0.0, 0.3, "g");
+    }
 
     // 13. neutral: in automatic at a stop (revs freely, no creep), at speed (coasts), and back into gear
     startBike(true);
@@ -310,7 +319,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     sim.pedalTarget = 0.4;
     double nPeak = 0.0;
     run(1.0, [&] { nPeak = std::max(nPeak, sim.rpm()); });
-    check("  ... revving in N: peak rpm", nPeak, 8000, S.limHi, "rpm");
+    check("  ... revving in N: peak rpm", nPeak, S.neutralRevMin, S.limHi, "rpm");
     check("  ... bike stays put", sim.drive.v * 3.6, 0.0, 0.5, "km/h");
     sim.pedalTarget = 0.0;
     run(2.0, none);
@@ -339,12 +348,12 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     }
     check("automatic at speed: N from a higher gear", gearBefore >= 3 && sim.drive.gear == 0 ? 1.0 : 0.0, 1, 1, "");
     check("  ... coasting in N (speed kept)", sim.drive.v / vN, 0.85, 1.0, "");
-    check("  ... engine back near idle", sim.rpm(), 1000, 2200, "rpm");
+    check("  ... engine back near idle", sim.rpm(), S.neutralIdleLo, S.neutralIdleHi, "rpm");
     sim.drive.bikeShift(0, sim.time, true);  // N again: back into a gear for this speed
     int back = sim.drive.gear;
     run(2.0, none);
-    check("  ... N again picks a gear for the speed", back, 3, 6, "");
-    check("  ... no stall rejoining", sim.rpm(), 3000, 14000, "rpm");
+    check("  ... N again picks a gear for the speed", back, 3, sim.drive.P.gears, "");
+    check("  ... no stall rejoining", sim.rpm(), S.rejoinLo, S.rejoinHi, "rpm");
 
     // manual: N from 4th at speed
     startBike(false);
@@ -355,7 +364,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     sim.pedalTarget = 0.5;
     run(2.5, none);
     for (int k = 0; k < 3; k++) {
-        while (sim.rpm() < 10000.0 && sim.time < 200.0) run(0.001, none);
+        while (sim.rpm() < S.shiftRpmGentle && sim.time < 200.0) run(0.001, none);
         sim.drive.requestShift(+1, sim.time);
         run(0.3, none);
     }

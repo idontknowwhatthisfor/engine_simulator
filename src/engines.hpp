@@ -1,6 +1,7 @@
 // the engines --engine-type can pick, and setting the simulation up for one of them
 #pragma once
 #include "engine_type.hpp"
+#include "calibration.hpp"
 
 const engineType &inline4FitType();   // engines/inline4_fit/inline4_fit.hpp
 const engineType &ducatiV4Type();     // engines/ducati_v4/ducati_v4.hpp

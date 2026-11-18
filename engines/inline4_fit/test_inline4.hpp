@@ -8,11 +8,7 @@ int physicsTestInline4(const engineModel &e, const engineType &type) {
     engineSim sim;
     setupSim(sim, e, type, e.cyls[0].theta0);
     sim.drive.reset(false);  // engine tests run in neutral with the clutch out
-    // tuning overrides for experiments
-    if (const char *v = std::getenv("IDLE_KP")) sim.P.idleKp = std::atof(v);
-    if (const char *v = std::getenv("IDLE_KI")) sim.P.idleKi = std::atof(v);
-    if (const char *v = std::getenv("IDLE_SG")) sim.P.idleSparkGain = std::atof(v);
-    if (const char *v = std::getenv("INERTIA")) sim.P.inertia = std::atof(v);
+    applyCalibrationEnv(sim.P);  // VE_*, FMEP_*, IDLE_*... (src/calibration.hpp)
     auto run = [&](double seconds, auto &&each) {
         int n = static_cast<int>(seconds / PHYS_DT);
         for (int k = 0; k < n; k++) {
@@ -349,6 +345,7 @@ int physicsTestInline4(const engineModel &e, const engineType &type) {
 int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
     engineSim sim;
     setupSim(sim, e, type, e.cyls[0].theta0, false, true);
+    applyCalibrationEnv(sim.P);
     sim.drive.reset(false);
     auto run = [&](double seconds, auto &&each) {
         int n = static_cast<int>(seconds / PHYS_DT);

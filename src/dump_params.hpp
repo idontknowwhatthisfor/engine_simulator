@@ -33,7 +33,7 @@ static_assert(sizeof(soundParams) == 232, "soundParams changed: update dumpSound
 static_assert(sizeof(turboParams) == 296, "turboParams changed: update dumpTurbo()");
 static_assert(sizeof(engineParams) == 1032, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 440, "drivetrainParams changed: update dumpDrive()");
-static_assert(sizeof(bikeSpec) == 240, "bikeSpec changed: update dumpBikeSpec()");
+static_assert(sizeof(bikeSpec) == 520, "bikeSpec changed: update dumpBikeSpec()");
 
 void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, pipeLowHz); DUMP(d, S, pipeResHz); DUMP(d, S, pipeResGain); DUMP(d, S, masterHz);
@@ -109,6 +109,15 @@ void dumpBikeSpec(const paramDumper &d, const bikeSpec &S) {
     DUMP(d, S, sweepTo); DUMP(d, S, pattern); DUMP(d, S, patternWhat); DUMP(d, S, bikeWhat);
     DUMP(d, S, upshiftLo); DUMP(d, S, upshiftHi); DUMP(d, S, topWhat); DUMP(d, S, topLo); DUMP(d, S, topHi);
     DUMP(d, S, neutralSettle); DUMP(d, S, takeoffMinRpm);
+    DUMP(d, S, crankLo); DUMP(d, S, crankHi); DUMP(d, S, catchRpm); DUMP(d, S, flareLo); DUMP(d, S, flareHi);
+    DUMP(d, S, idleLo); DUMP(d, S, idleHi); DUMP(d, S, idleMapLo); DUMP(d, S, idleMapHi);
+    DUMP(d, S, toLimiterLo); DUMP(d, S, toLimiterHi); DUMP(d, S, closedLo); DUMP(d, S, closedHi);
+    DUMP(d, S, coastFromRpm); DUMP(d, S, shakeRpm); DUMP(d, S, shakeMax1st); DUMP(d, S, firingRpm);
+    DUMP(d, S, idleGearLo); DUMP(d, S, idleGearHi); DUMP(d, S, zeroTo100What); DUMP(d, S, zeroTo100Lo);
+    DUMP(d, S, zeroTo100Hi); DUMP(d, S, zeroTo200What); DUMP(d, S, zeroTo200Lo); DUMP(d, S, zeroTo200Hi);
+    DUMP(d, S, launchAccelLo); DUMP(d, S, launchAccelHi); DUMP(d, S, shiftRpm); DUMP(d, S, shiftRpmGentle);
+    DUMP(d, S, stallsOnClutchDump); DUMP(d, S, neutralRevMin); DUMP(d, S, neutralIdleLo); DUMP(d, S, neutralIdleHi);
+    DUMP(d, S, rejoinLo); DUMP(d, S, rejoinHi);
 }
 
 void dumpExhaust(const paramDumper &d, const exhaustLayout &L) {
