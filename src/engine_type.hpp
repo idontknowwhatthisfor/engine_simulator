@@ -45,6 +45,7 @@ struct engineType {
     const char *label = "";                // HUD: what is running
     const char *firing = "";               // HUD: firing order
     const char *windowTitle = "";
+    const char *hudTag = "";               // shown after the rpm on the riding HUD (e.g. TUNED)
     const char *credit = "";               // model licence line (CC-BY needs it on screen)
     const char *meshFile = "";             // relative to the project root
     const char *buildHint = "";            // how to make the mesh when it is missing
@@ -66,4 +67,7 @@ struct engineType {
     const char *turboMeshFile = "";        // relative to the project root
     const char *turboBuildHint = "";
     std::vector<rideStep> ride;            // bikes: the --wav demo ride (empty: the stand script)
+    // --tuned yes: the tuned version of this engine, a whole engineType of its own (params, test
+    // targets, labels); nullptr when the engine has none
+    const engineType &(*tuned)() = nullptr;
 };

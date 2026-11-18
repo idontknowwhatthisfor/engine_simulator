@@ -131,6 +131,8 @@ exhaustLayout kawasakiH2Exhaust(const engineModel &e) {
     return L;
 }
 
+const engineType &kawasakiH2TunedType();  // --tuned yes, below
+
 const engineType &kawasakiH2Type() {
     static const engineType T = [] {
         engineType t;
@@ -171,6 +173,77 @@ const engineType &kawasakiH2Type() {
             {24.0, false, 0.0, 0, "brakes off, overrun", false},
             {27.0, false, 0.7, 0, "back on the throttle", false},
         };
+        t.tuned = kawasakiH2TunedType;
+        return t;
+    }();
+    return T;
+}
+
+// ---- --tuned yes: a top-end tune ------------------------------------------------------------------
+// What a race-kit H2 does to move the power peak up toward the 14000 rpm redline (estimates, not a
+// published kit):
+//   - higher-lift cams: the engine breathes best near 12000 rpm instead of 9000; the bottom end
+//     stays stock (the pull-away is no weaker), the 8000-10000 mid range gives a little
+//   - a stiffer spring in the plenum relief valve: the boost keeps climbing with the revs (rpm^2)
+//     instead of being held from ~10500
+//   - race fuel and a remapped ECU: less spark taken out for boost and the hot charge
+//   - an open exhaust and the ECU's exhaust valve held open: louder, more crackle
+//   - the shift points moved up, to the power peak just under the limiter
+// The block, supercharger, gearing and limiter are stock.
+engineParams kawasakiH2TunedParams() {
+    engineParams P = kawasakiH2Params();
+    P.evo = 480.0 * DEGR;           // exhaust opens 10 deg earlier: blows down in time at 14000 rpm
+    // calibrated with --engine-type h2 --tuned yes --phystest (hot charge, no ram air): 142 N m at
+    // 12000 and 186 kW (250 hp) at 13500 rpm, against stock's 133 N m at 10500 and 147.5 kW at 11000
+    P.veBase = 0.69; P.vePeak = 0.23; P.veRpm = 12000.0; P.veWidth = 4000.0;
+    turboParams &T = P.turbo;
+    T.reliefP = 225e3;              // stiffer relief spring: ~+1.2 bar at the top, against stock's ~+1.0
+    T.knockRetard = 2.5;            // race fuel
+    T.knockRetardHot = 0.03;
+    soundParams &S = P.sound;       // open exhaust
+    S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
+    S.flapShutGain = 1.0;
+    S.popChance = 0.5;
+    S.drive = 0.32;
+    return P;
+}
+
+drivetrainParams kawasakiH2TunedDriveParams() {
+    drivetrainParams P = kawasakiH2DriveParams();
+    P.upPedal = 9600.0;             // full throttle: change up at ~13600, on the power peak
+    P.sportUp = 13800.0; P.sportDown = 10500.0;
+    return P;
+}
+
+bikeSpec kawasakiH2TunedSpec() {
+    bikeSpec S = kawasakiH2Spec();
+    S.name = "Kawasaki Ninja H2 (tuned)";
+    S.torqueWhat = "peak torque (tuned)";
+    S.torqueRpmWhat = "peak torque rpm (tuned: high in the range)";
+    S.powerWhat = "peak power (tuned)";
+    S.powerRpmWhat = "peak power rpm (tuned: near the 14000 redline)";
+    S.torqueLo = 125; S.torqueHi = 165; S.torqueRpmLo = 11000; S.torqueRpmHi = 13500;
+    S.powerLo = 165; S.powerHi = 215; S.powerRpmLo = 13000; S.powerRpmHi = 14000;
+    S.bikeWhat = "H2 gearing, 318 kg with rider (tuned)";
+    S.upshiftLo = 13000; S.upshiftHi = 14100;
+    S.topWhat = "top speed after 30 s, 6th gear (tuned)";
+    S.topLo = 290; S.topHi = 360;
+    return S;
+}
+
+const engineType &kawasakiH2TunedType() {
+    static const engineType T = [] {
+        engineType t = kawasakiH2Type();
+        t.id = "h2-tuned";
+        t.name = "Kawasaki Ninja H2 (tuned)";
+        t.summary = "Kawasaki Ninja H2, tuned: race cams, more boost, race fuel, open exhaust";
+        t.label = "Kawasaki Ninja H2 supercharged inline-4, 998 cc, TUNED";
+        t.windowTitle = "Ninja H2 engine (tuned)";
+        t.hudTag = "TUNED";
+        t.engine = kawasakiH2TunedParams;
+        t.drive = kawasakiH2TunedDriveParams;
+        t.spec = kawasakiH2TunedSpec;
+        t.tuned = nullptr;
         return t;
     }();
     return T;

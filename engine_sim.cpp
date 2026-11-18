@@ -42,6 +42,7 @@ struct options {
     bool sport = false;      // automatic sport mode
     bool turbo = false;      // --turbo yes: a turbocharger in the exhaust (inline-4)
     bool bov = true;         // --bov no: the turbo without its blow-off valve (it surges on lift-off)
+    bool tuned = false;      // --tuned yes: the engine's tuned version (h2)
     std::string wav;         // --wav out.wav: render a scripted run to a file and quit
     bool selftest = false, phystest = false;
     std::string cmpA, cmpB;
@@ -84,6 +85,12 @@ options parseArgs(int argc, char **argv) {
             else if (v == "no") o.turbo = false;
             else throw std::runtime_error("--turbo takes yes or no, not \"" + v + "\"");
         }
+        else if (a == "--tuned" || a.rfind("--tuned=", 0) == 0) {
+            std::string v = a == "--tuned" ? next() : a.substr(8);
+            if (v == "yes") o.tuned = true;
+            else if (v == "no") o.tuned = false;
+            else throw std::runtime_error("--tuned takes yes or no, not \"" + v + "\"");
+        }
         else if (a == "--bov" || a.rfind("--bov=", 0) == 0) {
             std::string v = a == "--bov" ? next() : a.substr(6);
             if (v == "yes") o.bov = true;
@@ -116,7 +123,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type inline4|v4|s1000rr] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
                              "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--no-wheelie]\n"
-                             "                  [--turbo yes|no] [--bov yes|no]\n"
+                             "                  [--turbo yes|no] [--bov yes|no] [--tuned yes|no]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
                              "       engine_sim --engine-type list\n", ex.what());
@@ -133,6 +140,13 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "unknown engine type \"%s\"\n", opt.engineType.c_str());
         listEngineTypes(stderr);
         return 1;
+    }
+    if (opt.tuned) {
+        if (!typePtr->tuned) {
+            std::fprintf(stderr, "--tuned yes: the %s has no tuned version (only h2 has one)\n", typePtr->name);
+            return 1;
+        }
+        typePtr = &typePtr->tuned();
     }
     const engineType &type = *typePtr;
     if (opt.turbo && !type.exhaustTurbo) {
@@ -510,7 +524,7 @@ int main(int argc, char **argv) {
             else
             textStr = " FPS " + (fps > 0.f ? f0(fps) : std::string("--")) + "   time x" +
                       numToStr(static_cast<float>(TIME_SCALES[scaleIdx]), 2) + (paused ? "   PAUSED" : "") +
-                      "\n RPM " + f0(sim.rpm()) + "   gear " + gearName + (dv.automatic ? (dv.sport ? " SPORT" : " AUTO") : " MANUAL") +
+                      "\n RPM " + f0(sim.rpm()) + (*type.hudTag ? std::string("  ") + type.hudTag : std::string()) + "   gear " + gearName + (dv.automatic ? (dv.sport ? " SPORT" : " AUTO") : " MANUAL") +
                       "   " + f0(dv.v * 3.6) + " km/h" + camStr +
                       (bike ? "\n twist grip " : "\n pedal ") + f0(sim.pedal * 100.0) + "%  throttle " + f0(sim.throttleOpen * 100.0) +
                       "%  manifold " + f0(sim.pMan / 1000.0) + " kPa" +

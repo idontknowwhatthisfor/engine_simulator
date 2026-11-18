@@ -130,6 +130,33 @@ The 3D supercharger (`h2_supercharger.mesh`, written by `build_h2.py` with the e
 `src/turbo.hpp`: the volute, ram-air duct, plenum and throttle bodies are see-through like the block
 (`G` hides them), the impeller spins in proportion to its speed.
 
+#### Tuned (`--tuned yes`)
+
+```bash
+./engine_sim --engine-type h2 --tuned yes
+```
+
+A top-end tune that moves the peak up toward the 14000 rpm redline. The block, supercharger,
+gearing and limiter stay stock; the changes are estimates of a race kit, not a published one:
+
+- higher-lift cams: the engine breathes best near 12000 rpm instead of 9000. The bottom end stays
+  stock (the pull-away is no weaker); the 8000–10000 rpm mid range gives a little;
+- the exhaust opens 10° earlier, so it blows down in time at 14000 rpm;
+- a stiffer spring in the plenum relief valve: about +1.2 bar at the top instead of +1.0;
+- race fuel: less spark taken out for boost and for the hot charge;
+- an open exhaust (louder, ~3 dB, with more crackle), the exhaust valve always open;
+- the full-throttle upshift moved to ~13800 rpm.
+
+| | Stock | Tuned (sim) |
+|---|---|---|
+| Peak torque | 133 N·m at 10500 rpm | 142 N·m at 12000 rpm |
+| Peak power | 147.5 kW (198 hp) at 11000 rpm | 186 kW (250 hp) at 13500 rpm |
+| 0–200 km/h | 7.0 s | 6.8 s |
+| After 30 s in 6th | ~312 km/h | ~340 km/h |
+
+The HUD shows TUNED after the rpm. `--tuned yes` works with `--phystest` (its own targets),
+`--wav` and screenshots; `make test` checks both versions.
+
 ### Exhaust
 
 Each engine draws its exhaust beside the block (not with `--engine-only`). The pipes are swept tubes
@@ -248,6 +275,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--grade pct --reverse --sport --no-wheelie` | Starting conditions |
 | `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below). With `--phystest`, runs the turbo checks; with `--wav`, plays the turbo drive |
 | `--bov yes\|no` | With the turbo: fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
+| `--tuned yes\|no` | The engine's tuned version (default `no`; only `h2` has one, see above) |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 
 ## Project layout
