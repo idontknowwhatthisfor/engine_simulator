@@ -65,7 +65,7 @@ int synthTest(int n) {
     sim.drive.P = findEngineType("inline4")->drive();
     sim.standalone = true;  // on a stand: nothing downstream of the crank
     sim.init(e, e.cyls[0].theta0);
-    engineSound snd(1.0 / PHYS_DT, sim.P.sound);
+    engineSound snd(1.0 / PHYS_DT, sim);
 
     bool ok = true;
     auto check = [&](const char *what, double v, double lo, double hi, const char *unit) {
@@ -92,6 +92,8 @@ int synthTest(int n) {
     auto none = [] {};
     std::printf("synthetic %d-cylinder inline engine (%.0f cc, even firing every %.1f deg), dt = 1/%.0f s\n", n,
                 sim.vDispTotal * 1e6, 720.0 / n, 1.0 / PHYS_DT);
+    std::printf("    idle firing rate %.1f Hz, sound DC-block high-pass at %.1f Hz\n", sim.P.idleRpm / 60.0 * n / 2.0,
+                dcBlockCutoff(sim.P.sound, sim.P.idleRpm, n));
 
     // 1. start: crank with the ignition on, release the starter once it runs
     sim.ignition = true;

@@ -5,6 +5,7 @@
 // structs, add it here too: the sizeof checks below fail to compile until the list is updated.
 #pragma once
 #include "engines.hpp"
+#include "sound.hpp"
 
 struct paramDumper {
     std::string prefix;
@@ -29,9 +30,9 @@ struct paramDumper {
 #define DUMP(d, obj, f) (d).put(#f, (obj).f)
 
 // a field added to a parameter struct must be added to its dump below; these trip when one is not
-static_assert(sizeof(soundParams) == 232, "soundParams changed: update dumpSound()");
+static_assert(sizeof(soundParams) == 240, "soundParams changed: update dumpSound()");
 static_assert(sizeof(turboParams) == 296, "turboParams changed: update dumpTurbo()");
-static_assert(sizeof(engineParams) == 1032, "engineParams changed: update dumpEngine()");
+static_assert(sizeof(engineParams) == 1040, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 440, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 520, "bikeSpec changed: update dumpBikeSpec()");
 
@@ -43,7 +44,7 @@ void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, intakeGain); DUMP(d, S, popRpm); DUMP(d, S, popChance); DUMP(d, S, whineGain);
     DUMP(d, S, drive); DUMP(d, S, radiateHz); DUMP(d, S, burble); DUMP(d, S, burbleFadeFrom);
     DUMP(d, S, burbleFadeSpan); DUMP(d, S, burbleHigh); DUMP(d, S, tick); DUMP(d, S, tickHz);
-    DUMP(d, S, turboGain);
+    DUMP(d, S, turboGain); DUMP(d, S, dcBlockHz);
 }
 
 void dumpTurbo(const paramDumper &d, const turboParams &T) {
@@ -212,6 +213,7 @@ int dumpParams(const engineModel &e, const engineType &t, bool turbo, bool bov) 
     paramDumper root;
     dumpType(root.sub("type."), t, e);
     dumpEngine(root.sub("engine."), sim.P);
+    root.put("engine.sound.dcBlockCutoff", dcBlockCutoff(sim.P.sound, sim.P.idleRpm, sim.cylCount()));  // effective, Hz
     dumpDrive(root.sub("drive."), sim.drive.P);
     if (t.spec) dumpBikeSpec(root.sub("spec."), t.spec());
     dumpMesh(root.sub("mesh."), e);

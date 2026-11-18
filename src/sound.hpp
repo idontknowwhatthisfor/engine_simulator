@@ -34,6 +34,18 @@ struct biquad {
     }
 };
 
+// The exhaust signal is a train of positive pulses, so it carries a DC offset that a high-pass takes
+// out. Its corner must stay well under the slowest firing rate the engine makes (idle) or it eats the
+// fundamental and reshapes each pulse: 0.6 of the idle firing frequency, where the fundamental loses
+// about 0.5 dB, capped at 15 Hz (what every engine used before; all of them idle at 26.7 Hz or more,
+// so they still get exactly 15) and floored at 1 Hz. A single idling at 800 rpm fires at 6.7 Hz and
+// gets 4 Hz. soundParams::dcBlockHz > 0 sets it by hand.
+double dcBlockCutoff(const soundParams &sp, double idleRpm, int cylinders) {
+    if (sp.dcBlockHz > 0.0) return sp.dcBlockHz;
+    double idleFiringHz = idleRpm / 60.0 * cylinders / 2.0;  // one firing per cylinder per two turns
+    return std::clamp(0.6 * idleFiringHz, 1.0, 15.0);
+}
+
 struct engineSound {
     double fs;
     soundParams sp;
@@ -59,8 +71,9 @@ struct engineSound {
     biquad whoosh, bovBand, bovHigh, flutterBand, flutterThump;
     double whistlePhase = 0.0, splitterPhase = 0.0;
 
-    engineSound(double sampleRate, const soundParams &p = soundParams()) : fs(sampleRate), sp(p) {
-        dcBlock = biquad::make(biquad::HIGHPASS, fs, 15.0, 0.707);  // below the 26.7 Hz idle firing rate
+    // for this simulation's engine (its sound parameters, idle speed and cylinder count)
+    engineSound(double sampleRate, const engineSim &sim) : fs(sampleRate), sp(sim.P.sound) {
+        dcBlock = biquad::make(biquad::HIGHPASS, fs, dcBlockCutoff(sp, sim.P.idleRpm, sim.cylCount()), 0.707);
         pipeLow = biquad::make(biquad::LOWPASS, fs, sp.pipeLowHz, 0.9);
         pipeRes = biquad::make(biquad::BANDPASS, fs, sp.pipeResHz, 3.0);
         turbulence = biquad::make(biquad::BANDPASS, fs, 1200.0, 0.8);

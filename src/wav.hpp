@@ -9,7 +9,7 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
     setupSim(sim, e, type, e.cyls[0].theta0, type.bike, turbo);  // a bike engine revs on its stand
     sim.P.turbo.bov = bov;
     applyCalibrationEnv(sim.P);  // SND_* for the voice, and the engine overrides (src/calibration.hpp)
-    engineSound snd(1.0 / PHYS_DT, sim.P.sound);
+    engineSound snd(1.0 / PHYS_DT, sim);
     std::vector<float> raw;
     struct segment { double until; bool starter, ignition; double throttle; const char *what; };
     const segment SCRIPT[] = {

@@ -314,7 +314,7 @@ int main(int argc, char **argv) {
 
     // sound: synthesised per physics step, streamed on SFML's audio thread (off for scripted screenshots)
     std::unique_ptr<engineAudio> audio;
-    engineSound snd(1.0 / PHYS_DT, sim.P.sound);
+    engineSound snd(1.0 / PHYS_DT, sim);
     if (opt.sound && opt.screenshot.empty()) {
         audio = std::make_unique<engineAudio>();
         audio->play();
