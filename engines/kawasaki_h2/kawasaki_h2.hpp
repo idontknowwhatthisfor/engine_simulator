@@ -2,7 +2,9 @@
 // targets, demo ride and the engine type. Meshes: build_h2.py -> h2.mesh (built from the inline-4
 // model's parts) and h2_supercharger.mesh (procedural, drawn by src/turbo.hpp).
 #pragma once
-#include "../bmw_s1000rr/bmw_s1000rr.hpp"  // the H2 starts from the S 1000 RR's superbike values
+#include "../../src/engine_type.hpp"
+#include "../../src/presets.hpp"
+#include "../../src/exhaust_layouts.hpp"
 
 // Kawasaki Ninja H2 (2015-): 998 cc, 76.0 x 55.0 mm, 8.5:1, 147.2 kW (200 PS) at 11000 rpm and
 // 133.5 N m at 10500 rpm (without ram air), redline 14000 rpm. Flat-plane crank firing 1-2-4-3, four
@@ -12,7 +14,7 @@
 // no intercooler, ram air from the left of the fairing. Values not published by Kawasaki (rod,
 // inertia, friction, cam timing, compressor map) are estimates calibrated to the published figures.
 engineParams kawasakiH2Params() {
-    engineParams P = bmwS1000rrParams();  // same class of engine; the differences follow
+    engineParams P = superbikeBaseParams();  // a superbike; Kawasaki's own values follow
     P.bore = 0.076;
     P.compression = 8.5;            // low, for the boost
     P.ivc = 230.0 * DEGR;           // milder cam than a naturally aspirated superbike: the boost fills it
@@ -34,9 +36,11 @@ engineParams kawasakiH2Params() {
     // 10500 and 147.5 kW at 11000 rpm, flat to 11500 (Kawasaki: 133.5 N m at 10500, 147.2 kW at 11000)
     P.lowCam = false;
     P.veBase = 0.66; P.vePeak = 0.26; P.veRpm = 9000.0; P.veWidth = 4500.0;
+    P.veLowBase = 0.62; P.veLowPeak = 0.38; P.veLowRpm = 7500.0; P.veLowWidth = 5000.0;  // unused (lowCam off)
     P.sparkLow = 16.0; P.sparkHigh = 34.0; P.sparkFrom = 1300.0; P.sparkSpan = 7000.0;  // 8.5:1 takes more advance off boost; less with boost (knockRetard)
     P.rpmScale = 16000.0;
     P.blockMass = 64.0; P.blockRollInertia = 1.2;
+    P.counterweight = 0.0;          // flat-plane inline-4: 1st order cancels by symmetry
 
     // the supercharger, in the turbo model's compressor (src/physics.hpp, turboParams)
     turboParams &T = P.turbo;
@@ -69,6 +73,12 @@ engineParams kawasakiH2Params() {
     // over everything (src/sound.hpp turboVoice: blade pass of the 6 blades and 6 splitters, the
     // rush of air, the bypass valve's chirp when the throttles snap shut)
     soundParams &S = P.sound;
+    S.superbike = true;
+    S.pipeResGain = 0.6;
+    S.masterHz = 12000.0;
+    S.drive = 0.25;
+    S.radiateHz = 300.0;
+    S.burble = 3.0;
     S.pipeLength = 1.25;
     S.pipeLowHz = 2400.0; S.pipeResHz = 200.0;
     S.intakeGain = 0.7;             // the airbox is the plenum: less honk, more whistle
@@ -83,11 +93,11 @@ engineParams kawasakiH2Params() {
 // (3.188 2.526 2.045 1.727 1.524 1.348), chain 44/18 (2.444), 200/55 ZR17 rear (0.326 m).
 // 238 kg wet plus an 80 kg rider. Dog-ring gearbox, quickshifter, back-torque limiting clutch.
 drivetrainParams kawasakiH2DriveParams() {
-    drivetrainParams P = bmwDriveParams();  // same bike rules; Kawasaki's numbers follow
+    drivetrainParams P = superbikeDriveBase();  // superbike rules; Kawasaki's numbers follow
     P.primary = 74.0 / 50.0;
     P.teethIn = {0, 16, 19, 22, 22, 21, 23};
     P.teethOut = {0, 51, 48, 45, 38, 32, 31};
-    for (int g = 1; g <= 6; g++) P.ratios[g] = double(P.teethOut[g]) / P.teethIn[g];
+    ratiosFromTeeth(P);
     P.primaryIn = 50; P.primaryOut = 74;
     P.finalDrive = 44.0 / 18.0;
     P.sprocketTeeth = 18;
@@ -115,14 +125,15 @@ bikeSpec kawasakiH2Spec() {
 // supercharger frame origin (mesh space): keep in step with SC_AT in build_h2.py
 const vec3 H2_SC_AT{-165.f, -195.f, -95.f};
 
-// exhaust: the S 1000 RR's 4-2-1 layout (headers from the front of the inclined head, down in front of
-// the crankcase and under the engine, collector, link pipe with the flap) into the H2's bigger
-// silencer on the right. The layout also places the supercharger (h2_supercharger.mesh): impeller
-// axis across the bike, inlet facing left (-z), forward = +x.
+// exhaust: the inline superbike 4-2-1 layout (src/exhaust_layouts.hpp: headers from the front of the
+// inclined head, down in front of the crankcase and under the engine, collector, link pipe with the
+// flap) into the H2's bigger black-chrome silencer on the right. The layout also places the
+// supercharger (h2_supercharger.mesh): impeller axis across the bike, inlet facing left (-z), forward = +x.
 exhaustLayout kawasakiH2Exhaust(const engineModel &e) {
-    exhaustLayout L = bmwS1000rrExhaust(e);
-    for (pipeSpec &p : L.pipes)
-        if (p.r0 > 45.f) { p.r0 = 60.f; p.r1 = 56.f; p.rgba = {0.30f, 0.30f, 0.32f, 1.f}; }  // black-chrome can
+    superbike421Options o;
+    o.canRgba = {0.30f, 0.30f, 0.32f, 1.f};
+    o.canR0 = 60.f; o.canR1 = 56.f;
+    exhaustLayout L = superbike421Exhaust(e, o);
     L.turbo.on = true;
     L.turbo.at = H2_SC_AT;
     L.turbo.x = {0.f, 0.f, -1.f};

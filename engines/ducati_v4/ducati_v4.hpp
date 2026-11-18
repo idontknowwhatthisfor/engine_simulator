@@ -2,12 +2,13 @@
 // Mesh: build_v4.py -> v4.mesh (a V4 built from the inline-4 model's parts).
 #pragma once
 #include "../../src/engine_type.hpp"
+#include "../../src/presets.hpp"
 
 // Ducati Desmosedici Stradale (Panigale V4): 1103 cc, 81 x 53.5 mm, 14.0:1, 157 kW at 13000 rpm,
 // 124 N m at 9500-10000 rpm, ~14000 rpm limiter, ~1250 rpm idle. Light crank, four big throttle
 // bodies, long cam timing; the bike's gearbox is not modelled, so the engine runs on a stand.
 engineParams ducatiV4Params() {
-    engineParams P;
+    engineParams P = superbikeBaseParams();  // a superbike; the Ducati's own values follow
     P.bore = 0.081;
     P.compression = 14.0;
     P.ivc = 250.0 * DEGR;           // intake closes 70 deg after BDC: a high-rpm cam
@@ -64,7 +65,7 @@ engineParams ducatiV4Params() {
 // Ducati Panigale V4: primary 54/30, gears 38/14 36/17 33/19 32/21 30/22 30/24, chain 41/16, 200/55 ZR17
 // rear tyre. 198 kg wet plus an 80 kg rider. Wet slipper clutch, up/down quickshifter, wheelie control.
 drivetrainParams ducatiDriveParams() {
-    drivetrainParams P;
+    drivetrainParams P = superbikeDriveBase();  // superbike rules; the Panigale's own numbers follow
     P.bike = true;
     P.gears = 6;
     P.primary = 54.0 / 30.0;

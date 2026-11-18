@@ -1,7 +1,9 @@
 // BMW S 1000 RR (2023-, K67 ShiftCam engine): engine, sound, gearing, test targets, demo ride and the
 // engine type. Mesh: build_s1000rr.py -> s1000rr.mesh (built from the inline-4 model's parts).
 #pragma once
-#include "../ducati_v4/ducati_v4.hpp"  // the BMW starts from the Ducati's superbike values
+#include "../../src/engine_type.hpp"
+#include "../../src/presets.hpp"
+#include "../../src/exhaust_layouts.hpp"
 
 // BMW S 1000 RR (2023-, K67 ShiftCam engine): 999 cc, 80.0 x 49.7 mm, 13.3:1, 154 kW (210 hp) at
 // 13750 rpm, 113 N m at 11000 rpm, 14600 rpm limiter. Flat-plane crank firing 1-2-4-3, 48 mm
@@ -9,7 +11,7 @@
 // then the full race lobe. Values not published by BMW (inertia, reciprocating mass, friction, cam
 // timing) are estimates in line with the other superbike engines here.
 engineParams bmwS1000rrParams() {
-    engineParams P = ducatiV4Params();  // same class of engine; the differences follow
+    engineParams P = superbikeBaseParams();  // a superbike; BMW's own values follow
     P.bore = 0.080;
     P.compression = 13.3;
     P.ivc = 245.0 * DEGR;           // race lobe: intake closes 65 deg after BDC
@@ -34,7 +36,7 @@ engineParams bmwS1000rrParams() {
     P.blockMass = 58.0; P.blockRollInertia = 1.1;
     // the S 1000 RR's voice: 4-2-1 titanium header into a short silencer with an exhaust flap,
     // airbox honk at full throttle, crackle on the overrun, straight-cut gearbox whine
-    P.sound = soundParams();        // its own voice from scratch, not the Ducati's
+    P.sound = soundParams();        // its own voice, from the defaults
     soundParams &S = P.sound;
     S.superbike = true;
     S.pipeLowHz = 2600.0; S.pipeResHz = 220.0; S.pipeResGain = 0.6;
@@ -53,11 +55,11 @@ engineParams bmwS1000rrParams() {
 // (2.647 2.091 1.727 1.500 1.360 1.261), 525 chain 46/17, 190/55 ZR17 rear (0.320 m).
 // 197 kg wet plus an 80 kg rider. Anti-hopping clutch, Shift Assistant Pro, DTC Wheelie.
 drivetrainParams bmwDriveParams() {
-    drivetrainParams P = ducatiDriveParams();  // same bike rules; BMW's numbers follow
+    drivetrainParams P = superbikeDriveBase();  // superbike rules; BMW's numbers follow
     P.primary = 76.0 / 46.0;
     P.teethIn = {0, 17, 22, 22, 22, 25, 23};
     P.teethOut = {0, 45, 46, 38, 33, 34, 29};
-    for (int g = 1; g <= 6; g++) P.ratios[g] = double(P.teethOut[g]) / P.teethIn[g];
+    ratiosFromTeeth(P);
     P.primaryIn = 46; P.primaryOut = 76;
     P.finalDrive = 46.0 / 17.0;
     P.sprocketTeeth = 17;
@@ -81,51 +83,10 @@ bikeSpec bmwSpec() {
 }
 
 
-// exhaust: 4-2-1 titanium headers from the front of the inclined head, curving down in front of the
-// crankcase and under the engine; 1+4 and 2+3 merge (360 deg apart in the 1-2-4-3 order), then a
-// collector, a link pipe with the exhaust flap, and the short silencer rising on the right (+z) behind
-// the gearbox. Mesh space: front +x, "up" -y.
-exhaustLayout bmwS1000rrExhaust(const engineModel &e) {
-    exhaustLayout L;
-    const std::array<float, 4> TI{0.60f, 0.57f, 0.52f, 1.f}, CAN{0.68f, 0.68f, 0.70f, 1.f}, CARBON{0.10f, 0.10f, 0.11f, 1.f};
-    auto pipe = [&](std::vector<vec3> pts, float r0, float r1, int cyl, std::vector<int> from, std::array<float, 4> c,
-                    bool caps = false) {
-        pipeSpec p;
-        p.pts = pts; p.r0 = r0; p.r1 = r1; p.cyl = cyl; p.from = from; p.rgba = c;
-        p.rough = c == CARBON ? 0.5f : 0.3f;
-        p.metal = c == CARBON ? 0.2f : 0.9f;
-        p.capStart = p.capEnd = caps;
-        L.pipes.push_back(p);
-        return static_cast<int>(L.pipes.size()) - 1;
-    };
-    auto port = [&](int c) { return cylPoint(e, c, 0.5f * e.cyls[c].bore + 20.f, e.cyls[c].deckY - 41.f); };
-    auto out = [&](int c) { return port(c) + cylDir(e, c, 1.f, 0.f) * 40.f; };
-    // outer pair 1+4 runs wide and low to its merge (x 175); inner pair 2+3 merges higher (x 120)
-    for (int c : {0, 3}) {
-        float z = e.cyls[c].zCentre, sg = z < 0.f ? -1.f : 1.f;
-        pipe({port(c), out(c), {235.f, -60.f, z}, {245.f, 50.f, z}, {225.f, 160.f, 110.f * sg}, {200.f, 225.f, 50.f * sg},
-              {175.f, 235.f, 0.f}}, 18.f, 19.f, c, {}, TI);
-    }
-    for (int c : {1, 2}) {
-        float z = e.cyls[c].zCentre, sg = z < 0.f ? -1.f : 1.f;
-        pipe({port(c), out(c), {235.f, -60.f, z}, {245.f, 50.f, z}, {215.f, 140.f, 40.f * sg}, {165.f, 185.f, 20.f * sg},
-              {120.f, 195.f, 0.f}}, 18.f, 19.f, c, {}, TI);
-    }
-    int a = pipe({{175.f, 235.f, 0.f}, {120.f, 250.f, 0.f}, {40.f, 243.f, 0.f}}, 24.f, 25.f, -1, {0, 1}, TI);
-    int b = pipe({{120.f, 195.f, 0.f}, {75.f, 215.f, 0.f}, {40.f, 238.f, 0.f}}, 24.f, 25.f, -1, {2, 3}, TI);
-    int col = pipe({{40.f, 240.f, 0.f}, {-20.f, 245.f, 0.f}}, 28.f, 30.f, -1, {a, b}, TI);
-    int link = pipe({{-20.f, 245.f, 0.f}, {-150.f, 240.f, 40.f}, {-230.f, 215.f, 110.f}, {-262.f, 199.f, 143.f}}, 30.f, 30.f,
-                    -1, {col}, TI);
-    int can = pipe({{-250.f, 205.f, 140.f}, {-400.f, 110.f, 165.f}}, 52.f, 50.f, -1, {link}, CAN, true);
-    pipe({{-395.f, 113.f, 165.f}, {-435.f, 90.f, 170.f}}, 20.f, 20.f, -1, {can}, CARBON, true);
-    L.outlets.push_back({{-435.f, 90.f, 170.f}, {-40.f, -23.f, 5.f}, 20.f});
-    L.flap.on = true;
-    L.flap.at = {-190.f, 230.f, 75.f};
-    L.flap.axis = normalize(vec3{-1.f, -0.25f, 0.8f});
-    L.flap.shaft = {0.f, -1.f, 0.f};
-    L.flap.pipeR = 30.f;
-    return L;
-}
+// exhaust: the 4-2-1 titanium system (src/exhaust_layouts.hpp): headers from the front of the inclined
+// head, down in front of the crankcase and under the engine, 1+4 and 2+3 merging, a collector, the
+// link pipe with the flap and the short silencer rising on the right behind the gearbox.
+exhaustLayout bmwS1000rrExhaust(const engineModel &e) { return superbike421Exhaust(e); }
 
 const engineType &bmwS1000rrType() {
     static const engineType T = [] {
