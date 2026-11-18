@@ -66,18 +66,22 @@ run-h2: all
 	./engine_sim --engine-type h2
 
 # kinematics and physics checks for every engine (headless), plus synthetic inline engines of these
-# cylinder counts built in memory (--synthtest N)
+# cylinder counts built in memory (--synthtest N). Every check runs; make fails if any of them did
+# (each run's exit status, not just its last line, which is all that is printed)
 SYNTH_CYLINDERS = 1 2 3 4 6 8
 test: all
-	@for t in inline4 v4 s1000rr h2; do \
-		printf "%-8s selftest " $$t; ./engine_sim --engine-type $$t --selftest | tail -1; \
-		printf "%-8s phystest " $$t; ./engine_sim --engine-type $$t --phystest | tail -1; \
-	done
-	@printf "%-8s phystest " "h2 tuned"; ./engine_sim --engine-type h2 --tuned yes --phystest | tail -1
-	@if [ -f $(I4)/turbo.mesh ]; then printf "%-8s phystest " "turbo"; ./engine_sim --turbo yes --phystest | tail -1; fi
-	@for n in $(SYNTH_CYLINDERS); do \
-		printf "%-8s synthtest " "$$n cyl"; ./engine_sim --synthtest $$n | tail -1; \
-	done
+	@fail=0; \
+	check() { name=$$1; kind=$$2; shift 2; printf "%-8s %s " "$$name" "$$kind"; \
+		out=$$(./engine_sim "$$@"); rc=$$?; printf '%s\n' "$$out" | tail -1; \
+		if [ $$rc -ne 0 ]; then fail=1; fi; }; \
+	for t in inline4 v4 s1000rr h2; do \
+		check $$t selftest --engine-type $$t --selftest; \
+		check $$t phystest --engine-type $$t --phystest; \
+	done; \
+	check "h2 tuned" phystest --engine-type h2 --tuned yes --phystest; \
+	if [ -f $(I4)/turbo.mesh ]; then check turbo phystest --turbo yes --phystest; fi; \
+	for n in $(SYNTH_CYLINDERS); do check "$$n cyl" synthtest --synthtest $$n; done; \
+	if [ $$fail -ne 0 ]; then echo "make test: a check FAILED (see above)"; exit 1; fi
 
 clean:
 	rm -f engine_sim
