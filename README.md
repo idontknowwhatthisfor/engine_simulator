@@ -10,7 +10,7 @@ the crank speed comes from a physics model, not a fixed rate:
 
 The sound is synthesised from the same simulation.
 
-It has three engines. `engine_sim` is the single entry point, and you pick the engine with
+It has four engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
 
 | `--engine-type` | Engine | Drives | Also accepted |
@@ -18,6 +18,7 @@ It has three engines. `engine_sim` is the single entry point, and you pick the e
 | `inline4` (default) | 2.3 L inline-4 (the Sketchfab model) | a car with Honda Fit 5-speed gearing | `fit`, `honda-fit`, `inline4-fit`, `i4` |
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
+| `h2` | Kawasaki Ninja H2 supercharged inline-4, 998 cc | a Ninja H2 (bike) | `kawasaki`, `kawasaki-h2`, `ninja-h2` |
 
 ```bash
 ./engine_sim --engine-type list
@@ -44,8 +45,8 @@ optional, so without it everything builds and only `--turbo yes` is unavailable.
 ```
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
-meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run-v4` and
-`make run-s1000rr`. `make test` runs the headless checks for every engine.
+meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run-v4`,
+`make run-s1000rr` and `make run-h2`. `make test` runs the headless checks for every engine.
 
 ## The engines
 
@@ -98,6 +99,36 @@ crank.
 | Exhaust (3D) | 4-2-1 titanium headers from the front of the inclined head, under the engine (1+4 and 2+3 merge), collector, link pipe with the exhaust flap, short silencer rising on the right behind the gearbox |
 | Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 6.9 s, 307 km/h in 6th |
 | Sound | Its own voice (the inline-4 keeps the original one):<br>• radiated exhaust (brightens with revs) through a 4-2-1 quarter-wave pipe<br>• exhaust flap, shut at idle and open from ~5000 rpm or under throttle<br>• airbox honk at full throttle<br>• overrun crackle that fades out<br>• quickshifter bark<br>• straight-cut gear whine<br>• valvetrain tick |
+
+### `h2`: Kawasaki Ninja H2 (2015-), supercharged
+
+Built like the S 1000 RR, plus a procedural centrifugal supercharger behind the cylinders.
+
+| | |
+|---|---|
+| Engine | 76.0 × 55.0 mm = 998 cc, 8.5:1, 107 mm rods (estimate), 180° flat-plane crank, block inclined 30° (estimate), forward-turning crank |
+| Firing | 1-2-4-3 |
+| Supercharger | Gear-driven from the crank at 9.2× crank speed (~129k rpm at 14000), 69 mm impeller with 6 blades and 6 splitters, no intercooler, ram air, a 4 L plenum over the throttle bodies with a relief valve that holds ~+1.0 bar from ~10500 rpm, and a bypass valve that vents the charge when the throttles snap shut |
+| Output (sim) | 133 N·m at 10500 rpm, 147.5 kW at 11000–11500 rpm with the charge hot (~100 °C) and no ram air (Kawasaki: 133.5 N·m at 10500 / 147.2 kW at 11000), limiter 14000 rpm, idle 1200 rpm |
+| Gearbox | Primary 74/50 (1.480); gears 51/16, 48/19, 45/22, 38/22, 32/21, 31/23; chain 44/18; 200/55 ZR17 rear |
+| Vehicle | 238 kg wet + 80 kg rider, CdA 0.33 |
+| Rider aids | Same as the other bikes; launch control holds ~7500–9500 rpm, where the boost is |
+| Exhaust (3D) | The S 1000 RR's 4-2-1 layout into a bigger black silencer |
+| Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 7.0 s, ~312 km/h after 30 s in 6th (Kawasaki limits it to 299) |
+| Sound | The S 1000 RR's voice with a longer pipe, less airbox honk, more gear whine, and the supercharger's whine (impeller blade pass) and rush on top, with the bypass valve's chirp on each snap shut |
+
+**How the supercharger is modelled.** It uses the turbo's compressor model (`turboParams` with
+`supercharger = true`): the shaft is geared to the crank instead of driven by a turbine, so there is
+no exhaust back pressure, turbine lag or wastegate. The boost follows the revs (roughly with rpm²),
+and the crank pays for the compressor's power (~18–22 kW at the top), which counts as friction.
+The relief valve is what caps the boost. The `--phystest` dyno sweep and the D chart both measure
+with the charge as hot as a long pull leaves it, which is what the H2 is calibrated against; the HUD shows boost, plenum pressure, the drive power, the
+charge temperature (no intercooler: ~100 °C in a long full-throttle pull) and the impeller speed. `F` takes the
+bypass valve off, so the compressor surges on lift-offs.
+
+The 3D supercharger (`h2_supercharger.mesh`, written by `build_h2.py` with the engine) is drawn by
+`src/turbo.hpp`: the volute, ram-air duct, plenum and throttle bodies are see-through like the block
+(`G` hides them), the impeller spins in proportion to its speed.
 
 ### Exhaust
 
@@ -176,6 +207,7 @@ housing, rotor and bearing by geometry and writes `turbo.mesh`. `make` builds it
 there.
 
 **Estimates.** These values are not published: the V4 rod length; the S 1000 RR bore spacing (92 mm);
+the H2's rod length, bore spacing (84 mm), cylinder incline and supercharger compressor map;
 and the crank inertia, reciprocating mass, friction and cam timing of both bikes. They are estimates,
 calibrated so that the published torque and power come out of the physics.
 
@@ -196,7 +228,7 @@ calibrated so that the published torque and power come out of the physics.
 | V | Wheelie control on/off (bikes) |
 | H / J | Hill up / down |
 | L | Cargo (car) / passenger (bikes) |
-| F | Blow-off valve on/off (`--turbo yes`) |
+| F | Blow-off valve on/off (`--turbo yes`); bypass valve on/off (`h2`) |
 | `[` / `]` | Slow motion / back toward real time (×1 … ×0.01) |
 | `,` / `.` | When paused: step the crank by 1° |
 | G / B / M / D / X | See-through block / motion blur / mute / full-throttle dyno chart / shake view (×1, ×20, ×100) |
@@ -206,7 +238,7 @@ calibrated so that the published torque and power come out of the physics.
 
 | Option | |
 |---|---|
-| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `v4`, `s1000rr` or an alias; `list` prints them. `--v4` and `--s1000rr` still work. |
+| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `v4`, `s1000rr`, `h2` or an alias; `list` prints them. `--v4` and `--s1000rr` still work. |
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
@@ -243,6 +275,8 @@ engines/
                             build_v4.py, v4.mesh
   bmw_s1000rr/              bmw_s1000rr.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_s1000rr.py, s1000rr.mesh
+  kawasaki_h2/              kawasaki_h2.hpp (engine, supercharger, sound, gearing, test targets, demo ride,
+                            type), build_h2.py, h2.mesh, h2_supercharger.mesh
 tools/meshlib.py            mesh helpers shared by build_v4.py and build_s1000rr.py
 plan.md                     development log (design notes and measurements, phase by phase)
 ```

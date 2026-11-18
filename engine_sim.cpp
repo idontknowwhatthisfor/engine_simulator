@@ -10,6 +10,7 @@
 #include "engines/inline4_fit/inline4_fit.hpp"
 #include "engines/ducati_v4/ducati_v4.hpp"
 #include "engines/bmw_s1000rr/bmw_s1000rr.hpp"
+#include "engines/kawasaki_h2/kawasaki_h2.hpp"
 #include "src/sound.hpp"
 #include "src/wav.hpp"
 #include "src/test_bike.hpp"
@@ -135,7 +136,8 @@ int main(int argc, char **argv) {
     }
     const engineType &type = *typePtr;
     if (opt.turbo && !type.exhaustTurbo) {
-        std::fprintf(stderr, "--turbo yes: the %s has no turbo layout (only inline4 has one)\n", type.name);
+        std::fprintf(stderr, type.supercharged ? "--turbo yes: the %s is already supercharged\n"
+                                               : "--turbo yes: the %s has no turbo layout (only inline4 has one)\n", type.name);
         return 1;
     }
 
@@ -220,11 +222,11 @@ int main(int argc, char **argv) {
     exhaustModel exhaust;
     turboModel turbo;
     bool showExhaust = !opt.engineOnly && type.exhaust;
-    bool showTurbo = showExhaust && opt.turbo;
+    bool showTurbo = showExhaust && (opt.turbo || type.supercharged);  // the turbo, or the supercharger
     if (showExhaust) {
         exhaustLayout layout;
         try {
-            layout = showTurbo ? type.exhaustTurbo(eng) : type.exhaust(eng);
+            layout = opt.turbo ? type.exhaustTurbo(eng) : type.exhaust(eng);
             exhaust.build(layout);
         } catch (const std::exception &ex) {
             std::fprintf(stderr, "%s\n", ex.what());
@@ -315,14 +317,15 @@ int main(int argc, char **argv) {
                               "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset"
                             : type.bike
                             ? "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  S: brake  I: ignition\n"
-                              "T: auto/manual  Z: sport  E/Q: shift  N: neutral  C: clutch  V: wheelie ctrl  H/J: hill  L: passenger\n"
+                              "T: auto/manual  Z: sport  E/Q: shift  N: neutral  C: clutch  V: wheelie ctrl  H/J: hill  L: passenger" +
+                              std::string(type.supercharged ? "  F: bypass" : "") + "\n"
                               "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset"
                                : "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  S: brake  I: ignition\n"
                                  "T: auto/manual  Z: sport  E/Q: shift up/down (Q at a stop: R)  C: clutch  H/J: hill up/down  L: cargo" +
                                  std::string(opt.turbo ? "  F: BOV" : "") + "\n"
                                  "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset", 14);
     help.setFillColor(sf::Color(150, 150, 160));
-    sf::Text credit(font, std::string(type.credit) + (showTurbo ? "\nturbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0" : ""), 12);
+    sf::Text credit(font, std::string(type.credit) + (showTurbo && opt.turbo ? "\nturbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0" : ""), 12);
     credit.setFillColor(sf::Color(110, 110, 120));
 
     std::vector<mat4> modelOf;
@@ -381,7 +384,8 @@ int main(int argc, char **argv) {
                 if (e->code == K::B) blur = !blur;
                 if (e->code == K::F && sim.P.turbo.on) {
                     sim.P.turbo.bov = !sim.P.turbo.bov;
-                    sim.drive.message = sim.P.turbo.bov ? "blow-off valve fitted" : "blow-off valve removed: lift off on boost to hear it surge";
+                    const char *valve = sim.P.turbo.supercharger ? "bypass valve" : "blow-off valve";
+                    sim.drive.message = std::string(valve) + (sim.P.turbo.bov ? " fitted" : " removed: lift off on boost to hear it surge");
                     sim.drive.messageTime = sim.time;
                 }
                 if (e->code == K::M && audio) audio->muted = !audio->muted.load();
@@ -511,8 +515,12 @@ int main(int argc, char **argv) {
                       (bike ? "\n twist grip " : "\n pedal ") + f0(sim.pedal * 100.0) + "%  throttle " + f0(sim.throttleOpen * 100.0) +
                       "%  manifold " + f0(sim.pMan / 1000.0) + " kPa" +
                       (sim.P.turbo.on ? "\n boost " + std::string(sim.boostBar() >= 0.0 ? "+" : "") + numToStr(static_cast<float>(sim.boostBar()), 2) +
-                                            " bar  wastegate " + f0(sim.wastegate * 100.0) + "%  back pressure " + f0(sim.pExh / 1000.0) + " kPa" +
-                                            "\n charge " + f0(sim.tCharge - 273.15) + " C (compressor " + f0(sim.tComp - 273.15) + " C)  blow-off valve " +
+                                            (sim.P.turbo.supercharger
+                                                 ? " bar  plenum " + f0(sim.pCharge / 1000.0) + " kPa  drive " + f0(sim.chargerTorque * sim.omega / 1000.0) +
+                                                       " kW" + (sim.pInlet > sim.P.pAtm + 200.0 ? "  ram +" + f0(sim.pInlet - sim.P.pAtm) + " Pa" : "")
+                                                 : " bar  wastegate " + f0(sim.wastegate * 100.0) + "%  back pressure " + f0(sim.pExh / 1000.0) + " kPa") +
+                                            "\n charge " + f0(sim.tCharge - 273.15) + " C (compressor " + f0(sim.tComp - 273.15) + " C)  " +
+                                            (sim.P.turbo.supercharger ? "bypass valve " : "blow-off valve ") +
                                             (!sim.P.turbo.bov ? "removed" : sim.bovOpen > 0.05 ? "VENTING" : "shut") +
                                             (sim.surge > 0.2 ? "  SURGE" : "")
                                       : std::string()) +
@@ -524,7 +532,7 @@ int main(int argc, char **argv) {
                       f0(dv.mass()) + " kg" + (dv.cargo > 0 ? (bike ? " (passenger)" : " (cargo)") : "") +
                       (showExhaust ? "\n exhaust: headers ~" + std::to_string(exhaust.headerC()) + " C" +
                                          (exhaust.flapAt.on ? "  valve " + f0(exhaust.flap * 100.0) + "% open" : "") +
-                                         (showTurbo ? "  turbo " + f0(sim.turboRpm() / 1000.0) + "k rpm" : "")
+                                         (showTurbo ? (sim.P.turbo.supercharger ? "  supercharger " : "  turbo ") + f0(sim.turboRpm() / 1000.0) + "k rpm" : "")
                                    : std::string()) +
                       (flags.empty() ? "" : "\n" + flags) +
                       "\n shake 1st " + numToStr(static_cast<float>(sim.shake1() / 1000.0), 2) + " kN  2nd " +

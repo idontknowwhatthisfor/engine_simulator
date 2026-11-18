@@ -5,9 +5,10 @@
 const engineType &inline4FitType();   // engines/inline4_fit/inline4_fit.hpp
 const engineType &ducatiV4Type();     // engines/ducati_v4/ducati_v4.hpp
 const engineType &bmwS1000rrType();   // engines/bmw_s1000rr/bmw_s1000rr.hpp
+const engineType &kawasakiH2Type();   // engines/kawasaki_h2/kawasaki_h2.hpp
 
 const std::vector<const engineType *> &engineTypes() {
-    static const std::vector<const engineType *> all{&inline4FitType(), &ducatiV4Type(), &bmwS1000rrType()};
+    static const std::vector<const engineType *> all{&inline4FitType(), &ducatiV4Type(), &bmwS1000rrType(), &kawasakiH2Type()};
     return all;
 }
 

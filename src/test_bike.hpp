@@ -238,7 +238,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     sim.drive.clutchPedal = false;  // lever released at its slow rate
     double minRpm = 1e9;
     run(2.5, [&] { minRpm = std::min(minRpm, sim.rpm()); });
-    check("manual take-off: lowest rpm (no stall)", minRpm, 900, 5000, "rpm");
+    check("manual take-off: lowest rpm (no stall)", minRpm, S.takeoffMinRpm, 5000, "rpm");
     sim.pedalTarget = 0.7;
     while (sim.rpm() < 11000.0 && sim.time < 60.0) run(0.001, none);
     double vBefore = sim.drive.v, rpmBefore = sim.rpm();
