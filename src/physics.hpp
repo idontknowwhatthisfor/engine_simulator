@@ -787,7 +787,11 @@ struct engineSim {
         } else if (region == 1) {
             s.p *= std::pow(volume(s, phiOld) / volume(s, phiNew), P.gamma);
             double phiS = 360.0 * DEGR - sparkAdvance(r);
-            if (!s.sparked && dphi > 0.0 && phiOld < phiS && phiNew >= phiS) {
+            // fire once the crank is at or past the spark point. Not "crossed it this step": the
+            // advance moves with rpm and (boosted) manifold pressure, and when it moves back past
+            // the crank between two steps a crossing test never sees it and the cylinder misfires
+            // (sparked is reset when the intake valve closes, so this fires once per cycle)
+            if (!s.sparked && dphi > 0.0 && phiNew >= phiS) {
                 s.sparked = true;
                 s.phiSpark = phiS;
                 s.xbDone = 0.0;
