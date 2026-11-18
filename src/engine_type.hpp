@@ -107,6 +107,8 @@ struct engineType {
     exhaustLayout (*exhaustTurbo)(const engineModel &) = nullptr;
     const char *turboMeshFile = "";        // relative to the project root
     const char *turboBuildHint = "";
+    const char *turboCredit = "";          // --turbo yes: the turbo model's licence line, under credit
+    bool hudFiringLine = true;             // the HUD names the firing order above the cylinders' strokes
     std::vector<rideStep> ride;            // bikes: the --wav demo ride (empty: the stand script)
     std::vector<engineVariant> variants;   // other versions of this engine (--variant name)
 };

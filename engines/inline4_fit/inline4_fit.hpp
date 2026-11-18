@@ -157,6 +157,8 @@ const engineType &inline4FitType() {
         t.exhaustTurbo = inline4FitTurboExhaust;
         t.turboMeshFile = "engines/inline4_fit/turbo.mesh";
         t.turboBuildHint = "python3 -I engines/inline4_fit/build_turbo.py";
+        t.turboCredit = "turbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0";
+        t.hudFiringLine = false;   // the car's HUD lists the strokes without the order's name
         return t;
     }();
     return T;

@@ -195,7 +195,7 @@ void dumpType(const paramDumper &d, const engineType &t, const engineModel &e) {
     d.set("exhaustTurbo", t.exhaustTurbo);
     if (t.bike) d.put("zPrimary", primaryGearZ(e));  // from the mesh
     DUMP(d, t, gearboxSide); DUMP(d, t, primaryModule);
-    DUMP(d, t, turboMeshFile); DUMP(d, t, turboBuildHint);
+    DUMP(d, t, turboMeshFile); DUMP(d, t, turboBuildHint); DUMP(d, t, turboCredit); DUMP(d, t, hudFiringLine);
     d.put("ride", static_cast<int>(t.ride.size()));
     for (std::size_t k = 0; k < t.ride.size(); k++) {
         const rideStep &r = t.ride[k];

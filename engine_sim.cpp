@@ -17,6 +17,7 @@
 #include "src/dyno.hpp"
 #include "src/dump_params.hpp"
 #include "src/test_synth.hpp"
+#include "src/hud.hpp"
 
 // ---------------------------------------------------------------------------------------------
 // command line, for scripted test runs
@@ -144,13 +145,15 @@ int main(int argc, char **argv) {
     try {
         opt = parseArgs(argc, argv);
     } catch (const std::exception &ex) {
-        std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type inline4|v4|s1000rr] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
+        std::string ids;  // the registered engines
+        for (const engineType *t : engineTypes()) ids += std::string(ids.empty() ? "" : "|") + t->id;
+        std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type %s] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
                              "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--no-wheelie]\n"
                              "                  [--turbo yes|no] [--bov yes|no] [--tuned yes|no] [--variant name]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
-                             "       engine_sim --engine-type list [--ids]\n", ex.what());
+                             "       engine_sim --engine-type list [--ids]\n", ex.what(), ids.c_str());
         return 1;
     }
 
@@ -191,8 +194,14 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (opt.turbo && !type.exhaustTurbo) {
-        std::fprintf(stderr, type.supercharged ? "--turbo yes: the %s is already supercharged\n"
-                                               : "--turbo yes: the %s has no turbo layout (only inline4 has one)\n", type.name);
+        if (type.supercharged) std::fprintf(stderr, "--turbo yes: the %s is already supercharged\n", type.name);
+        else {
+            std::string have;  // the engines that do have a turbo layout
+            for (const engineType *t : engineTypes())
+                if (t->exhaustTurbo) have += std::string(have.empty() ? "" : ", ") + t->id;
+            std::fprintf(stderr, "--turbo yes: the %s has no turbo layout (%s)\n", type.name,
+                         have.empty() ? "no engine has one" : ("only " + have + " has one").c_str());
+        }
         return 1;
     }
 
@@ -369,22 +378,10 @@ int main(int argc, char **argv) {
     int fpsFrames = 0;
     float prevDelta = static_cast<float>(sim.theta - eng.cyls[0].theta0);
     frameEffects fx;
-    std::string textStr;
-    sf::Text text(font, textStr, 16);
-    sf::Text help(font, type.bike && opt.engineOnly
-                            ? "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  I: ignition\n"
-                              "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset"
-                            : type.bike
-                            ? "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  S: brake  I: ignition\n"
-                              "T: auto/manual  Z: sport  E/Q: shift  N: neutral  C: clutch  V: wheelie ctrl  H/J: hill  L: passenger" +
-                              std::string(type.supercharged ? "  F: bypass" : "") + "\n"
-                              "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset"
-                               : "drag: orbit  scroll: zoom  SPACE: starter  W/1-0: throttle  S: brake  I: ignition\n"
-                                 "T: auto/manual  Z: sport  E/Q: shift up/down (Q at a stop: R)  C: clutch  H/J: hill up/down  L: cargo" +
-                                 std::string(opt.turbo ? "  F: BOV" : "") + "\n"
-                                 "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset", 14);
+    sf::Text text(font, "", 16);
+    sf::Text help(font, helpText(sim), 14);
     help.setFillColor(sf::Color(150, 150, 160));
-    sf::Text credit(font, std::string(type.credit) + (showTurbo && opt.turbo ? "\nturbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0" : ""), 12);
+    sf::Text credit(font, std::string(type.credit) + (showTurbo && opt.turbo && *type.turboCredit ? std::string("\n") + type.turboCredit : ""), 12);
     credit.setFillColor(sf::Color(110, 110, 120));
 
     std::vector<mat4> modelOf;
@@ -526,82 +523,17 @@ int main(int argc, char **argv) {
         }
         if (firstFrame || clock3.getElapsedTime().asSeconds() >= 0.1f) {
             firstFrame = false;
-            double kw = sim.brakeAvg * sim.omega / 1000.0;
-            std::string strokes;
-            std::vector<int> order(sim.cyl.size());
-            for (std::size_t c = 0; c < order.size(); c++) order[c] = static_cast<int>(c);
-            std::sort(order.begin(), order.end(), [&](int a, int b) { return sim.lag[a] < sim.lag[b]; });
-            for (int c : order) {  // firing order
-                std::string name = sim.stroke(c);
-                name.resize(8, ' ');
-                strokes += std::string(c == 0 ? "\n" : "") + " " + std::to_string(c + 1) + " " + name.substr(0, 4) + " " +
-                           numToStr(static_cast<float>(sim.cyl[c].p / 1e5), 1);
-            }
-            const drivetrain &dv = sim.drive;
-            auto f0 = [](double v) { return numToStr(static_cast<float>(v), 0); };
-            auto gname = [](int g) { return g == 0 ? std::string("N") : g < 0 ? std::string("R") : std::to_string(g); };
-            std::string gearName = gname(dv.gear);
-            if (dv.shiftPhase) gearName += ">" + gname(dv.targetGear);
-            double slipRpm = (sim.omega - dv.omegaIn) * 60.0 / (2.0 * 3.14159265358979323846);
-            std::string flags = std::string(sim.ignition ? "" : "  IGNITION OFF") + (sim.revCut ? "  REV CUT" : "") +
-                                (sim.fuelCut ? "  FUEL CUT" : "") + (sim.starter ? "  STARTER" : "") +
-                                (dv.brake ? "  BRAKE" : "");
-            bool bike = dv.P.bike;
-            std::string camStr = sim.P.lowCam ? (sim.onLowCam(sim.rpm()) ? "   ShiftCam: partial-load lobe" : "   ShiftCam: full lobe") : "";
-            if (bike && dv.qsPhase != 0) gearName += ">" + gname(dv.targetGear);
-            if (bike && sim.tcTrim < 0.98) flags += "  WHEELIE CTRL";
-            if (bike && !dv.wheelieControl) flags += "  wheelie ctrl off";
-            if (sim.standalone)
-                textStr = " FPS " + (fps > 0.f ? f0(fps) : std::string("--")) + "   time x" +
-                      numToStr(static_cast<float>(TIME_SCALES[scaleIdx]), 2) + (paused ? "   PAUSED" : "") +
-                      "\n RPM " + f0(sim.rpm()) + "   " + type.label + ", on a stand" + camStr +
-                      "\n twist grip " + f0(sim.pedal * 100.0) + "%  throttle " + f0(sim.throttleOpen * 100.0) +
-                      "%  manifold " + f0(sim.pMan / 1000.0) + " kPa" +
-                      "\n torque " + numToStr(static_cast<float>(sim.brakeAvg), 1) + " N m  power " +
-                      numToStr(static_cast<float>(std::max(kw, 0.0)), 1) + " kW (" +
-                      f0(std::max(kw, 0.0) * 1.341) + " hp)" +
-                      (flags.empty() ? "" : "\n" + flags) +
-                      "\n shake 1st " + numToStr(static_cast<float>(sim.shake1() / 1000.0), 2) + " kN  2nd " +
-                      numToStr(static_cast<float>(sim.shake2() / 1000.0), 2) + " kN  roll +-" + f0(sim.rollAmp()) + " N m" +
-                      "\n sound " + (audio ? (audio->muted ? "muted" : "on") : "off") + "  shake view x" +
-                      f0(SHAKE_VIEWS[shakeIdx]) + "  block " + (ghost == 0 ? "ghost" : "hidden") + "  blur " +
-                      (blur ? "on" : "off") +
-                      "\n firing (" + hudFiring(type, eng) + "):" + strokes;
-            else
-            textStr = " FPS " + (fps > 0.f ? f0(fps) : std::string("--")) + "   time x" +
-                      numToStr(static_cast<float>(TIME_SCALES[scaleIdx]), 2) + (paused ? "   PAUSED" : "") +
-                      "\n RPM " + f0(sim.rpm()) + (*type.hudTag ? std::string("  ") + type.hudTag : std::string()) + "   gear " + gearName + (dv.automatic ? (dv.sport ? " SPORT" : " AUTO") : " MANUAL") +
-                      "   " + f0(dv.v * 3.6) + " km/h" + camStr +
-                      (bike ? "\n twist grip " : "\n pedal ") + f0(sim.pedal * 100.0) + "%  throttle " + f0(sim.throttleOpen * 100.0) +
-                      "%  manifold " + f0(sim.pMan / 1000.0) + " kPa" +
-                      (sim.P.turbo.on ? "\n boost " + std::string(sim.boostBar() >= 0.0 ? "+" : "") + numToStr(static_cast<float>(sim.boostBar()), 2) +
-                                            (sim.P.turbo.supercharger
-                                                 ? " bar  plenum " + f0(sim.pCharge / 1000.0) + " kPa  drive " + f0(sim.chargerTorque * sim.omega / 1000.0) +
-                                                       " kW" + (sim.pInlet > sim.P.pAtm + 200.0 ? "  ram +" + f0(sim.pInlet - sim.P.pAtm) + " Pa" : "")
-                                                 : " bar  wastegate " + f0(sim.wastegate * 100.0) + "%  back pressure " + f0(sim.pExh / 1000.0) + " kPa") +
-                                            "\n charge " + f0(sim.tCharge - 273.15) + " C (compressor " + f0(sim.tComp - 273.15) + " C)  " +
-                                            (sim.P.turbo.supercharger ? "bypass valve " : "blow-off valve ") +
-                                            (!sim.P.turbo.bov ? "removed" : sim.bovOpen > 0.05 ? "VENTING" : "shut") +
-                                            (sim.surge > 0.2 ? "  SURGE" : "")
-                                      : std::string()) +
-                      "\n torque " + numToStr(static_cast<float>(sim.brakeAvg), 1) + " N m  power " +
-                      numToStr(static_cast<float>(std::max(kw, 0.0)), 1) + " kW  wheels " +
-                      numToStr(static_cast<float>((bike ? sim.wheelForceFilt : dv.wheelForce) / 1000.0), 2) + " kN" +
-                      (bike ? "\n clutch lever " : "\n clutch pedal ") + f0((1.0 - dv.clutch) * 100.0) + "%  slip " + f0(slipRpm) + " rpm" +
-                      "\n hill " + (dv.grade >= 0 ? "+" : "") + f0(dv.grade * 100.0) + "%  mass " +
-                      f0(dv.mass()) + " kg" + (dv.cargo > 0 ? (bike ? " (passenger)" : " (cargo)") : "") +
-                      (showExhaust ? "\n exhaust: headers ~" + std::to_string(exhaust.headerC()) + " C" +
-                                         (exhaust.flapAt.on ? "  valve " + f0(exhaust.flap * 100.0) + "% open" : "") +
-                                         (showTurbo ? (sim.P.turbo.supercharger ? "  supercharger " : "  turbo ") + f0(sim.turboRpm() / 1000.0) + "k rpm" : "")
-                                   : std::string()) +
-                      (flags.empty() ? "" : "\n" + flags) +
-                      "\n shake 1st " + numToStr(static_cast<float>(sim.shake1() / 1000.0), 2) + " kN  2nd " +
-                      numToStr(static_cast<float>(sim.shake2() / 1000.0), 2) + " kN  roll +-" + f0(sim.rollAmp()) + " N m" +
-                      "\n sound " + (audio ? (audio->muted ? "muted" : "on") : "off") + "  shake view x" +
-                      f0(SHAKE_VIEWS[shakeIdx]) + "  block " + (ghost == 0 ? "ghost" : "hidden") + "  blur " +
-                      (blur ? "on" : "off") +
-                      (bike ? "\n firing (" + hudFiring(type, eng) + "):" : std::string()) + strokes;
-            text.setString(textStr);
+            hudView hv;
+            hv.fps = fps;
+            hv.timeScale = TIME_SCALES[scaleIdx];
+            hv.paused = paused;
+            hv.sound = audio ? (audio->muted ? "muted" : "on") : "off";
+            hv.shakeView = SHAKE_VIEWS[shakeIdx];
+            hv.ghost = ghost == 0;
+            hv.blur = blur;
+            hv.exhaust = showExhaust ? &exhaust : nullptr;
+            hv.showTurbo = showTurbo;
+            text.setString(hudText(sim, type, eng, hv));
         }
 
         // 3D pass
