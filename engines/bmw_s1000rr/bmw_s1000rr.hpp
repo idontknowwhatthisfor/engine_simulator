@@ -88,6 +88,8 @@ bikeSpec bmwSpec() {
 // link pipe with the flap and the short silencer rising on the right behind the gearbox.
 exhaustLayout bmwS1000rrExhaust(const engineModel &e) { return superbike421Exhaust(e); }
 
+const engineType &bmwS1000rrTunedType();  // --tuned yes, below
+
 const engineType &bmwS1000rrType() {
     static const engineType T = [] {
         engineType t;
@@ -123,6 +125,110 @@ const engineType &bmwS1000rrType() {
             {24.0, false, 0.0, 0, "brakes off, overrun", false},
             {27.0, false, 0.6, 0, "back on the throttle", false},
         };
+        t.variants = {{"tuned", bmwS1000rrTunedType}};
+        return t;
+    }();
+    return T;
+}
+
+// ---- --tuned yes: the M 1000 RR's engine -----------------------------------------------------------
+// BMW's own tune of the K67 for the M 1000 RR (2021-): 156 kW (212 hp) at 14500 rpm, 113 N m at
+// 11000 rpm, 15100 rpm limiter, 13.5:1. Pankl titanium rods and two-ring Mahle box pistons (less
+// reciprocating mass), reworked intake ports and a higher-lift, longer race lobe, so the engine pulls
+// to the higher limiter; the ShiftCam partial-load lobe, the gearbox and the gearing stay stock here.
+// On top: a titanium race exhaust with the exhaust valve deleted (louder, more crackle).
+engineParams bmwS1000rrTunedParams() {
+    engineParams P = bmwS1000rrParams();
+    P.compression = 13.5;
+    P.mRecip = 0.29;                // titanium rods, lighter two-ring pistons
+    P.ivc = 250.0 * DEGR;           // longer race lobe: intake closes 70 deg after BDC
+    P.evo = 475.0 * DEGR;           // exhaust opens 5 deg earlier: blows down in time at 15000 rpm
+    P.revLimit = 15100.0; P.revResume = 14700.0;
+    // calibrated with --engine-type s1000rr --tuned yes --phystest: ~115 N m at 11000 rpm and ~156 kW
+    // at 14500, the stock mid-range kept (the ShiftCam lobe below 9000 is unchanged)
+    P.veBase = 0.50; P.vePeak = 0.655; P.veRpm = 11800.0; P.veWidth = 8000.0;
+    soundParams &S = P.sound;       // race exhaust, valve deleted
+    S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
+    S.flapShutGain = 1.0;
+    S.popChance = 0.5;
+    S.drive = 0.3;
+    S.pipeLength = 1.05;            // the short race can: a shorter pipe, a higher note
+    S.pipeResHz = 240.0;
+    return P;
+}
+
+// the race exhaust: the stock titanium 4-2-1 route with the valve deleted, and a short titanium can
+// with a carbon end cap in place of the silencer
+exhaustLayout bmwS1000rrTunedExhaust(const engineModel &e) {
+    exhaustLayout L = bmwS1000rrExhaust(e);
+    const std::array<float, 4> TI{0.62f, 0.60f, 0.56f, 1.f}, CARBON{0.10f, 0.10f, 0.11f, 1.f};
+    L.pipes.resize(L.pipes.size() - 2);  // drop the silencer and its end cap
+    int link = static_cast<int>(L.pipes.size()) - 1;
+    pipeSpec can;
+    can.pts = {{-250.f, 205.f, 140.f}, {-340.f, 140.f, 156.f}};
+    can.r0 = 44.f; can.r1 = 40.f;
+    can.from = {link};
+    can.rgba = TI; can.rough = 0.25f; can.metal = 0.95f;
+    can.capStart = can.capEnd = true;
+    L.pipes.push_back(can);
+    pipeSpec cap;
+    cap.pts = {{-335.f, 144.f, 156.f}, {-356.f, 128.f, 159.f}};
+    cap.r0 = 40.f; cap.r1 = 28.f;
+    cap.from = {static_cast<int>(L.pipes.size()) - 1};
+    cap.rgba = CARBON; cap.rough = 0.5f; cap.metal = 0.2f;
+    cap.capStart = true;
+    L.pipes.push_back(cap);
+    pipeSpec tip;
+    tip.pts = {{-354.f, 130.f, 159.f}, {-366.f, 121.f, 161.f}};
+    tip.r0 = 24.f; tip.r1 = 24.f;
+    tip.from = {static_cast<int>(L.pipes.size()) - 1};
+    tip.rgba = TI; tip.rough = 0.25f; tip.metal = 0.95f;
+    tip.capStart = true;
+    L.pipes.push_back(tip);
+    L.outlets = {{{-366.f, 121.f, 161.f}, {-12.f, -9.f, 2.f}, 24.f}};
+    L.flap.on = false;              // valve deleted
+    return L;
+}
+
+drivetrainParams bmwS1000rrTunedDriveParams() {
+    drivetrainParams P = bmwDriveParams();
+    P.upPedal = 10400.0;            // full throttle: change up just under the 15100 limiter
+    P.sportUp = 14600.0; P.sportDown = 10500.0;
+    return P;
+}
+
+bikeSpec bmwS1000rrTunedSpec() {
+    bikeSpec S = bmwSpec();
+    S.name = "BMW S 1000 RR (tuned, M 1000 RR engine)";
+    S.limLo = 15100; S.limHi = 15700;
+    S.torqueWhat = "peak torque (M 1000 RR: 113 N m)";
+    S.torqueRpmWhat = "peak torque rpm (M 1000 RR: 11000)";
+    S.powerWhat = "peak power (M 1000 RR: 156 kW / 212 hp)";
+    S.powerRpmWhat = "peak power rpm (M 1000 RR: 14500)";
+    S.torqueLo = 104; S.torqueHi = 122; S.torqueRpmLo = 10000; S.torqueRpmHi = 12500;
+    S.powerLo = 150; S.powerHi = 168; S.powerRpmLo = 14000; S.powerRpmHi = 15000;
+    S.sweepTo = 15500;
+    S.bikeWhat = "S 1000 RR gearing, 277 kg with rider (tuned)";
+    S.upshiftLo = 13700; S.upshiftHi = 15200;
+    S.topWhat = "top speed after 30 s, 6th gear (tuned)";
+    S.topLo = 285; S.topHi = 325;
+    return S;
+}
+
+const engineType &bmwS1000rrTunedType() {
+    static const engineType T = [] {
+        engineType t = bmwS1000rrType();
+        t.id = "s1000rr-tuned";
+        t.name = "BMW S 1000 RR (tuned)";
+        t.summary = "BMW S 1000 RR with the M 1000 RR's engine: titanium rods, race lobe, 15100 limiter, race exhaust";
+        t.label = "BMW S 1000 RR inline-4, 999 cc, TUNED";
+        t.windowTitle = "S 1000 RR engine (tuned)";
+        t.hudTag = "TUNED";
+        t.engine = bmwS1000rrTunedParams;
+        t.drive = bmwS1000rrTunedDriveParams;
+        t.spec = bmwS1000rrTunedSpec;
+        t.exhaust = bmwS1000rrTunedExhaust;
+        t.variants.clear();  // a variant has no variants of its own
         return t;
     }();
     return T;

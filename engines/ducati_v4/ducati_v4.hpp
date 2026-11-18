@@ -147,10 +147,29 @@ exhaustLayout ducatiV4Exhaust(const engineModel &e) {
     int box = pipe({{-60.f, 270.f, 0.f}, {160.f, 270.f, 0.f}}, 46.f, 46.f, -1, {front, rear}, BLACK, true);
     // two short outlets leave the box's right side and turn back along the bike (rear is +x), one above
     // the other, ending just behind the box like the Panigale V4's low right-hand tips
-    pipe({{60.f, 262.f, 30.f}, {110.f, 262.f, 62.f}, {170.f, 260.f, 74.f}, {225.f, 258.f, 80.f}}, 18.f, 18.f, -1, {box}, STEEL, true);
-    pipe({{60.f, 292.f, 30.f}, {110.f, 296.f, 62.f}, {170.f, 300.f, 74.f}, {220.f, 303.f, 80.f}}, 18.f, 18.f, -1, {box}, STEEL, true);
-    L.outlets.push_back({{225.f, 258.f, 80.f}, {1.f, -0.04f, 0.11f}, 18.f});
-    L.outlets.push_back({{220.f, 303.f, 80.f}, {1.f, 0.06f, 0.12f}, 18.f});
+    int upper = pipe({{60.f, 262.f, 30.f}, {110.f, 262.f, 62.f}, {170.f, 260.f, 74.f}, {225.f, 258.f, 80.f}}, 18.f, 18.f, -1,
+                     {box}, STEEL, true);
+    int lower = pipe({{60.f, 292.f, 30.f}, {110.f, 296.f, 62.f}, {170.f, 300.f, 74.f}, {220.f, 303.f, 80.f}}, 18.f, 18.f, -1,
+                     {box}, STEEL, true);
+    // a finisher on each outlet: a satin-black sleeve over the pipe end, a size up, with a polished lip.
+    // Both are open at the back, so the outlet reads as a hole, and the flames leave from the lip
+    const std::array<float, 4> SATIN{0.16f, 0.16f, 0.17f, 1.f}, POLISHED{0.78f, 0.76f, 0.72f, 1.f};
+    auto finisher = [&](int from, vec3 end, vec3 dir) {
+        dir = normalize(dir);
+        vec3 a = end - dir * 12.f, b = end + dir * 30.f, c = b + dir * 4.f;
+        pipeSpec s;
+        s.pts = {a, b}; s.r0 = 22.f; s.r1 = 22.5f; s.from = {from};
+        s.rgba = SATIN; s.rough = 0.55f; s.metal = 0.6f;
+        s.capStart = true;
+        L.pipes.push_back(s);
+        pipeSpec lip;
+        lip.pts = {b, c}; lip.r0 = 22.5f; lip.r1 = 22.5f; lip.from = {static_cast<int>(L.pipes.size()) - 1};
+        lip.rgba = POLISHED; lip.rough = 0.15f; lip.metal = 1.f;
+        L.pipes.push_back(lip);
+        L.outlets.push_back({c, dir, 22.5f});
+    };
+    finisher(upper, {225.f, 258.f, 80.f}, {1.f, -0.04f, 0.11f});
+    finisher(lower, {220.f, 303.f, 80.f}, {1.f, 0.06f, 0.12f});
     // exhaust valve in the rear secondary
     L.flap.on = true;
     L.flap.at = {205.f, 249.f, 9.f};
@@ -159,6 +178,8 @@ exhaustLayout ducatiV4Exhaust(const engineModel &e) {
     L.flap.pipeR = 27.f;
     return L;
 }
+
+const engineType &ducatiV4TunedType();  // --tuned yes, below
 
 const engineType &ducatiV4Type() {
     static const engineType T = [] {
@@ -196,6 +217,101 @@ const engineType &ducatiV4Type() {
             {24.0, false, 0.0, 0, "brakes off, overrun", false},
             {27.0, false, 0.6, 0, "back on the throttle", false},
         };
+        t.variants = {{"tuned", ducatiV4TunedType}};
+        return t;
+    }();
+    return T;
+}
+
+// ---- --tuned yes: the race exhaust and its map ------------------------------------------------------
+// Ducati's accessory route to more power for the Desmosedici Stradale: a full titanium racing exhaust
+// (Akrapovic-made) with the ECU map that comes with it, quoted at about 226 hp (166 kW) against the
+// stock 214. The engine itself is stock: the gains are at the top, where the freer system lets the
+// cylinders empty and fill better (the bigger, unrestricted collector and short cans), and the map
+// adds a little spark and fuel. The limiter, gearbox and gearing are stock.
+engineParams ducatiV4TunedParams() {
+    engineParams P = ducatiV4Params();
+    // calibrated with --engine-type v4 --tuned yes --phystest: 130 N m at 11000 and 164.5 kW at
+    // 13000 rpm, against stock's 124 N m at 10500 and 155 kW; a little more everywhere above 7000
+    P.veBase = 0.60; P.vePeak = 0.60; P.veRpm = 11400.0; P.veWidth = 6000.0;
+    P.sparkHigh = 37.0;             // race map
+    soundParams &S = P.sound;       // open race system, no exhaust valve
+    S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
+    S.flapShutGain = 1.0;
+    S.popChance = 0.6;
+    S.drive = 0.27;
+    S.pipeLength = 1.3;             // the same headers into short cans: a little shorter, a higher note
+    S.pipeResHz = 170.0;
+    S.burble = 3.5;                 // a harder lope at idle with the valve gone
+    return P;
+}
+
+// the race exhaust: titanium headers on the stock route (a size up), the two bank pairs into a titanium
+// collector under the engine in place of the black pre-silencer, then two short titanium cans stacked on
+// the right with carbon end caps and open titanium tips. No exhaust valve.
+exhaustLayout ducatiV4TunedExhaust(const engineModel &e) {
+    exhaustLayout L = ducatiV4Exhaust(e);
+    const std::array<float, 4> TI{0.62f, 0.60f, 0.56f, 1.f}, BLUED{0.45f, 0.42f, 0.55f, 1.f},
+        CARBON{0.10f, 0.10f, 0.11f, 1.f};
+    // the stock layout: 4 headers, 2 bank merges, then the pre-silencer and the outlets; keep the pipework
+    L.pipes.resize(6);
+    for (pipeSpec &p : L.pipes) {
+        if (p.cyl >= 0) { p.r0 = 21.f; p.r1 = 22.f; p.rgba = BLUED; }  // heat-blued titanium headers
+        else p.rgba = TI;
+        p.rough = 0.25f; p.metal = 0.95f;
+    }
+    auto pipe = [&](std::vector<vec3> pts, float r0, float r1, std::vector<int> from, std::array<float, 4> c,
+                    bool capStart, bool capEnd) {
+        pipeSpec p;
+        p.pts = pts; p.r0 = r0; p.r1 = r1; p.from = from; p.rgba = c;
+        p.rough = c == CARBON ? 0.5f : 0.25f;
+        p.metal = c == CARBON ? 0.2f : 0.95f;
+        p.capStart = capStart; p.capEnd = capEnd;
+        L.pipes.push_back(p);
+        return static_cast<int>(L.pipes.size()) - 1;
+    };
+    int col = pipe({{-60.f, 270.f, 0.f}, {160.f, 270.f, 0.f}}, 32.f, 32.f, {4, 5}, TI, true, true);
+    // two cans, one above the other, leaving the collector's right side and running back along the bike
+    for (float y : {238.f, 304.f}) {
+        int link = pipe({{40.f, 270.f, 20.f}, {75.f, y, 50.f}, {110.f, y, 72.f}}, 20.f, 20.f, {col}, TI, true, false);
+        int can = pipe({{105.f, y, 72.f}, {235.f, y - 4.f, 88.f}}, 30.f, 28.f, {link}, TI, true, true);
+        int cap = pipe({{230.f, y - 4.f, 88.f}, {252.f, y - 5.f, 91.f}}, 28.f, 20.f, {can}, CARBON, true, false);
+        pipe({{250.f, y - 5.f, 91.f}, {262.f, y - 5.f, 92.f}}, 14.f, 14.f, {cap}, TI, true, false);
+        L.outlets.push_back({{262.f, y - 5.f, 92.f}, {1.f, 0.f, 0.08f}, 14.f});
+    }
+    L.outlets.erase(L.outlets.begin(), L.outlets.end() - 2);  // the stock finishers' outlets go
+    L.flap.on = false;              // valve deleted
+    return L;
+}
+
+bikeSpec ducatiV4TunedSpec() {
+    bikeSpec S = ducatiSpec();
+    S.name = "Ducati V4 (tuned)";
+    S.torqueWhat = "peak torque (tuned)";
+    S.torqueRpmWhat = "peak torque rpm (tuned)";
+    S.powerWhat = "peak power (Ducati, race exhaust: ~166 kW / 226 hp)";
+    S.powerRpmWhat = "peak power rpm (tuned)";
+    S.torqueLo = 118; S.torqueHi = 140; S.torqueRpmLo = 9500; S.torqueRpmHi = 12000;
+    S.powerLo = 158; S.powerHi = 178; S.powerRpmLo = 12500; S.powerRpmHi = 14000;
+    S.bikeWhat = "Panigale V4 gearing, 278 kg with rider (tuned)";
+    S.topWhat = "top speed after 30 s, 6th gear (tuned)";
+    S.topLo = 275; S.topHi = 315;
+    return S;
+}
+
+const engineType &ducatiV4TunedType() {
+    static const engineType T = [] {
+        engineType t = ducatiV4Type();
+        t.id = "v4-tuned";
+        t.name = "Ducati V4 (tuned)";
+        t.summary = "Ducati Desmosedici Stradale V4, tuned: titanium race exhaust and its map, no exhaust valve";
+        t.label = "Ducati-style 90 deg V4, 1103 cc, TUNED";
+        t.windowTitle = "V4 engine (tuned)";
+        t.hudTag = "TUNED";
+        t.engine = ducatiV4TunedParams;
+        t.spec = ducatiV4TunedSpec;
+        t.exhaust = ducatiV4TunedExhaust;
+        t.variants.clear();  // a variant has no variants of its own
         return t;
     }();
     return T;

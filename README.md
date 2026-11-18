@@ -85,6 +85,32 @@ Built from the inline-4's piston and rod, scaled, on a new procedural crank and 
 | Results (sim) | 0–100 km/h 3.3 s, 0–200 km/h 6.8 s, top speed ~289 km/h |
 | Sound | Its own Ducati voice. The Twin Pulse firing comes from the physics: pulses arrive in pairs, so the howl sits at the crank rate (rpm/60), an octave below an even-firing inline-4, with a loping, off-beat idle. On top of that:<br>• longer headers from both banks (lower, darker pipe modes)<br>• an idle burble that gives way to the radiated howl as the revs rise<br>• exhaust valve, airbox honk<br>• more overrun crackle than the BMW<br>• Desmo valvetrain clatter |
 
+#### Tuned (`--tuned yes`)
+
+```bash
+./engine_sim --engine-type v4 --tuned yes
+```
+
+Ducati's own accessory route to more power: the full titanium racing exhaust (made by Akrapovič) and
+the ECU map that comes with it, quoted at about 226 hp (166 kW) against the stock 214. The engine,
+limiter, gearbox and gearing stay stock. The changes:
+
+- the freer system and the map: the engine breathes better from ~7000 rpm up, most of all at the top,
+  and the map adds a little spark advance;
+- the exhaust: heat-blued titanium headers a size up on the stock route, a titanium collector under the
+  engine in place of the black pre-silencer, and two short titanium cans stacked on the right with
+  carbon end caps. No exhaust valve;
+- the voice: louder, with a harder idle lope, more crackle and a slightly higher pipe note.
+
+| | Stock | Tuned (sim) |
+|---|---|---|
+| Peak torque | 124 N·m at 10500 rpm | 130 N·m at 11000 rpm |
+| Peak power | 155 kW (208 hp) at 13000 rpm | 164.5 kW (221 hp) at 13000 rpm |
+| 0–200 km/h | 6.8 s | 6.8 s |
+| After 30 s in 6th | ~290 km/h | ~292 km/h (6th tops out at the 14000 limiter) |
+
+The HUD shows TUNED after the rpm.
+
 ### `s1000rr`: BMW S 1000 RR (2023-, K67 ShiftCam engine)
 
 Built the same way as the V4: an inline-4 with the block inclined 32° forward and a forward-turning
@@ -102,6 +128,34 @@ crank.
 | Exhaust (3D) | 4-2-1 titanium headers from the front of the inclined head, under the engine (1+4 and 2+3 merge), collector, link pipe with the exhaust flap, short silencer rising on the right behind the gearbox |
 | Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 6.9 s, 307 km/h in 6th |
 | Sound | Its own voice (the inline-4 keeps the original one):<br>• radiated exhaust (brightens with revs) through a 4-2-1 quarter-wave pipe<br>• exhaust flap, shut at idle and open from ~5000 rpm or under throttle<br>• airbox honk at full throttle<br>• overrun crackle that fades out<br>• quickshifter bark<br>• straight-cut gear whine<br>• valvetrain tick |
+
+#### Tuned (`--tuned yes`)
+
+```bash
+./engine_sim --engine-type s1000rr --tuned yes
+```
+
+BMW's own tune of this engine: the M 1000 RR's (2021-), which BMW rates at 156 kW (212 hp) at
+14500 rpm and 113 N·m at 11000 rpm, with a 15100 rpm limiter. The block, the ShiftCam partial-load
+lobe, the gearbox and the gearing stay stock. The changes:
+
+- titanium rods and lighter two-ring pistons (less reciprocating mass), 13.5:1;
+- reworked ports and a longer race lobe (intake closes 5° later, exhaust opens 5° earlier), so the
+  engine breathes to the higher limiter. The mid range below 9000 rpm is unchanged;
+- the limiter raised from 14600 to 15100 rpm, and the full-throttle upshift moved to ~14700 rpm;
+- a titanium race exhaust: the stock 4-2-1 route without the exhaust valve, and a short titanium can
+  with a carbon end cap in place of the silencer. It's louder, with more crackle and a higher note.
+
+| | Stock | Tuned (sim) |
+|---|---|---|
+| Peak torque | 114.5 N·m at 11000 rpm | 115 N·m at 11000 rpm |
+| Peak power | 153 kW (205 hp) at 14500 rpm | 156 kW (209 hp) at 14500 rpm |
+| Limiter | 14600 rpm | 15100 rpm |
+| 0–200 km/h | 6.9 s | 6.8 s |
+| After 30 s in 6th | ~307 km/h | ~319 km/h |
+
+The sim's figures come from `--phystest` (no ram air), like the stock engine's. The HUD shows TUNED
+after the rpm.
 
 ### `h2`: Kawasaki Ninja H2 (2015-), supercharged
 
@@ -304,7 +358,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--grade pct --reverse --sport --no-wheelie` | Starting conditions |
 | `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below). With `--phystest`, runs the turbo checks; with `--wav`, plays the turbo drive |
 | `--bov yes\|no` | With the turbo: fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
-| `--variant name` | Another version of the engine (only `h2` has one: `tuned`) |
+| `--variant name` | Another version of the engine (`v4`, `s1000rr` and `h2` have one: `tuned`) |
 | `--tuned yes\|no` | Same as `--variant tuned` (default `no`) |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 | `--synthtest N` | Hidden: test an N-cylinder inline engine built in memory (see [Testing](#testing)) |
