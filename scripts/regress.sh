@@ -10,7 +10,8 @@
 #   - the --wav render, compared by sha256 (the sound has a fixed RNG seed; `baseline` renders it twice
 #     to prove that, and falls back to duration + RMS within 0.1% if the two renders differ)
 #   - screenshots: the engine alone (--engine-only), the whole scene (gearbox, exhaust), the scene with
-#     the HUD, and a running engine with the HUD (glow, flames, exhaust heat), compared over every pixel
+#     the HUD, a running engine with the HUD (glow, flames, exhaust heat), the HUD and help on a stand
+#     (--engine-only) and with HUD-changing options, compared over every pixel
 # and the sha256 of every generated .mesh and the --engine-type list output.
 # `check` prints PASS / FAIL per item and exits 1 if anything failed. Output goes to regress/ (gitignored).
 set -u
@@ -46,6 +47,9 @@ SHOTS=(
     "scene|--nohud --noblur --mute --crank 30 --stopat 30"
     "hud|--noblur --mute --crank 30 --stopat 30"
     "running|--noblur --mute --simtime 3 --start --throttle 0.5 --stopat 370"
+    # HUD and help on a stand (the bikes' --engine-only) and with the options that change HUD lines
+    "stand|--noblur --mute --engine-only --simtime 3 --start --throttle 0.5 --stopat 370"
+    "options|--noblur --mute --no-wheelie --grade 5 --sport --bov no --simtime 3 --start --throttle 0.3 --stopat 370"
 )
 
 wav_stats() {  # duration and RMS of a 16-bit mono WAV
