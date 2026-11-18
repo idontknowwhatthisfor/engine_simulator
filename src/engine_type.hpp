@@ -54,6 +54,9 @@ struct bikeSpec {
     double neutralRevMin = 8000.0;                     // revving in N at 40% pedal reaches at least this
     double neutralIdleLo = 1000.0, neutralIdleHi = 2200.0;  // rpm after coasting in N from speed
     double rejoinLo = 3000.0, rejoinHi = 14000.0;      // rpm once N picks a gear again at speed
+    bool liftsFront = true;                            // strong enough to wheelie: the wheelie control must
+                                                       // cut in, and with it off the launch passes 1.15 g
+    double downshiftMaxMs = 200.0;                     // a rev-matched quickshift down takes at most this
 };
 
 // one step of a scripted ride for --wav (bikes): hold these controls until `until` seconds

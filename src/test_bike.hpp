@@ -226,7 +226,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     check(S.zeroTo100What, t100, S.zeroTo100Lo, S.zeroTo100Hi, "s");
     check(S.zeroTo200What, t200, S.zeroTo200Lo, S.zeroTo200Hi, "s");
     check("rpm at the 1 -> 2 upshift", firstShiftRpm, S.upshiftLo, S.upshiftHi, "rpm");
-    check("wheelie control cut in (lowest fuel share)", minTrim, 0.3, 0.95, "");
+    if (S.liftsFront) check("wheelie control cut in (lowest fuel share)", minTrim, 0.3, 0.95, "");
     check("peak smoothed acceleration", peakAccel / 9.81, S.launchAccelLo, S.launchAccelHi, "g");
     check(S.topWhat, sim.drive.v * 3.6, S.topLo, S.topHi, "km/h");
     check("  ... in gear", sim.drive.gear, sim.drive.P.gears, sim.drive.P.gears, "");  // top gear
@@ -278,7 +278,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
         check("  ... throttle blip opened", blipMax, 0.05, 1.0, "");
         check("  ... old gear dropped out first (dogs unloaded)", wentFree ? 1.0 : 0.0, 1, 1, "");
         check("  ... engine speed at engagement vs the gear's", engRpm / engMatch, 0.96, 1.04, "");
-        check("  ... shift time", engT * 1000.0, 10, 200, "ms");
+        check("  ... shift time", engT * 1000.0, 10, S.downshiftMaxMs, "ms");
         check("  ... clutch slip just after (no lurch)", slipAfter, 0, 400, "rpm");
     };
     std::printf("  quickshift down from 2nd on the overrun:\n");
@@ -389,8 +389,12 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     });
     sim.drive.wheelieControl = true;
     check("wheelie control OFF: no fuel trim", trimOff, 1.0, 1.0, "");
-    check("  ... peak smoothed acceleration", accelOff / 9.81, 1.15, 3.0, "g");
-    check("  ... 0-100 km/h (front would be in the air)", t100off, 1.5, t100 - 0.2, "s");
+    if (S.liftsFront) {
+        check("  ... peak smoothed acceleration", accelOff / 9.81, 1.15, 3.0, "g");
+        check("  ... 0-100 km/h (front would be in the air)", t100off, 1.5, t100 - 0.2, "s");
+    } else {
+        std::printf("  (not strong enough to wheelie, bikeSpec::liftsFront: peak %.2f g, 0-100 km/h %.1f s)\n", accelOff / 9.81, t100off);
+    }
     std::printf("%s\n", ok ? "PASS" : "FAIL");
     return ok ? 0 : 1;
 }
