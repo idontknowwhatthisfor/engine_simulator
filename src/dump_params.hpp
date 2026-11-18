@@ -176,14 +176,15 @@ void dumpMesh(const paramDumper &d, const engineModel &e) {
     d.put("hi", e.hi);
 }
 
-void dumpType(const paramDumper &d, const engineType &t) {
+void dumpType(const paramDumper &d, const engineType &t, const engineModel &e) {
     DUMP(d, t, id); DUMP(d, t, aliases); DUMP(d, t, name); DUMP(d, t, summary); DUMP(d, t, label);
-    DUMP(d, t, firing); DUMP(d, t, windowTitle); DUMP(d, t, hudTag); DUMP(d, t, credit); DUMP(d, t, meshFile);
+    d.put("firing", hudFiring(t, e)); DUMP(d, t, windowTitle); DUMP(d, t, hudTag); DUMP(d, t, credit); DUMP(d, t, meshFile);
     DUMP(d, t, buildHint); DUMP(d, t, bike); DUMP(d, t, supercharged);
     d.set("engine", t.engine); d.set("drive", t.drive); d.set("physTest", t.physTest);
     d.set("physTestTurbo", t.physTestTurbo); d.set("spec", t.spec); d.set("exhaust", t.exhaust);
     d.set("exhaustTurbo", t.exhaustTurbo);
-    DUMP(d, t, zPrimary); DUMP(d, t, gearboxSide); DUMP(d, t, primaryModule);
+    if (t.bike) d.put("zPrimary", primaryGearZ(e));  // from the mesh
+    DUMP(d, t, gearboxSide); DUMP(d, t, primaryModule);
     DUMP(d, t, turboMeshFile); DUMP(d, t, turboBuildHint);
     d.put("ride", static_cast<int>(t.ride.size()));
     for (std::size_t k = 0; k < t.ride.size(); k++) {
@@ -200,11 +201,17 @@ int dumpParams(const engineModel &e, const engineType &t, bool turbo, bool bov) 
     setupSim(sim, e, t, e.cyls[0].theta0, false, turbo);
     sim.P.turbo.bov = bov;
     paramDumper root;
-    dumpType(root.sub("type."), t);
+    dumpType(root.sub("type."), t, e);
     dumpEngine(root.sub("engine."), sim.P);
     dumpDrive(root.sub("drive."), sim.drive.P);
     if (t.spec) dumpBikeSpec(root.sub("spec."), t.spec());
     dumpMesh(root.sub("mesh."), e);
-    if (t.exhaust) dumpExhaust(root.sub("exhaust."), turbo ? t.exhaustTurbo(e) : t.exhaust(e));
+    if (t.exhaust) {
+        try {
+            dumpExhaust(root.sub("exhaust."), turbo ? t.exhaustTurbo(e) : t.exhaust(e));
+        } catch (const std::exception &ex) {
+            root.put("exhaust.error", ex.what());  // e.g. a mesh from before v3 without supercharger_at
+        }
+    }
     return 0;
 }

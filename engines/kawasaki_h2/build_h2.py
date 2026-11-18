@@ -14,7 +14,7 @@ Kawasaki Ninja H2 (2015-): 998 cc, 76.0 x 55.0 mm, 8.5:1, 180 deg crank, firing 
 crank rotation. Estimates (not published): rod length 107 mm, bore pitch 84 mm, cylinders inclined
 30 deg forward.
 
-h2.mesh: the v2 engine layout (magic "ENGMSHv2"). Mesh space as for the S 1000 RR: crank axis = Z,
+h2.mesh: the ENGMSHv3 engine format (tools/meshlib.py), with zPrimary and supercharger_at. Mesh space as for the S 1000 RR: crank axis = Z,
 "up" is -Y, front of the bike +X, left side -Z.
 
 h2_supercharger.mesh: the centrifugal supercharger in the "TURBOv1" layout of
@@ -22,7 +22,7 @@ engines/inline4_fit/build_turbo.py, so src/turbo.hpp draws it and spins the impe
 the cylinders on the left, above the gearbox, its impeller axis across the bike, the inlet facing
 left. Its frame: origin SC_AT (mesh space) at the impeller's back plate, +x along the shaft out of
 the inlet (mesh -Z), y = mesh Y, z = mesh +X (forward). kawasaki_h2.hpp places it with the same
-SC_AT. Parts:
+position, stored in h2.mesh. Parts:
     - impeller (rotor): 69 mm, 6 full blades and 6 splitters on a hub, turning at 9.2x the crank;
     - volute, inlet bellmouth, ram-air duct to the front of the fairing, outlet into the plenum
       (surge tank) over the throttle bodies, and the throttle bodies: housings, see-through;
@@ -46,8 +46,8 @@ FIRING = (1, 2, 4, 3)
 
 COVER_GLASS = (0.10, 0.11, 0.12, 0.35, 0.0, 0.35, 1)   # dark graphite cam cover, see-through like the block
 
-# supercharger frame origin in mesh space (mm): impeller back plate. Keep in step with H2_SC_AT in
-# kawasaki_h2.hpp
+# supercharger frame origin in mesh space (mm): impeller back plate. Written into h2.mesh as
+# supercharger_at, where kawasaki_h2.hpp reads it
 SC_AT = (-165.0, -195.0, -95.0)
 IMPELLER_R = 34.5       # 69 mm impeller
 HOUSING, ROTOR, BEARING = range(3)
@@ -61,8 +61,8 @@ def main():
     src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "..", "inline4_fit", "engine.mesh")
     out_file = sys.argv[2] if len(sys.argv) > 2 else os.path.join(here, "h2.mesh")
     sc_file = sys.argv[3] if len(sys.argv) > 3 else os.path.join(here, "h2_supercharger.mesh")
-    eng = inline_engine(src, out_file, b"ENGMSHv2", "Kawasaki Ninja H2 style inline-4", BORE, STROKE, ROD_L, PITCH,
-                        INCLINE, FIRING, COVER_GLASS)
+    eng = inline_engine(src, out_file, "Kawasaki Ninja H2 style inline-4", BORE, STROKE, ROD_L, PITCH,
+                        INCLINE, FIRING, COVER_GLASS, meta=[("supercharger_at", list(SC_AT))])
     build_supercharger(sc_file, eng["deck_y"], eng["zs"])
 
 

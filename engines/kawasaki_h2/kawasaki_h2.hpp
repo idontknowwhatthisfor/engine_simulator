@@ -122,9 +122,6 @@ bikeSpec kawasakiH2Spec() {
             750};  // 41 kg more than the BMW on a softer 8.5:1 bottom end: a 25% take-off bogs deeper
 }
 
-// supercharger frame origin (mesh space): keep in step with SC_AT in build_h2.py
-const vec3 H2_SC_AT{-165.f, -195.f, -95.f};
-
 // exhaust: the inline superbike 4-2-1 layout (src/exhaust_layouts.hpp: headers from the front of the
 // inclined head, down in front of the crankcase and under the engine, collector, link pipe with the
 // flap) into the H2's bigger black-chrome silencer on the right. The layout also places the
@@ -135,7 +132,7 @@ exhaustLayout kawasakiH2Exhaust(const engineModel &e) {
     o.canR0 = 60.f; o.canR1 = 56.f;
     exhaustLayout L = superbike421Exhaust(e, o);
     L.turbo.on = true;
-    L.turbo.at = H2_SC_AT;
+    L.turbo.at = meshPoint(e, "supercharger_at");  // build_h2.py's SC_AT, from h2.mesh
     L.turbo.x = {0.f, 0.f, -1.f};
     L.turbo.y = {0.f, 1.f, 0.f};
     L.turbo.z = {1.f, 0.f, 0.f};
@@ -152,7 +149,6 @@ const engineType &kawasakiH2Type() {
         t.name = "Kawasaki Ninja H2";
         t.summary = "Kawasaki Ninja H2 supercharged inline-4, 998 cc, 180 deg crank, H2 gearing and sound";
         t.label = "Kawasaki Ninja H2 supercharged inline-4, 998 cc";
-        t.firing = "1-2-4-3, 180 deg apart";
         t.windowTitle = "Ninja H2 engine";
         t.credit = "H2 built from \"Inline-4 Engine\" by rafaelaraujo55, CC-BY-4.0";
         t.meshFile = "engines/kawasaki_h2/h2.mesh";
@@ -166,7 +162,6 @@ const engineType &kawasakiH2Type() {
         t.turboMeshFile = "engines/kawasaki_h2/h2_supercharger.mesh";
         t.turboBuildHint = "python3 -I engines/kawasaki_h2/build_h2.py";
         t.spec = kawasakiH2Spec;
-        t.zPrimary = 182.5f;       // build_h2.py prints it
         t.gearboxSide = -1.f;      // forward-turning crank, front at +x: the box sits toward -x
         t.primaryModule = 2.6f * 84.f / (50.f + 74.f);  // 50/74 at the Ducati's 30/54 shaft spacing
         // --wav: the supercharger whines up with the revs and chirps on each snap shut; then a launch

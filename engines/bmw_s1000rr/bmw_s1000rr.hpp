@@ -96,7 +96,6 @@ const engineType &bmwS1000rrType() {
         t.name = "BMW S 1000 RR";
         t.summary = "BMW S 1000 RR inline-4, 999 cc, ShiftCam, 180 deg crank, BMW gearing and sound";
         t.label = "BMW S 1000 RR inline-4, 999 cc";
-        t.firing = "1-2-4-3, 180 deg apart";
         t.windowTitle = "S 1000 RR engine";
         t.credit = "S 1000 RR built from \"Inline-4 Engine\" by rafaelaraujo55, CC-BY-4.0";
         t.meshFile = "engines/bmw_s1000rr/s1000rr.mesh";
@@ -107,7 +106,6 @@ const engineType &bmwS1000rrType() {
         t.physTest = physicsTestBike;
         t.exhaust = bmwS1000rrExhaust;
         t.spec = bmwSpec;
-        t.zPrimary = 195.2f;       // build_s1000rr.py prints it
         t.gearboxSide = -1.f;      // forward-turning crank, front at +x: the box sits toward -x
         t.primaryModule = 2.6f * 84.f / (46.f + 76.f);  // 46/76 at the Ducati's 30/54 shaft spacing
         // --wav: revs in neutral, a launch up the box with the quickshifter, braking with rev-matched

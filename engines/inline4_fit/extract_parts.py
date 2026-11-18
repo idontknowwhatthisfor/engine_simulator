@@ -14,18 +14,12 @@ geometry, nothing is hard-coded except the classification rules.
 All coordinates are raw mesh space (mm): crank axis = Z, cylinders point toward -Y.
 The root node matrix (Y and Z flipped) is stored in the file for the renderer.
 
-engine.mesh layout (little endian):
-    char[8]  magic "I4ENGv1\\0"
-    f32[16]  root matrix (column major, as in glTF)
-    u32      material count, then per material: f32 rgba[4], f32 metallic, f32 roughness, u32 blend
-    f32[3]   crank axis point (x, y, z); axis direction is +Z
-    u32      cylinder count, then per cylinder:
-                 f32 z_centre, f32 gudgeon_x, f32 gudgeon_y, f32 crankpin_x, f32 crankpin_y,
-                 f32 throw_r, f32 theta0 (rad, crankpin angle from the bore axis, toward +X), f32 rod_L
-    u32      group count, then per group:
-                 u32 kind (0 static, 1 crank, 2 piston, 3 rod, 4 block), i32 cylinder (-1 if none),
-                 u32 material, u32 vertex count, u32 index count,
-                 f32[6 * vertex count] (px py pz nx ny nz), u32[index count]
+engine.mesh is the ENGMSHv3 engine format (see tools/meshlib.py). Per cylinder: z_centre, gudgeon
+(x, y), crankpin (x, y), throw_r, theta0 (rad, crankpin angle from the bore axis, toward +X), rod_L,
+then bank 0 (the model's bores all point toward -Y), the deck (the lowest point of the see-through
+block), the 85 mm bore and the firing lag from FIRING. Metadata: banked = 0 (the original model, its
+skirts sit between the counterweights). Files written before v3 have the magic "I4ENGv1" and only
+the first eight values per cylinder; the simulator still reads them.
 """
 import json
 import math
@@ -33,7 +27,12 @@ import os
 import struct
 import sys
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tools"))
+from meshlib import Mesh, write_engine  # noqa: E402
+
 KIND_NAMES = ["static", "crank", "piston", "rod", "block"]
+FIRING = (1, 3, 4, 2)   # flat-plane crank, cylinders numbered from the timing end
+BORE = 85.0
 STATIC, CRANK, PISTON, ROD, BLOCK = range(5)
 
 # mesh index -> what it holds (see plan.md section 1)
@@ -264,21 +263,15 @@ def main():
             sum(len(i.verts) for i in isl), sum(len(i.tris) for i in isl)))
 
     # ---- write -------------------------------------------------------------------------
-    out = bytearray(b"I4ENGv1\0")
-    out += struct.pack("<16f", *root)
-    out += struct.pack("<I", len(g["materials"]))
+    mats = []
     for m in g["materials"]:
         pbr = m.get("pbrMetallicRoughness", {})
         rgba = pbr.get("baseColorFactor", [1, 1, 1, 1])
-        out += struct.pack("<4f2fI", *rgba, pbr.get("metallicFactor", 1.0), pbr.get("roughnessFactor", 1.0),
-                           1 if m.get("alphaMode") == "BLEND" else 0)
-    out += struct.pack("<3f", axis_x, axis_y, 0.0)
-    out += struct.pack("<I", len(cylinders))
-    for cyl in cylinders:
-        out += struct.pack("<8f", *cyl)
-    out += struct.pack("<I", len(groups))
+        mats.append((*rgba, pbr.get("metallicFactor", 1.0), pbr.get("roughnessFactor", 1.0),
+                     1 if m.get("alphaMode") == "BLEND" else 0))
+    out_groups = []
     for (kind, cyl, mat), isl in sorted(groups.items()):
-        vdata, idata, remap = [], [], {}
+        mesh, remap = Mesh(), {}
         for i in isl:
             _, pos, nor, idx = meshes[i.mesh]
             for t in i.tris:
@@ -286,16 +279,20 @@ def main():
                     v = idx[3 * t + k]
                     if v not in remap:
                         remap[v] = len(remap)
-                        vdata += pos[v]
-                        vdata += nor[v]
-                    idata.append(remap[v])
-        out += struct.pack("<IiIII", kind, cyl, mat, len(remap), len(idata))
-        out += struct.pack("<%df" % len(vdata), *vdata)
-        out += struct.pack("<%dI" % len(idata), *idata)
-    with open(out_file, "wb") as f:
-        f.write(out)
-    print("\nwrote %s (%.1f MB)" % (out_file, len(out) / 1e6))
-
+                        mesh.v += pos[v]
+                        mesh.v += nor[v]
+                    mesh.i.append(remap[v])
+        out_groups.append((kind, cyl, mat, mesh))
+    # the deck is the lowest point (mesh -y is up) of the see-through block, as stored in f32
+    f32 = lambda x: struct.unpack("<f", struct.pack("<f", x))[0]  # noqa: E731
+    deck = min(f32(y) for kind, _, mat, mesh in out_groups if kind == BLOCK and mats[mat][6]
+               for y in mesh.v[1::6])
+    lag = [0.0] * len(cylinders)
+    for k, cn in enumerate(FIRING):
+        lag[cn - 1] = 720.0 / len(FIRING) * k
+    cyls = [tuple(cyl) + (0.0, deck, BORE, lag[c]) for c, cyl in enumerate(cylinders)]
+    size = write_engine(out_file, root, mats, cyls, out_groups, [("banked", [0.0])], (axis_x, axis_y, 0.0))
+    print("\nwrote %s (%.1f MB)" % (out_file, size / 1e6))
 
 if __name__ == "__main__":
     main()

@@ -20,7 +20,8 @@ Unlike the V4 the front of the bike is +X here: the crank turns R_z(+delta), whi
 the crank toward +X, so with the front at +X the crank turns forward like the wheels. The block leans
 forward (bank +32 deg) and the simulator puts the gearbox behind the crank (-X).
 
-s1000rr.mesh = the v2 layout of engines/ducati_v4/build_v4.py with the magic "BMWS1KRR".
+s1000rr.mesh: the ENGMSHv3 engine format (tools/meshlib.py), with zPrimary. (Files written before v3
+carry the magic "BMWS1KRR"; the simulator still reads them.)
 """
 import os
 import sys
@@ -43,7 +44,7 @@ def main():
     here = os.path.dirname(os.path.abspath(__file__))
     src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "..", "inline4_fit", "engine.mesh")
     out_file = sys.argv[2] if len(sys.argv) > 2 else os.path.join(here, "s1000rr.mesh")
-    inline_engine(src, out_file, b"BMWS1KRR", "BMW S 1000 RR style inline-4", BORE, STROKE, ROD_L, PITCH, INCLINE,
+    inline_engine(src, out_file, "BMW S 1000 RR style inline-4", BORE, STROKE, ROD_L, PITCH, INCLINE,
                   FIRING, BLUE_GLASS)
 
 

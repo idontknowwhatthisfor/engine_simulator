@@ -20,12 +20,12 @@ struct bikeGearboxModel {
     int N_SPROCKET = 16;
     float side = 1.f;             // +1: box toward +x (Ducati), -1: toward -x (BMW)
 
-    void configure(const engineType &t, const drivetrainParams &dp) {
+    void configure(const engineType &t, const drivetrainParams &dp, const engineModel &e) {
         N_PC = dp.primaryIn;
         N_PB = dp.primaryOut;
         N_SPROCKET = dp.sprocketTeeth;
         MOD_P = t.primaryModule;
-        Z_PRIMARY = t.zPrimary;
+        Z_PRIMARY = primaryGearZ(e);
         side = t.gearboxSide;
     }
     float mx = 0.f, my = 0.f, ox = 0.f, oy = 0.f, drumX = 0.f, drumY = 0.f;  // shaft centres

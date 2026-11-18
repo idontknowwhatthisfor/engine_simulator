@@ -168,7 +168,7 @@ const engineType &ducatiV4Type() {
         t.name = "Ducati V4";
         t.summary = "Ducati Desmosedici Stradale 90 deg V4, 1103 cc, Twin Pulse, Panigale V4 gearing";
         t.label = "Ducati-style 90 deg V4, 1103 cc";
-        t.firing = "Twin Pulse 0-90-290-380";
+        t.firingLabel = "Twin Pulse 0-90-290-380";
         t.windowTitle = "V4 engine";
         t.credit = "V4 built from \"Inline-4 Engine\" by rafaelaraujo55, CC-BY-4.0";
         t.meshFile = "engines/ducati_v4/v4.mesh";
@@ -179,7 +179,6 @@ const engineType &ducatiV4Type() {
         t.physTest = physicsTestBike;
         t.exhaust = ducatiV4Exhaust;
         t.spec = ducatiSpec;
-        t.zPrimary = 119.f;        // build_v4.py: the crank's primary gear hub
         t.gearboxSide = 1.f;       // counter-rotating crank, front at -x: the box sits toward +x
         t.primaryModule = 2.6f;
         // --wav: start-up and blips in neutral, the limiter, a launch up the box with the quickshifter,

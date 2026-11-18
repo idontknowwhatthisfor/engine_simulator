@@ -43,7 +43,8 @@ struct engineType {
     const char *name = "";                 // short name for tests and messages
     const char *summary = "";              // one line for --engine-type list
     const char *label = "";                // HUD: what is running
-    const char *firing = "";               // HUD: firing order
+    const char *firingLabel = "";          // HUD: a descriptive firing order (e.g. "Twin Pulse 0-90-290-380");
+                                           // empty: the order from the mesh's lags (firingOrder, "1-2-4-3")
     const char *windowTitle = "";
     const char *hudTag = "";               // shown after the rpm on the riding HUD (e.g. TUNED)
     const char *credit = "";               // model licence line (CC-BY needs it on screen)
@@ -57,9 +58,10 @@ struct engineType {
     int (*physTest)(const engineModel &, const engineType &) = nullptr;  // --phystest
     int (*physTestTurbo)(const engineModel &, const engineType &) = nullptr;  // --turbo yes --phystest
     bikeSpec (*spec)() = nullptr;          // bikes: --phystest targets
-    // bike gearbox drawing (src/bike_gearbox.hpp): where the crank's primary gear sits along the crank,
-    // which side of the crank the box goes (+1 toward +x, -1 toward -x) and the primary gear module
-    float zPrimary = 119.f, gearboxSide = 1.f, primaryModule = 2.6f;
+    // bike gearbox drawing (src/bike_gearbox.hpp): which side of the crank the box goes (+1 toward +x,
+    // -1 toward -x) and the primary gear module. Where the crank's primary gear sits along the crank
+    // comes from the mesh (zPrimary, see primaryGearZ)
+    float gearboxSide = 1.f, primaryModule = 2.6f;
     // the exhaust system (src/exhaust.hpp): headers from the ports to the tailpipe, in mesh space
     exhaustLayout (*exhaust)(const engineModel &) = nullptr;
     // --turbo yes: the exhaust with a turbocharger in it (its turboSpec places src/turbo.hpp's model)
@@ -71,3 +73,6 @@ struct engineType {
     // targets, labels); nullptr when the engine has none
     const engineType &(*tuned)() = nullptr;
 };
+
+// the firing order the HUD shows: the engine's label, or the order from the mesh
+std::string hudFiring(const engineType &t, const engineModel &e) { return *t.firingLabel ? t.firingLabel : firingOrder(e); }

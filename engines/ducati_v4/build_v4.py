@@ -23,9 +23,9 @@ turns R_z(+delta), which moves the top of the crank backwards: counter-rotating,
 Cylinders: 1 front-left, 2 rear-left (crankpin A), 3 front-right, 4 rear-right (crankpin B).
 Firing 1-2-3-4 at 0, 90, 290, 380 degrees: the Twin Pulse order (the sim holds the lags).
 
-v4.mesh = engine.mesh layout with magic "ENGMSHv2", and three more floats per cylinder:
-    f32 bank (rad, bore axis = R_z(bank) applied to -Y), f32 deck_y (local frame), f32 bore (mm),
-    f32 firing lag (deg of the 720 deg cycle behind cylinder 1)
+v4.mesh: the ENGMSHv3 engine format (tools/meshlib.py): per cylinder also its bank (rad, bore axis =
+R_z(bank) applied to -Y), deck_y (local frame), bore (mm) and firing lag (deg of the 720 deg cycle
+behind cylinder 1), and the named value zPrimary.
 Cylinder pivots (gudgeon, crankpin, theta0) and the vertices of piston and rod groups are stored in
 the cylinder's local frame (bore toward -Y). The renderer rotates them by `bank` about the crank
 axis. Crank and block groups are stored in mesh space.
@@ -35,7 +35,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tools"))
-from meshlib import CRANK, BLOCK, Donor, build_crank, main_shells, build_block, write_engine  # noqa: E402
+from meshlib import CRANK, BLOCK, Donor, build_crank, main_shells, build_block, write_engine, primary_meta  # noqa: E402
 
 # ---- Ducati Desmosedici Stradale (Panigale V4) numbers --------------------------------------
 BORE = 81.0
@@ -92,7 +92,7 @@ def main():
     R_CW = skirt_bdc - 6.0
     pins = [(pin_z[k], ROD_PITCH, rest_pin[k]) for k in ("A", "B")]
     # mains written centre, left, right
-    crank, mains, w_lo, w_hi, _ = build_crank(pins, THROW, R_MAIN, R_PIN, R_CW, 14.0, 50.0, 30.0, main_order=(1, 0, 2))
+    crank, mains, w_lo, w_hi, z_primary = build_crank(pins, THROW, R_MAIN, R_PIN, R_CW, 14.0, 50.0, 30.0, main_order=(1, 0, 2))
     out_groups.append((CRANK, -1, MAT_CRANK, crank))
     out_groups += main_shells(mains, R_MAIN)
 
@@ -121,7 +121,7 @@ def main():
         print("  cyl %d %-11s pin %s  bank %+5.1f deg  z %+6.1f  rest crank %6.1f deg from TDC  fires at %3.0f deg"
               % (c + 1, name, pin, bank, cy_[0], math.degrees(cy_[6]) % 360, lag))
 
-    size = write_engine(out_file, b"ENGMSHv2", donor.root, mats, out_cyls, out_groups)
+    size = write_engine(out_file, donor.root, mats, out_cyls, out_groups, [("banked", [1.0]), primary_meta(z_primary)])
     print("wrote %s (%.1f MB, %d groups)" % (out_file, size / 1e6, len(out_groups)))
 
 

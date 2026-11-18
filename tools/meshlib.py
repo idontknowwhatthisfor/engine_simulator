@@ -1,5 +1,28 @@
 """Shared mesh helpers and engine-building steps for the engine builders (standard library only).
 
+Engine mesh format ENGMSHv3 (little endian), written by write_engine for every engine and read by
+src/model.hpp (which also still reads the older I4ENGv1, ENGMSHv2 and BMWS1KRR files):
+    char[8]  magic "ENGMSHv3"
+    f32[16]  root matrix (column major, as in glTF)
+    u32      material count, then per material: f32 rgba[4], f32 metallic, f32 roughness, u32 blend
+    f32[3]   crank axis point (x, y, z); the axis direction is +Z
+    u32      cylinder count (any number), then per cylinder 12 x f32:
+                 z_centre, gudgeon_x, gudgeon_y, crankpin_x, crankpin_y, throw_r,
+                 theta0 (rad, rest crankpin angle from the bore axis), rod_L,
+                 bank (rad: the cylinder frame, bore toward -Y, turned by R_z(bank) about the crank axis),
+                 deck_y (cylinder frame), bore (mm), firing lag (deg of the 720 deg cycle behind cylinder 1)
+    u32      metadata count, then per entry: u32 name length, char[length] name (no terminator),
+             u32 value count, f32[value count] values. Named values the simulator reads:
+                 banked           1: built by these steps (pivots and piston / rod vertices in the
+                                  cylinder frame, the crank-vs-skirt clearance test applies); 0: the
+                                  original inline-4 model
+                 zPrimary         where the crank's primary gear sits along the crank (bike gearbox)
+                 supercharger_at  a supercharger's frame origin in mesh space (3 values)
+    u32      group count, then per group:
+                 u32 kind (0 static, 1 crank, 2 piston, 3 rod, 4 block), i32 cylinder (-1 if none),
+                 u32 material, u32 vertex count, u32 index count,
+                 f32[6 * vertex count] (px py pz nx ny nz), u32[index count]
+
 read_i4 reads the inline-4 engine.mesh (engines/inline4_fit/extract_parts.py makes it); Mesh, prism,
 cylinder, box, ... build procedural parts. The steps every engine built from the inline-4's parts
 shares are here too, so a builder only declares its own dimensions, layout and extra parts:
@@ -16,10 +39,12 @@ import struct
 STATIC, CRANK, PISTON, ROD, BLOCK = range(5)
 
 
-# ---- engine.mesh v1 reader -------------------------------------------------------------------
+# ---- engine.mesh reader (the inline-4: v1 or v3) ---------------------------------------------
 def read_i4(path):
+    """root, materials, crank axis, cylinders (their first 8 values), groups of an engine mesh"""
     d = open(path, "rb").read()
-    assert d[:8] == b"I4ENGv1\0", "not an inline-4 engine.mesh"
+    v3 = d[:8] == b"ENGMSHv3"
+    assert v3 or d[:8] == b"I4ENGv1\0", "not an inline-4 engine.mesh"
     p = 8
     root = struct.unpack_from("<16f", d, p); p += 64
     nm, = struct.unpack_from("<I", d, p); p += 4
@@ -30,7 +55,12 @@ def read_i4(path):
     nc, = struct.unpack_from("<I", d, p); p += 4
     cyls = []
     for _ in range(nc):
-        cyls.append(struct.unpack_from("<8f", d, p)); p += 32
+        cyls.append(struct.unpack_from("<8f", d, p)); p += 48 if v3 else 32
+    if v3:
+        nmeta, = struct.unpack_from("<I", d, p); p += 4
+        for _ in range(nmeta):
+            n, = struct.unpack_from("<I", d, p); p += 4 + n
+            n, = struct.unpack_from("<I", d, p); p += 4 + 4 * n
     ng, = struct.unpack_from("<I", d, p); p += 4
     groups = []
     for _ in range(ng):
@@ -333,17 +363,23 @@ def build_block(banks, bore, deck_y, case_r, case_z, sump_y, margin, head_h, hea
     return block, covers
 
 
-def write_engine(out_file, magic, root, mats, cyls, groups):
-    """the banked engine mesh (v2 layout): see engines/ducati_v4/build_v4.py. Returns the byte count."""
-    out = bytearray(magic)
+def write_engine(out_file, root, mats, cyls, groups, meta=(), axis=(0.0, 0.0, 0.0)):
+    """an ENGMSHv3 engine mesh (the format is at the top of this file). cyls: 12 values each; meta:
+    (name, [values]) pairs; groups: (kind, cylinder, material, mesh with .v and .i). Returns the
+    byte count."""
+    out = bytearray(b"ENGMSHv3")
     out += struct.pack("<16f", *root)
     out += struct.pack("<I", len(mats))
     for m in mats:
         out += struct.pack("<4f2fI", *m)
-    out += struct.pack("<3f", 0.0, 0.0, 0.0)
+    out += struct.pack("<3f", *axis)
     out += struct.pack("<I", len(cyls))
     for cy_ in cyls:
         out += struct.pack("<12f", *cy_)
+    out += struct.pack("<I", len(meta))
+    for name, values in meta:
+        b = name.encode("ascii")
+        out += struct.pack("<I", len(b)) + b + struct.pack("<I%df" % len(values), len(values), *values)
     out += struct.pack("<I", len(groups))
     for kind, cyl, mat, mesh in groups:
         out += struct.pack("<IiIII", kind, cyl, mat, len(mesh.v) // 6, len(mesh.i))
@@ -354,13 +390,20 @@ def write_engine(out_file, magic, root, mats, cyls, groups):
     return len(out)
 
 
-def inline_engine(donor_path, out_file, magic, name, bore, stroke, rod_l, pitch, incline, firing, cover_mat,
-                  rest_local1=30.0, squish=1.0, web=12.0):
+def primary_meta(z_primary):
+    """the zPrimary metadata entry. Stored to 0.1 mm, as the simulator has always drawn it (the value
+    used to be copied by hand from the builder's printout)."""
+    return ("zPrimary", [round(z_primary, 1)])
+
+
+def inline_engine(donor_path, out_file, name, bore, stroke, rod_l, pitch, incline, firing, cover_mat,
+                  rest_local1=30.0, squish=1.0, web=12.0, meta=()):
     """An inline engine from the inline-4's parts, the bank inclined `incline` deg forward (toward +X,
     with the front of the bike at +X the crank turns forward): cylinders `pitch` apart along the crank,
     a flat-plane crank whose pins follow the even firing order `firing` (cylinder numbers from 1), a
     see-through crankcase, block, head and a cam cover in material cover_mat (rgba, metallic,
-    roughness, blend). Writes out_file and returns what the builder may need for extra parts."""
+    roughness, blend). meta: more named values for the file. Writes out_file and returns what the
+    builder may need for extra parts."""
     donor = Donor(donor_path)
     mats = list(donor.mats) + [cover_mat]
     mat_cover, mat_crank = len(mats) - 1, 2
@@ -390,7 +433,8 @@ def inline_engine(donor_path, out_file, magic, name, bore, stroke, rod_l, pitch,
     groups.append((BLOCK, -1, 0, block))
     groups.append((BLOCK, -1, mat_cover, cover))
 
-    size = write_engine(out_file, magic, donor.root, mats, cyls, groups)
+    size = write_engine(out_file, donor.root, mats, cyls, groups,
+                        [("banked", [1.0]), primary_meta(z_primary)] + list(meta))
     disp = n * math.pi / 4 * bore ** 2 * stroke / 1000.0
     print("%s from the inline-4 parts" % name)
     print("  bore %.1f  stroke %.1f  rod %.1f  -> %.0f cc   bank leans %.0f deg forward, bore pitch %.0f"

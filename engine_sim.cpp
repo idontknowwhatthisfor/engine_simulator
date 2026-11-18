@@ -172,7 +172,11 @@ int main(int argc, char **argv) {
         return 1;
     }
     if (opt.dumpParams) return dumpParams(eng, type, opt.turbo, opt.bov);
-    if (opt.selftest) return selfTest(eng, type.name);
+    if (opt.selftest) {
+        std::vector<double> pattern;  // the published firing intervals the mesh must give (bikes)
+        if (type.spec) for (double d : type.spec().pattern) pattern.push_back(d);
+        return selfTest(eng, type.name, pattern);
+    }
     if (opt.phystest) return opt.turbo ? type.physTestTurbo(eng, type) : type.physTest(eng, type);
     if (!opt.wav.empty()) return renderWav(eng, type, opt.wav, opt.turbo, opt.bov);
 
@@ -235,7 +239,7 @@ int main(int argc, char **argv) {
     }
     bikeGearboxModel bbox;
     if (!opt.engineOnly && type.bike) {
-        bbox.configure(type, sim.drive.P);
+        bbox.configure(type, sim.drive.P, eng);
         bbox.layout();
         if (bbox.side > 0.f) eng.hi.x = std::max(eng.hi.x, bbox.maxX() + 5.f);
         else eng.lo.x = std::min(eng.lo.x, bbox.maxX() - 5.f);
@@ -530,7 +534,7 @@ int main(int argc, char **argv) {
                       "\n sound " + (audio ? (audio->muted ? "muted" : "on") : "off") + "  shake view x" +
                       f0(SHAKE_VIEWS[shakeIdx]) + "  block " + (ghost == 0 ? "ghost" : "hidden") + "  blur " +
                       (blur ? "on" : "off") +
-                      "\n firing (" + type.firing + "):" + strokes;
+                      "\n firing (" + hudFiring(type, eng) + "):" + strokes;
             else
             textStr = " FPS " + (fps > 0.f ? f0(fps) : std::string("--")) + "   time x" +
                       numToStr(static_cast<float>(TIME_SCALES[scaleIdx]), 2) + (paused ? "   PAUSED" : "") +
@@ -564,7 +568,7 @@ int main(int argc, char **argv) {
                       "\n sound " + (audio ? (audio->muted ? "muted" : "on") : "off") + "  shake view x" +
                       f0(SHAKE_VIEWS[shakeIdx]) + "  block " + (ghost == 0 ? "ghost" : "hidden") + "  blur " +
                       (blur ? "on" : "off") +
-                      (bike ? "\n firing (" + std::string(type.firing) + "):" : std::string()) + strokes;
+                      (bike ? "\n firing (" + hudFiring(type, eng) + "):" : std::string()) + strokes;
             text.setString(textStr);
         }
 

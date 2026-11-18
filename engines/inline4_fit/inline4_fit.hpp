@@ -144,7 +144,6 @@ const engineType &inline4FitType() {
         t.name = "inline-4";
         t.summary = "2.3 L inline-4 (the Sketchfab model) in a car with Honda Fit 5-speed gearing";
         t.label = "inline-4, 2.3 L";
-        t.firing = "1-3-4-2";
         t.windowTitle = "inline-4 engine";
         t.credit = "model: \"Inline-4 Engine\" by rafaelaraujo55, CC-BY-4.0";
         t.meshFile = "engines/inline4_fit/engine.mesh";
