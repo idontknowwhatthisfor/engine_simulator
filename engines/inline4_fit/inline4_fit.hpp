@@ -7,12 +7,14 @@
 #include "test_inline4.hpp"
 
 // engine: 85 mm bore, ~103 mm mean stroke (the model's throws are uneven: 108.4 mm on 1/4, 97.8 mm
-// on 2/3, measured from the mesh), 10:1, 160 mm rods, flat-plane crank firing 1-3-4-2. Calibrated
-// with --phystest: idle 800 rpm, 203 N m at 3500 rpm, 110 kW at 6500-7000 rpm, limiter 6800 rpm.
+// on 2/3, measured from the mesh), 160 mm rods, flat-plane crank firing 1-3-4-2: 2.34 L. Tuned to
+// match a Honda K24Z3 (2008-12 Accord, 87 x 99 mm, 2.35 L, 10.5:1, 177 hp at 6500 rpm, 218 N m at
+// 4300 rpm). Calibrated with --phystest: idle 800 rpm, 223 N m at 4000-4500 rpm, 131 kW (176 hp)
+// at 6500 rpm, limiter 6800 rpm. The bore stays at the mesh's 85 mm, so the swept volume matches.
 engineParams inline4FitParams() {
     engineParams P;
     P.bore = 0.085;
-    P.compression = 10.0;
+    P.compression = 10.5;
     P.ivc = 220.0 * DEGR;           // intake closes 40 deg after BDC
     P.evo = 500.0 * DEGR;           // exhaust opens 40 deg before BDC
     P.burn = 50.0 * DEGR;
@@ -25,7 +27,7 @@ engineParams inline4FitParams() {
     P.starterMaxRpm = 300.0;
     P.revLimit = 6800.0; P.revResume = 6500.0;
     P.fmepA = 1.0e5; P.fmepB = 0.12e5; P.fmepC = 0.04e5;
-    P.veBase = 0.80; P.vePeak = 0.12; P.veRpm = 4500.0; P.veWidth = 2800.0;
+    P.veBase = 0.765; P.vePeak = 0.25; P.veRpm = 5200.0; P.veWidth = 3300.0;  // broad, high peak (K24 intake VTC)
     P.sparkLow = 8.0; P.sparkHigh = 30.0; P.sparkFrom = 800.0; P.sparkSpan = 3500.0;
     P.rpmScale = 8000.0;
     P.blockMass = 150.0; P.blockRollInertia = 5.0;
@@ -44,7 +46,7 @@ drivetrainParams inline4FitDriveParams() {
     P.wheelRadius = 0.305;
     P.carMass = 1300.0;
     P.cdA = 0.65;
-    P.clutchCapacity = 350.0;       // well above the 203 N m peak
+    P.clutchCapacity = 350.0;       // well above the 223 N m peak
     return P;
 }
 

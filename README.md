@@ -58,13 +58,13 @@ The original model, split into moving parts from the glTF.
 
 | | |
 |---|---|
-| Engine | 85 mm bore, 160 mm rods, 10:1, flat-plane crank, firing 1-3-4-2 |
+| Engine | 85 mm bore, 160 mm rods, 10.5:1, flat-plane crank, firing 1-3-4-2. Tuned to match a Honda K24Z3 (2008–12 Accord: 2.35 L, 177 hp at 6500 rpm, 218 N·m at 4300 rpm) |
 | Stroke | The model's crank throws are uneven: 108.4 mm on cylinders 1/4 and 97.8 mm on 2/3 (~2.34 L). Each cylinder uses its own measured throw, so the parts stay joined. |
-| Output (sim) | 203 N·m at 3500 rpm, 110 kW at 6500–7000 rpm, idle 800 rpm, limiter 6800 rpm |
+| Output (sim) | 223 N·m at 4000–4500 rpm, 131 kW (176 hp) at 6500 rpm, idle 800 rpm, limiter 6800 rpm |
 | Gearbox | 2nd-gen (2009–2013) Honda Fit 5MT: 3.308 / 1.870 / 1.303 / 0.949 / 0.727, reverse 3.308, final drive 4.62 |
 | Vehicle | 1300 kg car, 0.305 m tyres, CdA 0.65 |
 | Drivetrain | Friction clutch, automatic mode (shift schedule, kickdown, downshift under load, sport mode with rev-matched downshifts) or manual (clutch pedal, stalls if you dump it at idle) |
-| Results (sim) | 0–100 km/h in 7.7 s |
+| Results (sim) | 0–100 km/h in 6.8 s |
 | 3D | The see-through block, and a procedural 5-speed gearbox with a reverse idler behind the flywheel |
 | Exhaust (3D) | Tubular 4-2-1 manifold (1+4, 2+3) on a cast flange, close-coupled catalyst, mid pipe, silencer and tailpipe running back beside the gearbox |
 
@@ -226,8 +226,8 @@ intercooler ahead of the crank snout; the cooled charge comes back up the intake
   when rendering a WAV. `--turbo yes --wav out.wav` drives the car through two full-throttle pulls
   with lift-offs (add `--bov no` to hear the flutter).
 - **What it does (sim).** Boost comes in at ~3000 rpm and is held at 0.58 bar to the limiter:
-  331 N·m at 3500–4000 rpm, 196 kW at 7000 rpm (203 N·m / 110 kW without). Floored at 3000 rpm, it
-  reaches 90% boost in 1.2 s. 0–100 km/h takes 5.1 s (7.7 s without); the car model has no
+  365 N·m at 4000–5000 rpm, 226 kW at 7000 rpm (223 N·m / 131 kW without). Floored at 3000 rpm, it
+  reaches 90% boost in 1.0 s. 0–100 km/h takes 4.7 s (6.8 s without); the car model has no
   wheelspin. The HUD shows the boost, wastegate, back pressure, charge and compressor-outlet
   temperatures, the blow-off valve and surge, and the shaft speed (~105–125k rpm on boost). The
   wheels are drawn turning at a readable speed in proportion to the shaft, since the real speed

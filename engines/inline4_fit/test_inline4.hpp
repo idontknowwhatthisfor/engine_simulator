@@ -168,7 +168,7 @@ int physicsTestInline4(const engineModel &e, const engineType &type) {
         std::printf("  WOT shifts:");
         for (auto &sh : shifts) std::printf("  ->%d at %.0f rpm", sh.first, sh.second);
         std::printf("\n");
-        check("auto: 0-100 km/h at full throttle", t100, 7.0, 12.0, "s");
+        check("auto: 0-100 km/h at full throttle", t100, 6.0, 12.0, "s");
         double minShiftRpm = 1e9;
         for (auto &sh : shifts) minShiftRpm = std::min(minShiftRpm, sh.second);
         check("auto: WOT upshift rpm (lowest)", shifts.empty() ? 0.0 : minShiftRpm, 5800, 6800, "rpm");
@@ -522,7 +522,7 @@ int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
             slipMax = std::max(slipMax, std::fabs(sim.rpm() - sim.drive.omegaIn * 60.0 / TWO_PI));
         if (sim.drive.v * 3.6 >= 100.0) t100 = sim.time - t0;
     }
-    check("auto: 0-100 km/h at full throttle (7.7 s without)", t100, 4.0, 7.0, "s");
+    check("auto: 0-100 km/h at full throttle (6.8 s without)", t100, 4.0, 7.0, "s");
     check("clutch slip away from the shifts", slipMax, 0, 150, "rpm");
     std::printf("\n%s\n", ok ? "PASS" : "FAIL");
     return ok ? 0 : 1;
