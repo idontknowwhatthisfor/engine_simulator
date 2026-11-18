@@ -45,8 +45,10 @@ optional, so without it everything builds and only `--turbo yes` is unavailable.
 ```
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
-meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run-v4`,
-`make run-s1000rr` and `make run-h2`. `make test` runs the headless checks for every engine.
+meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run ENGINE=<id>`
+or `make run-<id>` (`make run-v4`, `make run-s1000rr`, `make run-h2`; aliases work too). `make test` runs
+the headless checks for every engine and version of one (`./engine_sim --engine-type list --ids`), and
+fails if any of them fails.
 
 ## The engines
 
@@ -333,9 +335,13 @@ sit behind the crank.
      upstream pipes feed each one), optional flange boxes, the tailpipe outlets (for the crackle flames) and an exhaust valve. `cylPoint` and `cylDir`
      place the ports on the head in the cylinder's own frame;
    - a function returning its `engineType`, with the id, labels, mesh path, physics test, and for bikes
-     the gearbox placement and an optional `ride` for `--wav`.
-3. **Register it.** Add it to `engineTypes()` in `src/engines.hpp`, include the header in
-   `engine_sim.cpp`, and add the mesh rule to the `Makefile`.
+     the gearbox placement and an optional `ride` for `--wav`; other versions of the engine go in
+     `variants` (`--variant <name>`; `--tuned yes` is `--variant tuned`).
+3. **Register it.** End the header with `REGISTER_ENGINE(<type function>, <key>)` (the key orders
+   `--engine-type list`: inline4 10, v4 20, s1000rr 30, h2 40). Add `engines/<name>/engine.mk` with the
+   mesh rule, `MESHES += ...` and `ENGINE_HEADERS += engines/<name>/<name>.hpp` (copy one from another
+   engine). Nothing outside the folder needs an edit: the Makefile includes every `engine.mk` and
+   generates `engines/all.hpp`, and `make test` picks the engine up.
 4. **Calibrate.** Run `./engine_sim --engine-type <name> --phystest`. The `VE_*`, `FMEP_*`, `IDLE_*` and
    `SND_*` environment variables override parameters while you calibrate.
 

@@ -161,3 +161,5 @@ const engineType &inline4FitType() {
     }();
     return T;
 }
+
+REGISTER_ENGINE(inline4FitType, 10);

@@ -179,7 +179,7 @@ const engineType &kawasakiH2Type() {
             {24.0, false, 0.0, 0, "brakes off, overrun", false},
             {27.0, false, 0.7, 0, "back on the throttle", false},
         };
-        t.tuned = kawasakiH2TunedType;
+        t.variants = {{"tuned", kawasakiH2TunedType}};
         return t;
     }();
     return T;
@@ -294,8 +294,10 @@ const engineType &kawasakiH2TunedType() {
         t.drive = kawasakiH2TunedDriveParams;
         t.spec = kawasakiH2TunedSpec;
         t.exhaust = kawasakiH2TunedExhaust;
-        t.tuned = nullptr;
+        t.variants.clear();  // a variant has no variants of its own
         return t;
     }();
     return T;
 }
+
+REGISTER_ENGINE(kawasakiH2Type, 40);

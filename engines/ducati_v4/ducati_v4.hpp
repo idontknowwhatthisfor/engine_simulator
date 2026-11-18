@@ -200,3 +200,5 @@ const engineType &ducatiV4Type() {
     }();
     return T;
 }
+
+REGISTER_ENGINE(ducatiV4Type, 20);

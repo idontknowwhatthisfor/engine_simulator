@@ -202,7 +202,8 @@ void dumpType(const paramDumper &d, const engineType &t, const engineModel &e) {
         paramDumper q = d.sub("ride[" + std::to_string(k) + "].");
         DUMP(q, r, until); DUMP(q, r, starter); DUMP(q, r, throttle); DUMP(q, r, shift); DUMP(q, r, what); DUMP(q, r, brake);
     }
-    d.put("tuned", t.tuned != nullptr);
+    d.put("tuned", findVariant(t, "tuned") != nullptr);
+    for (std::size_t k = 0; k < t.variants.size(); k++) d.put(("variants[" + std::to_string(k) + "]").c_str(), t.variants[k].name);
 }
 
 // everything for one engine type, as setupSim leaves it

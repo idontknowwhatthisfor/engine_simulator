@@ -127,3 +127,5 @@ const engineType &bmwS1000rrType() {
     }();
     return T;
 }
+
+REGISTER_ENGINE(bmwS1000rrType, 30);

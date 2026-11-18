@@ -1,15 +1,38 @@
-// the engines --engine-type can pick, and setting the simulation up for one of them
+// the engines --engine-type can pick (every engine that registered itself, src/engine_type.hpp), and
+// setting the simulation up for one of them
 #pragma once
 #include "engine_type.hpp"
 #include "calibration.hpp"
 
-const engineType &inline4FitType();   // engines/inline4_fit/inline4_fit.hpp
-const engineType &ducatiV4Type();     // engines/ducati_v4/ducati_v4.hpp
-const engineType &bmwS1000rrType();   // engines/bmw_s1000rr/bmw_s1000rr.hpp
-const engineType &kawasakiH2Type();   // engines/kawasaki_h2/kawasaki_h2.hpp
-
+// the registered engines in key order. Two engines with the same key, id or alias are a mistake in
+// the engines' headers: reported and the program stops.
 const std::vector<const engineType *> &engineTypes() {
-    static const std::vector<const engineType *> all{&inline4FitType(), &ducatiV4Type(), &bmwS1000rrType(), &kawasakiH2Type()};
+    static const std::vector<const engineType *> all = [] {
+        std::vector<engineRegistration> r = engineRegistry();
+        std::stable_sort(r.begin(), r.end(), [](const engineRegistration &a, const engineRegistration &b) { return a.key < b.key; });
+        std::vector<const engineType *> out;
+        std::vector<std::pair<std::string, const char *>> names;  // every id and alias, with its engine's id
+        for (std::size_t k = 0; k < r.size(); k++) {
+            const engineType &t = r[k].type();
+            if (k > 0 && r[k].key == r[k - 1].key) {
+                std::fprintf(stderr, "engine registry: %s and %s both use key %d\n", r[k - 1].type().id, t.id, r[k].key);
+                std::exit(2);
+            }
+            std::istringstream aliases(t.aliases);
+            std::vector<std::string> mine{t.id};
+            for (std::string a; aliases >> a;) mine.push_back(a);
+            for (const std::string &n : mine) {
+                for (const auto &[other, owner] : names)
+                    if (n == other) {
+                        std::fprintf(stderr, "engine registry: \"%s\" names both %s and %s\n", n.c_str(), owner, t.id);
+                        std::exit(2);
+                    }
+                names.push_back({n, t.id});
+            }
+            out.push_back(&t);
+        }
+        return out;
+    }();
     return all;
 }
 
