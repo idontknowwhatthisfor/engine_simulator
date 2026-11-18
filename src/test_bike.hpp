@@ -224,7 +224,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
                         (sim.omega - sim.drive.omegaIn) * 9.549, sim.drive.wheelForce, sim.tcTrim);
     });
     check(S.zeroTo100What, t100, S.zeroTo100Lo, S.zeroTo100Hi, "s");
-    check(S.zeroTo200What, t200, S.zeroTo200Lo, S.zeroTo200Hi, "s");
+    if (S.zeroTo200What) check(S.zeroTo200What, t200, S.zeroTo200Lo, S.zeroTo200Hi, "s");
     check("rpm at the 1 -> 2 upshift", firstShiftRpm, S.upshiftLo, S.upshiftHi, "rpm");
     if (S.liftsFront) check("wheelie control cut in (lowest fuel share)", minTrim, 0.3, 0.95, "");
     check("peak smoothed acceleration", peakAccel / 9.81, S.launchAccelLo, S.launchAccelHi, "g");
@@ -308,7 +308,7 @@ int physicsTestBike(const engineModel &e, const engineType &type) {
     } else {
         double dumpMin = 1e9, dumpAccel = 0.0;
         run(1.0, [&] { dumpMin = std::min(dumpMin, sim.rpm()); dumpAccel = std::max(dumpAccel, std::fabs(sim.drive.accel)); });
-        check("clutch dump at idle in 1st: lowest rpm (no stall)", dumpMin, 0.5 * S.idleLo, 1e9, "rpm");
+        check("clutch dump at idle in 1st: lowest rpm (no stall)", dumpMin, S.dumpMinRpm > 0.0 ? S.dumpMinRpm : 0.5 * S.idleLo, 1e9, "rpm");
         check("  ... no lurch (peak smoothed acceleration)", dumpAccel / 9.81, 0.0, 0.3, "g");
     }
 

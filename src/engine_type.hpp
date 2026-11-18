@@ -44,13 +44,15 @@ struct bikeSpec {
     const char *zeroTo100What = "0-100 km/h, full throttle (tests ~3.0-3.4 s)";
     double zeroTo100Lo = 2.6, zeroTo100Hi = 3.7;       // s
     const char *zeroTo200What = "0-200 km/h (road tests ~5.5-7 s)";
-    double zeroTo200Lo = 5.0, zeroTo200Hi = 8.0;       // s
+    double zeroTo200Lo = 5.0, zeroTo200Hi = 8.0;       // s (zeroTo200What nullptr: no check, for a bike that
+                                                       // never gets there)
     double launchAccelLo = 0.8, launchAccelHi = 1.15;  // peak smoothed acceleration with wheelie control, g
     double shiftRpm = 11000.0;                         // manual tests: quickshift up at this rpm (70-80% pedal)
     double shiftRpmGentle = 10000.0;                   // ... and at this one (50% pedal, up to 4th)
                                                        // (both must be below the rev limiter)
     bool stallsOnClutchDump = true;                    // dumping the clutch in 1st at idle stalls it (a light
                                                        // crank); false: it must pull away without a lurch
+    double dumpMinRpm = 0.0;                           // ... and without falling below this, rpm (0: half idleLo)
     double neutralRevMin = 8000.0;                     // revving in N at 40% pedal reaches at least this
     double neutralIdleLo = 1000.0, neutralIdleHi = 2200.0;  // rpm after coasting in N from speed
     double rejoinLo = 3000.0, rejoinHi = 14000.0;      // rpm once N picks a gear again at speed

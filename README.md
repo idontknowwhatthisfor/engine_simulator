@@ -19,6 +19,7 @@ It has four engines. `engine_sim` is the single entry point, and you pick the en
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
 | `h2` | Kawasaki Ninja H2 supercharged inline-4, 998 cc | a Ninja H2 (bike) | `kawasaki`, `kawasaki-h2`, `ninja-h2` |
+| `mxking` | Yamaha MX King 150 single, 149.7 cc | an MX King underbone (bike) | `mx-king`, `jupiter-mx`, `t150`, `yamaha150` |
 
 ```bash
 ./engine_sim --engine-type list
@@ -46,7 +47,7 @@ optional, so without it everything builds and only `--turbo yes` is unavailable.
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
 meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run ENGINE=<id>`
-or `make run-<id>` (`make run-v4`, `make run-s1000rr`, `make run-h2`; aliases work too). `make test` runs
+or `make run-<id>` (`make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-mxking`; aliases work too). `make test` runs
 the headless checks for every engine and version of one (`./engine_sim --engine-type list --ids`), and
 fails if any of them fails.
 
@@ -161,6 +162,30 @@ gearing and limiter stay stock; the changes are estimates of a race kit, not a p
 The HUD shows TUNED after the rpm. `--tuned yes` works with `--phystest` (its own targets),
 `--wav` and screenshots; `make test` checks both versions.
 
+### `mxking`: Yamaha MX King 150 (2015-2020)
+
+The Indonesian underbone (Jupiter MX King, T150 engine), made from the engine template: a single
+from the inline-4's scaled parts, the barrel laid 70° forward, a forward-turning crank.
+
+| | |
+|---|---|
+| Engine | 57.0 × 58.7 mm = 149.7 cc, 10.4:1, SOHC four valves, liquid cooled, fuel injected, 98 mm rod (estimate) |
+| Firing | Single, every 720° |
+| Output (sim) | 13.9 N·m at 7000 rpm, 11.2 kW at 8000 rpm in the 1000 rpm sweep (the curve peaks ~8400) (Yamaha: 13.8 N·m at 7000 / 11.3 kW at 8500), limiter ~10300 rpm (estimate), idle 1400 rpm |
+| Gearbox | Five speeds: primary 73/24 (3.042); gears 34/12, 30/16, 30/22, 24/21, 22/23; chain 40/14; 120/70-17 rear |
+| Vehicle | 117 kg wet + 70 kg rider, CdA 0.42 |
+| Rider aids | None on the real bike. The sim's bike drivetrain still gives it the quickshifter and the automatic; no slipper clutch, launch or wheelie control |
+| Exhaust (3D) | One header out of the underside of the head, back under the crankcase into a black-shielded silencer on the right |
+| Results (sim) | 0–100 km/h 13.6 s, ~117 km/h after 30 s in 5th |
+| Sound | The superbike stages tuned for a single: one thump every other turn, a longer pipe, a small silencer with no exhaust valve, little crackle |
+
+The heavier crank (0.012 kg·m², flywheel included) idles with a ~200 rpm ripple, pulls away from a
+clutch dump at idle after nearly stalling (`bikeSpec::dumpMinRpm`), and needs up to ~400 ms to blip up
+for the rev-matched 2 → 1 downshift. `--phystest` checks the 1st-order shake against a fixed limit
+(`shakeMax1st`): the test measures only vertical force, which a counterweight on a laid-down single
+adds to rather than cancels. It never reaches 200 km/h, so it sets `zeroTo200What = nullptr` to skip
+that check. The superbike-sized gearbox drawing looks large next to this engine.
+
 ### Exhaust
 
 Each engine draws its exhaust beside the block (not with `--engine-only`). The pipes are swept tubes
@@ -269,7 +294,7 @@ calibrated so that the published torque and power come out of the physics.
 
 | Option | |
 |---|---|
-| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `v4`, `s1000rr`, `h2` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
+| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `v4`, `s1000rr`, `h2`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
@@ -321,6 +346,8 @@ engines/
                             build_s1000rr.py, s1000rr.mesh
   kawasaki_h2/              kawasaki_h2.hpp (engine, supercharger, sound, gearing, test targets, demo ride,
                             type), build_h2.py, h2.mesh, h2_supercharger.mesh
+  yamaha_mxking/            mxking.hpp (engine, sound, gearing, test targets, type), build_mxking.py,
+                            mxking.mesh
   _template/                a new engine to copy (not built): myengine.hpp, build_myengine.py, engine.mk
 tools/meshlib.py            the mesh builders' shared steps and the ENGMSHv3 writer
 scripts/
@@ -386,7 +413,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    - the `engineType`: id, labels, mesh path, physics test, for bikes the gearbox placement and an
      optional `ride` for `--wav`; other versions of the engine go in `variants` (`--variant <name>`).
 4. **Register.** The header ends with `REGISTER_ENGINE(<type function>, <key>)`; the key orders
-   `--engine-type list` (inline4 10, v4 20, s1000rr 30, h2 40), pick a free one. `engine.mk` lists the
+   `--engine-type list` (inline4 10, v4 20, s1000rr 30, h2 40, mxking 50), pick a free one. `engine.mk` lists the
    header and the mesh rule. Nothing outside the folder needs an edit: the Makefile includes every
    `engine.mk` and generates `engines/all.hpp`, `make test` picks the engine up, and the help line
    and HUD follow from what it has (bike or car, boost, wheelie control).
