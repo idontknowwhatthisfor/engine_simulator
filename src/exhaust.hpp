@@ -17,7 +17,7 @@
 struct pipeSpec {
     std::vector<vec3> pts;
     float r0 = 20.f, r1 = 20.f;
-    int cyl = -1;                 // a runner from this cylinder's port (0..3); -1: fed by `from`
+    int cyl = -1;                 // a runner from this cylinder's port (0 .. cylinders - 1); -1: fed by `from`
     std::vector<int> from;        // upstream pipes (earlier indices) that flow into this one
     std::array<float, 4> rgba{0.5f, 0.5f, 0.5f, 1.f};
     float rough = 0.4f, metal = 0.8f;

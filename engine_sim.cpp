@@ -137,7 +137,10 @@ void listEngineIds(std::FILE *out) {
 void listEngineTypes(std::FILE *out) {
     std::fprintf(out, "engine types (--engine-type):\n");
     for (const engineType *t : engineTypes())
-        std::fprintf(out, "  %-9s %s\n            also: %s\n", t->id, t->summary, t->aliases);
+    {
+        std::fprintf(out, "  %-9s %s\n", t->id, t->summary);
+        if (*t->aliases) std::fprintf(out, "            also: %s\n", t->aliases);
+    }
 }
 
 int main(int argc, char **argv) {

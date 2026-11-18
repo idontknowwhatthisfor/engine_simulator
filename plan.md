@@ -503,6 +503,29 @@ engine physics → GL renderer → HUD → `main()` event loop (the event handli
      the target rpm, ≤ 230 rpm clutch slip after (≤ 400 required). The `--s1000rr --wav` demo now brakes
      and quickshifts 5→4→3→2.
 
+14. **Scaling refactor: new engines without editing shared code.** ✅ DONE (on request). Nothing in
+   any existing engine's behaviour changed; `scripts/regress.sh` proved it after every step (dumps,
+   test output, WAV hashes, screenshots with and without the HUD).
+   - **Gears:** any count (vectors, `validateDrivetrain`), the car gearbox drawing sized from it.
+   - **Presets:** the superbikes start from `superbikeBaseParams()` / `superbikeDriveBase()`, not from
+     each other.
+   - **Meshes:** the builders share `tools/meshlib.py`; ENGMSHv3 carries any cylinder count, the firing
+     lags and named values (`zPrimary`, `supercharger_at`), so nothing is copied by hand between Python
+     and C++; the HUD's firing order comes from the mesh and `--selftest` checks it against the
+     published pattern.
+   - **Cylinders:** any count up to 16. Per-cylinder state is a fixed-capacity `cylArray` (vectors
+     measured 5% slower in the physics step, `cylArray` ~1%). `--synthtest N` runs 1-8 cylinder inline
+     engines built in memory. The sound's DC-block high-pass follows the idle firing rate (15 Hz for
+     every existing engine, 4 Hz for a single).
+   - **Tests:** every superbike number in the bike test is a `bikeSpec` field with the old value as the
+     default; calibration environment variables work for every engine; `make test` fails on a FAIL.
+   - **Registration:** `REGISTER_ENGINE`, per-engine `engine.mk`, generated `engines/all.hpp`, named
+     variants (`--variant`); the help line and HUD are built from what the engine has.
+   - **Template:** `engines/_template/` copies into a working (uncalibrated) inline-3 bike that passes
+     its own tests; trying it found two more superbike assumptions (`liftsFront`, `downshiftMaxMs`).
+   - Not done: splitting the build into several translation units (a full build is 4.5 s; little to
+     gain at this size).
+
 ---
 
 ## 9. Risks / open points
