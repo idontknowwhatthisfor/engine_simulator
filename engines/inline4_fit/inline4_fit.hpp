@@ -3,7 +3,7 @@
 // splits scene.gltf / scene.bin into engine.mesh.
 #pragma once
 #include "../../src/engine_type.hpp"
-#include "gearbox_5mt.hpp"
+#include "gearbox_manual.hpp"
 #include "test_inline4.hpp"
 
 // engine: 85 mm bore, ~103 mm mean stroke (the model's throws are uneven: 108.4 mm on 1/4, 97.8 mm
@@ -37,7 +37,7 @@ engineParams inline4FitParams() {
 // final drive 4.62, 0.305 m tyres, 1300 kg car
 drivetrainParams inline4FitDriveParams() {
     drivetrainParams P;
-    P.ratios = {0.0, 3.308, 1.870, 1.303, 0.949, 0.727, 0.0};
+    P.ratios = {0.0, 3.308, 1.870, 1.303, 0.949, 0.727};
     P.gears = 5;
     P.reverseRatio = 3.308;
     P.finalDrive = 4.62;

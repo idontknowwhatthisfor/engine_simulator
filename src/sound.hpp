@@ -207,7 +207,7 @@ struct engineSound {
         primaryPhase = std::fmod(primaryPhase + TWO_PI * crankHz * dp.primaryIn / fs, TWO_PI);
         double whine = 0.4 * std::sin(primaryPhase);
         int g = sim.drive.gear;
-        if (g > 0 && g < 7 && dp.teethIn[g] > 0 && !sim.standalone) {
+        if (g > 0 && g < static_cast<int>(dp.teethIn.size()) && dp.teethIn[g] > 0 && !sim.standalone) {
             double mainHz = std::fabs(sim.drive.omegaIn) / TWO_PI / dp.primary;
             gearMeshPhase = std::fmod(gearMeshPhase + TWO_PI * mainHz * dp.teethIn[g] / fs, TWO_PI);
             double load = std::clamp(std::fabs(sim.drive.clutchTorque) / 80.0, 0.0, 1.0);

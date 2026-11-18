@@ -1,4 +1,4 @@
-// the superbikes' gearbox, drawn beside the crank: primary pair, clutch, six speeds, sprocket, drum
+// the superbikes' gearbox, drawn beside the crank: primary pair, clutch, the gears, sprocket, drum
 #pragma once
 #include "engine_type.hpp"
 #include "render.hpp"
@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------------------------
 // Layout of a motorcycle box: a gear on the crank drives the clutch basket (primary pair 30/54) on the
 // right-hand end of the main shaft, behind and below the crank. The clutch hub turns the main shaft.
-// Six always-meshed pairs (the real tooth counts when known) sit between the main shaft and the output
+// One always-meshed pair per gear (the real tooth counts when known) sit between the main shaft and the output
 // shaft below and behind it; the engaged pair is brass. The chain sprocket is on the left-hand end
 // of the output shaft, and a shift drum turns one notch per gear. The Ducati's crank counter-rotates
 // with the front at -x; the BMW's turns forward with the front at +x, so its box is mirrored (side -1).
@@ -29,10 +29,11 @@ struct bikeGearboxModel {
         side = t.gearboxSide;
     }
     float mx = 0.f, my = 0.f, ox = 0.f, oy = 0.f, drumX = 0.f, drumY = 0.f;  // shaft centres
-    std::array<int, 7> nIn{}, nOut{};
-    std::array<float, 7> zGear{};
+    // per gear, index 1..gears (sized by build from drivetrainParams::gears)
+    std::vector<int> nIn, nOut;
+    std::vector<float> zGear;
     meshBuf crankGear, basket, clutchPack, mainShaft, outShaft, sprocket, drum, housing, cover;
-    std::array<meshBuf, 7> inGear, outGear;
+    std::vector<meshBuf> inGear, outGear;
 
     static float meshPhase(float theta, int nA, int nB) { return gearMeshPhase(theta, nA, nB); }
 
@@ -64,10 +65,17 @@ struct bikeGearboxModel {
         drum = makeGear(15.f, 6, 150.f, 6.f);
         // in the real box the tooth counts don't all add up the same and the gears are profile
         // shifted; here each pair just gets pitch radii in its ratio at the common centre distance
+        std::size_t n = static_cast<std::size_t>(dp.gears) + 1;
+        nIn.assign(n, 0);
+        nOut.assign(n, 0);
+        zGear.assign(n, 0.f);
+        inGear.assign(n, meshBuf());
+        outGear.assign(n, meshBuf());
         for (int g = 1; g <= dp.gears; g++) {
             double r = dp.ratios[g];
             // the real tooth counts when they give this ratio, else ~52 teeth per pair from the ratio
-            if (dp.teethIn[g] > 0 && std::fabs(r - double(dp.teethOut[g]) / dp.teethIn[g]) < 1e-9) {
+            bool known = g < static_cast<int>(dp.teethIn.size()) && dp.teethIn[g] > 0;
+            if (known && std::fabs(r - double(dp.teethOut[g]) / dp.teethIn[g]) < 1e-9) {
                 nIn[g] = dp.teethIn[g];
                 nOut[g] = dp.teethOut[g];
             } else {

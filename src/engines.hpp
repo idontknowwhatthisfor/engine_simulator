@@ -29,6 +29,7 @@ const engineType *findEngineType(std::string name) {
 void setupSim(engineSim &sim, const engineModel &e, const engineType &type, double theta1, bool stand = false, bool turbo = false) {
     sim.P = type.engine();
     sim.drive.P = type.drive();
+    validateDrivetrain(sim.drive.P);
     sim.P.turbo.on = turbo || sim.P.turbo.supercharger;  // a supercharged engine always has it
     if (turbo && !sim.P.turbo.supercharger) sim.drive.P.clutchCapacity *= 1.5;
     if (type.bike) {

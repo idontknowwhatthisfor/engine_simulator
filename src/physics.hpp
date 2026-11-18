@@ -181,7 +181,7 @@ struct cylinderState {
 };
 
 // ---------------------------------------------------------------------------------------------
-// drivetrain: clutch, 5-speed gearbox, final drive and the car it pushes
+// drivetrain: clutch, gearbox (any number of gears), final drive and the vehicle it pushes
 // ---------------------------------------------------------------------------------------------
 // The clutch is a friction coupling: it passes slip * stiffness up to engagement * capacity, so it
 // slips on take-off, locks once the speeds match, and can drag the engine down (stall) when dumped.
@@ -190,8 +190,9 @@ struct cylinderState {
 // and a downshift when the engine labours (throttle open but the car is not accelerating, e.g. a hill).
 
 struct drivetrainParams {
-    // 2nd-generation (2009-2013) Honda Fit 5-speed manual, from Honda's 2010 spec sheet
-    std::array<double, 7> ratios{0.0, 3.308, 1.870, 1.303, 0.949, 0.727, 0.0};  // index 0 = neutral
+    // 2nd-generation (2009-2013) Honda Fit 5-speed manual, from Honda's 2010 spec sheet.
+    // ratios[0] is neutral, ratios[1..gears] the gears: gears + 1 entries (validateDrivetrain checks)
+    std::vector<double> ratios{0.0, 3.308, 1.870, 1.303, 0.949, 0.727};
     int gears = 5;
     bool bike = false;              // sequential box: 1-N-2-3..., no reverse, quickshifter, slipper clutch
     double primary = 1.0;           // crank -> gearbox input reduction (bikes have a primary gear pair)
@@ -233,10 +234,39 @@ struct drivetrainParams {
     double qsMatchTimeout = 0.25;   // s between gears at most
     double qsMaxRpm = 1e9;          // a downshift that would land above this is refused (set to the limiter)
     double wheelieAccel = 0.0;      // m/s^2 the wheelie control allows, 0 = none fitted
-    // bike gearbox drawing: real tooth counts (0 = derive from the ratio), primary pair, sprocket
-    std::array<int, 7> teethIn{}, teethOut{};
+    // bike gearbox drawing: real tooth counts, indexed like ratios (empty, or 0 for a gear: derive the
+    // teeth from the ratio), primary pair, sprocket
+    std::vector<int> teethIn, teethOut;
     int primaryIn = 30, primaryOut = 54, sprocketTeeth = 16;
 };
+
+// the most gears the gearbox drawings and the gear tables are laid out for
+const int MAX_GEARS = 10;
+
+// a drivetrain's gear tables must fit its gear count: throws std::runtime_error saying what is wrong
+void validateDrivetrain(const drivetrainParams &P) {
+    auto fail = [](const std::string &what) { throw std::runtime_error("drivetrainParams: " + what); };
+    if (P.gears < 1 || P.gears > MAX_GEARS)
+        fail("gears = " + std::to_string(P.gears) + ", must be 1.." + std::to_string(MAX_GEARS));
+    if (P.ratios.size() != static_cast<std::size_t>(P.gears) + 1)
+        fail("ratios has " + std::to_string(P.ratios.size()) + " entries, needs gears + 1 = " + std::to_string(P.gears + 1) +
+             " (index 0 is neutral)");
+    for (int g = 1; g <= P.gears; g++)
+        if (!(P.ratios[g] > 0.0) || !std::isfinite(P.ratios[g]))
+            fail("ratios[" + std::to_string(g) + "] = " + std::to_string(P.ratios[g]) + ": every gear needs a ratio > 0");
+    for (const std::vector<int> *teeth : {&P.teethIn, &P.teethOut}) {
+        const char *name = teeth == &P.teethIn ? "teethIn" : "teethOut";
+        if (!teeth->empty() && teeth->size() != P.ratios.size())
+            fail(std::string(name) + " has " + std::to_string(teeth->size()) + " entries, needs none or gears + 1 = " +
+                 std::to_string(P.gears + 1));
+        for (int t : *teeth)
+            if (t < 0) fail(std::string(name) + " has a negative tooth count");
+    }
+    if (P.teethIn.empty() != P.teethOut.empty()) fail("teethIn and teethOut must both be given or both be empty");
+    if (!P.bike && !(P.reverseRatio > 0.0)) fail("a car needs reverseRatio > 0");
+    if (!(P.primary > 0.0) || !(P.finalDrive > 0.0) || !(P.wheelRadius > 0.0))
+        fail("primary, finalDrive and wheelRadius must be > 0");
+}
 
 struct drivetrain {
     drivetrainParams P;

@@ -152,6 +152,12 @@ int main(int argc, char **argv) {
         typePtr = &typePtr->tuned();
     }
     const engineType &type = *typePtr;
+    try {
+        validateDrivetrain(type.drive());  // setupSim checks again; here it is a message, not an abort
+    } catch (const std::exception &ex) {
+        std::fprintf(stderr, "%s: %s\n", type.name, ex.what());
+        return 1;
+    }
     if (opt.turbo && !type.exhaustTurbo) {
         std::fprintf(stderr, type.supercharged ? "--turbo yes: the %s is already supercharged\n"
                                                : "--turbo yes: the %s has no turbo layout (only inline4 has one)\n", type.name);
@@ -224,7 +230,7 @@ int main(int argc, char **argv) {
 
     // make room for the gearbox behind the flywheel (world z = -mesh z, world y = -mesh y)
     if (!opt.engineOnly && !type.bike) {
-        eng.lo.z = std::min(eng.lo.z, -gearboxModel::rearZ() - 5.f);
+        eng.lo.z = std::min(eng.lo.z, -gearboxModel::rearZ(sim.drive.P.gears) - 5.f);
         eng.lo.y = std::min(eng.lo.y, -(eng.crankAxis.y + gearboxModel::D + 84.f) - 5.f);
     }
     bikeGearboxModel bbox;

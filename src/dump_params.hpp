@@ -32,7 +32,7 @@ struct paramDumper {
 static_assert(sizeof(soundParams) == 232, "soundParams changed: update dumpSound()");
 static_assert(sizeof(turboParams) == 296, "turboParams changed: update dumpTurbo()");
 static_assert(sizeof(engineParams) == 1032, "engineParams changed: update dumpEngine()");
-static_assert(sizeof(drivetrainParams) == 480, "drivetrainParams changed: update dumpDrive()");
+static_assert(sizeof(drivetrainParams) == 440, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 248, "bikeSpec changed: update dumpBikeSpec()");
 
 void dumpSound(const paramDumper &d, const soundParams &S) {
@@ -94,8 +94,9 @@ void dumpDrive(const paramDumper &d, const drivetrainParams &P) {
     DUMP(d, P, qsUnloadTorque); DUMP(d, P, qsMatchTol); DUMP(d, P, qsMatchTimeout); DUMP(d, P, qsMaxRpm);
     DUMP(d, P, wheelieAccel);
     for (int g = 1; g <= P.gears; g++) {
-        d.put(("teethIn[" + std::to_string(g) + "]").c_str(), P.teethIn[g]);
-        d.put(("teethOut[" + std::to_string(g) + "]").c_str(), P.teethOut[g]);
+        auto tooth = [&](const std::vector<int> &t) { return g < static_cast<int>(t.size()) ? t[g] : 0; };  // none: 0
+        d.put(("teethIn[" + std::to_string(g) + "]").c_str(), tooth(P.teethIn));
+        d.put(("teethOut[" + std::to_string(g) + "]").c_str(), tooth(P.teethOut));
     }
     DUMP(d, P, primaryIn); DUMP(d, P, primaryOut); DUMP(d, P, sprocketTeeth);
 }

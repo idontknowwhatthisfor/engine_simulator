@@ -294,10 +294,10 @@ src/
   engine_type.hpp           engineType: what an engine provides (params, mesh, labels, tests, demo)
   engines.hpp               registry for --engine-type, setupSim()
   sound.hpp, wav.hpp        sound synthesis + audio stream, --wav rendering
-  bike_gearbox.hpp          the bikes' 6-speed gearbox (3D)
+  bike_gearbox.hpp          the bikes' sequential gearbox (3D)
   test_bike.hpp             --phystest for the bikes, checked against each engine's bikeSpec
 engines/
-  inline4_fit/              inline4_fit.hpp (engine + Honda Fit gearing + type), gearbox_5mt.hpp (3D car
+  inline4_fit/              inline4_fit.hpp (engine + Honda Fit gearing + type), gearbox_manual.hpp (3D car
                             gearbox), test_inline4.hpp, extract_parts.py, scene.gltf/.bin, license.txt,
                             engine.mesh, tests/ (pixel baselines), build_turbo.py, turbocharger/
                             (turbo model), turbo.mesh
