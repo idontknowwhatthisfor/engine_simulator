@@ -30,12 +30,12 @@ struct paramDumper {
 #define DUMP(d, obj, f) (d).put(#f, (obj).f)
 
 // a field added to a parameter struct must be added to its dump below; these trip when one is not
-static_assert(sizeof(soundParams) == 240, "soundParams changed: update dumpSound()");
+static_assert(sizeof(soundParams) == 248, "soundParams changed: update dumpSound()");
 static_assert(sizeof(turboParams) == 328, "turboParams changed: update dumpTurbo()");
-static_assert(sizeof(engineParams) == 1152, "engineParams changed: update dumpEngine()");
+static_assert(sizeof(engineParams) == 1160, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 448, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
-static_assert(sizeof(carSpec) == 536, "carSpec changed: update dumpCarSpec()");
+static_assert(sizeof(carSpec) == 552, "carSpec changed: update dumpCarSpec()");
 
 void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, pipeLowHz); DUMP(d, S, pipeResHz); DUMP(d, S, pipeResGain); DUMP(d, S, masterHz);
@@ -45,7 +45,7 @@ void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, intakeGain); DUMP(d, S, popRpm); DUMP(d, S, popChance); DUMP(d, S, whineGain);
     DUMP(d, S, drive); DUMP(d, S, radiateHz); DUMP(d, S, burble); DUMP(d, S, burbleFadeFrom);
     DUMP(d, S, burbleFadeSpan); DUMP(d, S, burbleHigh); DUMP(d, S, tick); DUMP(d, S, tickHz);
-    DUMP(d, S, turboGain); DUMP(d, S, dcBlockHz);
+    DUMP(d, S, turboGain); DUMP(d, S, raspGain); DUMP(d, S, dcBlockHz);
 }
 
 void dumpTurbo(const paramDumper &d, const turboParams &T) {
@@ -109,7 +109,7 @@ void dumpCarSpec(const paramDumper &d, const carSpec &S) {
     DUMP(d, S, name); DUMP(d, S, dispLo); DUMP(d, S, dispHi); DUMP(d, S, crankLo); DUMP(d, S, crankHi);
     DUMP(d, S, flareLo); DUMP(d, S, flareHi); DUMP(d, S, idleLo); DUMP(d, S, idleHi); DUMP(d, S, idleMapLo);
     DUMP(d, S, idleMapHi); DUMP(d, S, toLimiterLo); DUMP(d, S, toLimiterHi); DUMP(d, S, limiterOver);
-    DUMP(d, S, liftLo); DUMP(d, S, liftHi); DUMP(d, S, sweepTo); DUMP(d, S, torqueWhat); DUMP(d, S, torqueLo);
+    DUMP(d, S, liftLo); DUMP(d, S, liftHi); DUMP(d, S, coastLo); DUMP(d, S, coastHi); DUMP(d, S, sweepTo); DUMP(d, S, torqueWhat); DUMP(d, S, torqueLo);
     DUMP(d, S, torqueHi); DUMP(d, S, torqueRpmLo); DUMP(d, S, torqueRpmHi); DUMP(d, S, powerWhat);
     DUMP(d, S, powerLo); DUMP(d, S, powerHi); DUMP(d, S, powerRpmLo); DUMP(d, S, powerRpmHi);
     for (std::size_t k = 0; k < S.torqueAt.size(); k++)

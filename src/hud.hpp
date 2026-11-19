@@ -63,10 +63,13 @@ std::string hudText(const engineSim &sim, const engineType &type, const engineMo
     std::vector<int> order(sim.cyl.size());
     for (std::size_t c = 0; c < order.size(); c++) order[c] = static_cast<int>(c);
     std::sort(order.begin(), order.end(), [&](int a, int b) { return sim.lag[a] < sim.lag[b]; });
-    for (int c : order) {
+    // more than six cylinders (the V10): two lines, so the list stays inside the window
+    const std::size_t perLine = order.size() > 6 ? (order.size() + 1) / 2 : order.size();
+    for (std::size_t k = 0; k < order.size(); k++) {
+        int c = order[k];
         std::string name = sim.stroke(c);
         name.resize(8, ' ');
-        strokes += std::string(c == 0 ? "\n" : "") + " " + std::to_string(c + 1) + " " + name.substr(0, 4) + " " +
+        strokes += std::string(k % perLine == 0 ? "\n" : "") + " " + std::to_string(c + 1) + " " + name.substr(0, 4) + " " +
                    numToStr(static_cast<float>(sim.cyl[c].p / 1e5), 1);
     }
     auto gname = [](int g) { return g == 0 ? std::string("N") : g < 0 ? std::string("R") : std::to_string(g); };

@@ -12,13 +12,14 @@ the crank speed comes from a physics model, not a fixed rate:
 
 The sound is synthesised from the same simulation.
 
-It has seven engines. `engine_sim` is the single entry point, and you pick the engine with
+It has eight engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
 
 | `--engine-type` | Engine | Drives | Also accepted |
 |---|---|---|---|
 | `inline4` (default) | 2.3 L inline-4 (the Sketchfab model) | a car with Honda Fit 5-speed gearing | `fit`, `honda-fit`, `inline4-fit`, `i4` |
 | `rs3` | Audi RS 3 2.5 TFSI turbocharged inline-5, 2480 cc | an RS 3 (8Y) with the 7-speed S tronic | `audi`, `audi-rs3`, `rs-3`, `inline5`, `i5`, `2.5tfsi`, `daza` |
+| `lfa` | Lexus LFA 1LR-GUE 72° V10, 4805 cc | an LFA with the 6-speed ASG | `lexus`, `lexus-lfa`, `v10`, `1lr-gue`, `1lr` |
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
 | `h2` | Kawasaki Ninja H2 supercharged inline-4, 998 cc | a Ninja H2 (bike) | `kawasaki`, `kawasaki-h2`, `ninja-h2` |
@@ -51,7 +52,7 @@ optional, so without it everything builds and only `--turbo yes` is unavailable.
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
 meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run ENGINE=<id>`
-or `make run-<id>` (`make run-rs3`, `make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-mxking`; aliases work too). `make test` runs
+or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-mxking`; aliases work too). `make test` runs
 the headless checks for every engine and version of one (`./engine_sim --engine-type list --ids`), and
 fails if any of them fails.
 
@@ -126,6 +127,49 @@ A typical big-turbo build (estimates, not one tuner's car) on the stock 82.5 × 
 | 3D | The downpipe a size up with a straight pipe where the catalyst was, bigger blued titanium tips |
 | Sound | Louder, flaps open from 2500 rpm, more crackle, more turbo |
 
+
+### `lfa`: Lexus LFA (2010-2012), 1LR-GUE 72° V10
+
+```bash
+./engine_sim --engine-type lfa
+```
+
+A V like the Ducati (the inline-4's piston and rod scaled to the 88 mm bore, on a procedural crank,
+crankcase, two banks, heads and red cam covers) in a car like the RS 3. Five crankpins 144° apart,
+each shared by one rod from each bank: each bank fires as an even inline-5, and the 72° V puts the
+other bank's cylinder half way between, so the ten fire evenly every 72°.
+
+| | |
+|---|---|
+| Engine | 88 × 79 mm = 4805 cc, 12.0:1, 72° V, banks 36° either side of vertical, five shared crankpins 104 mm apart (estimate), 136 mm rods (estimate), ten individual throttle bodies. Cylinders 1-5 are bank A (−x), 6-10 bank B (+x), n+5 sharing n's pin |
+| Firing | 1-6-5-10-2-7-3-8-4-9, every 72° (the usual V10 order; with shared pins each pin's two cylinders fire 72° apart). No free 1st- or 2nd-order force (each bank is an even inline-5), only rocking couples; the test checks them against the textbook, with each bore's vertical share for the V |
+| Output (sim) | 480 N·m at 6500–7000 rpm, 408 kW (547 hp) at 9000 (Toyota: 480 N·m at 6800, 412 kW / 560 PS at 8700, 90% of the torque from 3700 to 9000); idle 1000 rpm, limiter 9000, idle to the limiter in 0.42 s in neutral (Toyota: 0.6 s) |
+| Wave tuning | ~0.33 m from the surge tank through each throttle body ram at ~7000 rpm; the equal-length 5-into-1 headers reflect at the catalysts (measured on the drawn exhaust). A dip at ~3000 rpm and a sag of 2–3% at 7500–8500 (runner: estimate) |
+| Gearbox | 6-speed ASG (Aisin automated single-clutch manual, rear transaxle): 3.231 / 2.188 / 1.609 / 1.233 / 0.970 / 0.795, final drive 4.556, reverse 3.25 (estimate). 6th at the limiter is ~323 km/h, the LFA's 325 km/h top speed. Shifts 0.05 s out and 0.10 s in (the ASG at its quickest), drawn as a single-clutch box |
+| Vehicle | 1480 kg + 75 kg driver, 305/30 ZR20 rears (0.345 m), CdA 0.59 (Cd 0.31), rear-wheel drive |
+| Exhaust (3D) | Exhaust ports on the outer sides of the heads: each bank's equal-length 5-into-1 header drops down the block to a collector and a catalyst, two titanium mid pipes (the left one with the exhaust valve) into a transverse silencer, and the LFA's three tailpipes in a triangle in the middle of the rear. Intake: a carbon surge tank over the V, ten runners with their throttle bodies into the valley-side ports, the inlet duct from an airbox ahead of the engine |
+| Results (sim) | 0–100 km/h 3.6 s floored (Lexus: 3.7 s), 3.2 s with launch control (optimistic: the simulator has no tyre grip limit), 0–200 km/h 9.9 s, full-throttle upshifts at ~8900 rpm |
+| Sound | The detailed voice on a car: a short, bright exhaust for the V10's scream (the firing rate is 10 × rpm / 120, 750 Hz at 9000 rpm), the intake howl, the exhaust valve opening from ~3700 rpm, a light crackle on the overrun. The turbulent rasp is turned down to an eighth (`soundParams::raspGain`): it follows the summed exhaust flow squared, and with ten cylinders' exhaust strokes overlapping (about three at once) the flow hardly drops between pulses, so at full strength the roar was ~7 dB over the firing note |
+
+The light crank (0.14 kg·m²) against a 4.8 L's pumping losses stops quicker than a road car's from
+3000 rpm with the ignition off, so the LFA sets its own coast-down window (`carSpec::coastLo`/`coastHi`).
+#### Tuned (`--tuned yes`): straight pipe
+
+```bash
+./engine_sim --engine-type lfa --tuned yes
+```
+
+A typical straight-pipe build with an ECU tune (estimates, not one tuner's car) on the stock 88 × 79 mm,
+4805 cc, 12.0:1 and internals.
+
+| | |
+|---|---|
+| Exhaust | Catalysts, silencer and exhaust valve removed: the stock headers and collectors, the two banks crossed in an X-pipe under the gearbox, two straight titanium pipes to two big blued tips. Almost no back pressure (1.025 bar). The wave tuning is unchanged: each bank's pulses still reflect at its 5-into-1 collector (0.78 m acoustically, measured on the drawn exhaust) |
+| ECU | Limiter 9500 rpm (stock 9000), a little more advance at the top; the VE curve peaks higher up |
+| Output (sim) | 479 N·m at 7000 rpm, 425 kW (570 hp) at 9500 (stock: 480 N·m, 408 kW at 9000) |
+| Gearbox | Stock ratios; full-throttle upshifts at ~9400 rpm |
+| Results (sim) | 0–100 km/h 3.6 s floored, 3.2 s with launch control (no grip limit), 0–200 km/h 9.7 s |
+| Sound | No silencer or valve: always open, the pipe rings harder (2.4 m, more reflection), brighter and louder (+5 dB at idle, +2 dB at full throttle), more crackle on the overrun; the low burble held under the stock car's so the decel boom stays below full throttle, and the rasp at the stock eighth |
 
 ### `v4`: Ducati Desmosedici Stradale (Panigale V4)
 
@@ -611,6 +655,8 @@ engines/
                             (turbo model), turbo.mesh
   audi_rs3/                 audi_rs3.hpp (engine, turbo, sound, S tronic gearing, exhaust, car spec, type),
                             build_rs3.py, rs3.mesh, build_rs3_turbo.py, rs3_turbo.mesh (procedural turbo)
+  lexus_lfa/                lexus_lfa.hpp (engine, sound, ASG gearing, exhaust and intake, car spec, type),
+                            build_lfa.py, lfa.mesh
   ducati_v4/                ducati_v4.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_v4.py, v4.mesh
   bmw_s1000rr/              bmw_s1000rr.hpp (engine, sound, gearing, test targets, demo ride, type),
@@ -688,7 +734,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    - the `engineType`: id, labels, mesh path, physics test, for bikes the gearbox placement and an
      optional `ride` for `--wav`; other versions of the engine go in `variants` (`--variant <name>`).
 4. **Register.** The header ends with `REGISTER_ENGINE(<type function>, <key>)`; the key orders
-   `--engine-type list` (inline4 10, rs3 15, v4 20, s1000rr 30, h2 40, zx10r 45, mxking 50), pick a free one. `engine.mk` lists the
+   `--engine-type list` (inline4 10, rs3 15, lfa 17, v4 20, s1000rr 30, h2 40, zx10r 45, mxking 50), pick a free one. `engine.mk` lists the
    header and the mesh rule. Nothing outside the folder needs an edit: the Makefile includes every
    `engine.mk` and generates `engines/all.hpp`, `make test` picks the engine up, and the help line
    and HUD follow from what it has (bike or car, boost, wheelie control).

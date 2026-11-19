@@ -78,6 +78,7 @@ struct carSpec {
     double toLimiterLo = 0.5, toLimiterHi = 2.5; // s from idle to the limiter, full throttle
     double limiterOver = 400.0;                  // peak rpm on the limiter: revLimit .. revLimit + this
     double liftLo = 700.0, liftHi = 950.0;       // rpm 4 s after lifting off the limiter
+    double coastLo = 0.8, coastHi = 6.0;         // s to coast from 3000 rpm to a stop, ignition off
     // WOT dyno, speed locked, from 1000 rpm in 500 rpm steps
     double sweepTo = 7000.0;
     const char *torqueWhat = "peak torque";

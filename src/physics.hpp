@@ -55,6 +55,10 @@ struct soundParams {
     double tick = 0.0;              // valvetrain: a click as each cam lobe snaps a valve shut
     double tickHz = 3200.0;         // ... centred here (a Desmo's rocker clatter sits lower)
     double turboGain = 1.0;         // the turbo's whistle, whoosh, blow-off and flutter (--turbo yes)
+    // the turbulent rasp (broadband noise on the exhaust flow, around 1.2 kHz). It follows the summed
+    // outflow squared, so with many cylinders whose exhaust strokes overlap (a V10: about three at
+    // once) the flow hardly drops between pulses and the rasp drowns the firing note: turn it down
+    double raspGain = 1.0;
     double dcBlockHz = 0.0;         // high-pass taking the DC out of the exhaust pulses; 0: from the
                                     // engine's idle firing rate (dcBlockCutoff in src/sound.hpp)
 };

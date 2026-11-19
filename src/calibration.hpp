@@ -36,5 +36,5 @@ void applyCalibrationEnv(engineParams &P) {
     env("SND_INTAKE", S.intakeGain); env("SND_RES", S.pipeResGain); env("SND_RAD", S.radiateHz);
     env("SND_BURBLE", S.burble); env("SND_BFROM", S.burbleFadeFrom); env("SND_BSPAN", S.burbleFadeSpan);
     env("SND_BHIGH", S.burbleHigh); env("SND_TICK", S.tick); env("SND_WHINE", S.whineGain);
-    env("SND_POP", S.popChance); env("SND_TURBO", S.turboGain);
+    env("SND_POP", S.popChance); env("SND_TURBO", S.turboGain); env("SND_RASP", S.raspGain);
 }

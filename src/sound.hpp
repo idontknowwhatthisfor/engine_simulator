@@ -161,7 +161,7 @@ struct engineSound {
         double ex = dcBlock.run(exhaust);
         if (!sp.detailed) {
             double body = pipeLow.run(ex) + sp.pipeResGain * pipeRes.run(ex);
-            double rasp = 0.6 * turbulence.run(noise() * exhaust);
+            double rasp = 0.6 * sp.raspGain * turbulence.run(noise() * exhaust);
             double induction = intake.run(0.4 * intakeFlow + 3.0 * sim.throttleFlow * noise());
             double knock = 0.15 * clatter.run(noise() * std::min(1.0, heat / 5e6));
             double mix = master.run(body + rasp + induction + knock + starterWhine(sim)) + turboVoice(sim);
@@ -185,7 +185,7 @@ struct engineSound {
         // turbulence noise climbs steeply with the gas speed (jet noise goes as a high power of it), so it
         // follows the outflow squared: a full charge at high revs roars, the thin overrun flow barely hisses
         double outflow = std::max(0.0, exhaust);
-        double rasp = 0.5 * turbulence.run(noise() * outflow * std::min(outflow, 3.0) / 1.5);
+        double rasp = 0.5 * sp.raspGain * turbulence.run(noise() * outflow * std::min(outflow, 3.0) / 1.5);
         double raw = body + rasp;
         // silencer: shut flap = dull and quieter, open = bright and loud (crossfade, both always running)
         double shut = sp.flapShutGain * flapShut.run(raw), open = flapOpen.run(raw);

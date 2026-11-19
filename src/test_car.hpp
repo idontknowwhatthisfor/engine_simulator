@@ -98,7 +98,7 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
     sim.ignition = false;
     t0 = sim.time;
     while (sim.rpm() > 30.0 && sim.time - t0 < 20.0) run(0.001, none);
-    check("coast down 3000 rpm -> stop, ignition off", sim.time - t0, 0.8, 6.0, "s");
+    check("coast down 3000 rpm -> stop, ignition off", sim.time - t0, S.coastLo, S.coastHi, "s");
 
     // 6. WOT dyno sweep, speed locked. A boosted engine gets 3 s to spool at each speed, with its charge
     // as hot as in a long pull and air through the intercooler (as the HUD's dyno, src/dyno.hpp)
@@ -230,8 +230,8 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
 
     // 8. balance at a locked 6000 rpm, ignition off, against the slider-crank textbook for this crank:
     // one cylinder's 1st- and 2nd-order force m r w^2 and m r^2 / L w^2 at its crank angle (its firing
-    // lag round: the cycle angle is 720 deg periodic), summed over the cylinders as forces and, with
-    // each cylinder's place along the crank, as rocking couples
+    // lag round: the cycle angle is 720 deg periodic), its vertical share (cos bank) for a V, summed over
+    // the cylinders as forces and, with each cylinder's place along the crank, as rocking couples
     {
         sim.reset(0.0);
         sim.lockSpeed = true;
@@ -242,7 +242,9 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
         double f1x = 0, f1y = 0, f2x = 0, f2y = 0, c1x = 0, c1y = 0, c2x = 0, c2y = 0, one1 = 0, one2 = 0;
         for (int c = 0; c < sim.cylCount(); c++) {
             const cylinderState &s = sim.cyl[c];
-            double a1 = m * s.r * w2, a2 = m * s.r * s.r / s.L * w2, lag = sim.lag[c];
+            // the vertical share of the force along the bore (a V engine's bores lean by their bank)
+            double up = std::cos(e.cyls[c].bank);
+            double a1 = m * s.r * w2 * up, a2 = m * s.r * s.r / s.L * w2 * up, lag = sim.lag[c];
             one1 = std::max(one1, a1);
             one2 = std::max(one2, a2);
             f1x += a1 * std::cos(lag); f1y += a1 * std::sin(lag);
