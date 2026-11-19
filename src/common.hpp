@@ -139,6 +139,16 @@ std::string numToStr(float num, int prec = 2) {
     return temp.str();
 }
 
+// right-aligned in at least `width` characters: in the HUD's monospaced font a changing number then
+// keeps its field, so the text after it on the line stays put
+std::string padLeft(const std::string &s, std::size_t width) {
+    return s.size() >= width ? s : std::string(width - s.size(), ' ') + s;
+}
+std::string numPad(float num, int prec, std::size_t width) {
+    if (std::fabs(num) < 0.5f * std::pow(10.f, static_cast<float>(-prec))) num = 0.f;  // no "-0" flicker
+    return padLeft(numToStr(num, prec), width);
+}
+
 // ---------------------------------------------------------------------------------------------
 // camera, same yaw/pitch/dist orbit and drag feel as the sphere sim
 // ---------------------------------------------------------------------------------------------

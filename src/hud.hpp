@@ -53,6 +53,10 @@ struct hudView {
 
 std::string hudText(const engineSim &sim, const engineType &type, const engineModel &eng, const hudView &v) {
     auto f0 = [](double x) { return numToStr(static_cast<float>(x), 0); };
+    // fixed-width fields for the numbers that change while it runs (the font is monospaced)
+    auto p0 = [](double x, std::size_t w) { return numPad(static_cast<float>(x), 0, w); };
+    auto p1 = [](double x, std::size_t w) { return numPad(static_cast<float>(x), 1, w); };
+    auto p2 = [](double x, std::size_t w) { return numPad(static_cast<float>(x), 2, w); };
     const drivetrain &dv = sim.drive;
     const controlWords w = controlsOf(dv.P);
     const bool stand = sim.standalone;
@@ -70,12 +74,13 @@ std::string hudText(const engineSim &sim, const engineType &type, const engineMo
         std::string name = sim.stroke(c);
         name.resize(8, ' ');
         strokes += std::string(k % perLine == 0 ? "\n" : "") + " " + std::to_string(c + 1) + " " + name.substr(0, 4) + " " +
-                   numToStr(static_cast<float>(sim.cyl[c].p / 1e5), 1);
+                   p1(sim.cyl[c].p / 1e5, 5);
     }
     auto gname = [](int g) { return g == 0 ? std::string("N") : g < 0 ? std::string("R") : std::to_string(g); };
     std::string gearName = gname(dv.gear);
     if (dv.shiftPhase) gearName += ">" + gname(dv.targetGear);
     if (dv.qsPhase != 0) gearName += ">" + gname(dv.targetGear);  // a quickshift (bikes)
+    gearName.resize(std::max<std::size_t>(gearName.size(), 3), ' ');  // "2" and "2>3" take the same room
     double slipRpm = (sim.omega - dv.omegaIn) * 60.0 / (2.0 * 3.14159265358979323846);
     std::string flags = std::string(sim.ignition ? "" : "  IGNITION OFF") + (sim.revCut ? "  REV CUT" : "") +
                         (sim.fuelCut ? "  FUEL CUT" : "") + (sim.starter ? "  STARTER" : "") + (dv.brake ? "  BRAKE" : "");
@@ -85,44 +90,46 @@ std::string hudText(const engineSim &sim, const engineType &type, const engineMo
     }
     std::string camStr = sim.P.lowCam ? (sim.onLowCam(sim.rpm()) ? "   ShiftCam: partial-load lobe" : "   ShiftCam: full lobe") : "";
 
-    std::string s = " FPS " + (v.fps > 0.f ? f0(v.fps) : std::string("--")) + "   time x" +
+    std::string s = " FPS " + padLeft(v.fps > 0.f ? f0(v.fps) : std::string("--"), 3) + "   time x" +
                     numToStr(static_cast<float>(v.timeScale), 2) + (v.paused ? "   PAUSED" : "");
-    if (stand) s += "\n RPM " + f0(sim.rpm()) + "   " + type.label + ", on a stand" + camStr;
+    if (stand) s += "\n RPM " + p0(sim.rpm(), 5) + "   " + type.label + ", on a stand" + camStr;
     else
-        s += "\n RPM " + f0(sim.rpm()) + (*type.hudTag ? std::string("  ") + type.hudTag : std::string()) + "   gear " + gearName +
-             (dv.automatic ? (dv.sport ? " SPORT" : " AUTO") : dv.dctOn() ? " MANUAL DCT" : " MANUAL") + "   " + f0(dv.v * 3.6) + " km/h" + camStr;
-    s += std::string("\n ") + w.throttle + " " + f0(sim.pedal * 100.0) + "%  throttle " + f0(sim.throttleOpen * 100.0) +
-         "%  manifold " + f0(sim.pMan / 1000.0) + " kPa";
+        s += "\n RPM " + p0(sim.rpm(), 5) + (*type.hudTag ? std::string("  ") + type.hudTag : std::string()) + "   gear " + gearName +
+             (dv.automatic ? (dv.sport ? " SPORT" : " AUTO") : dv.dctOn() ? " MANUAL DCT" : " MANUAL") + "   " + p0(dv.v * 3.6, 3) + " km/h" + camStr;
+    s += std::string("\n ") + w.throttle + " " + p0(sim.pedal * 100.0, 3) + "%  throttle " + p0(sim.throttleOpen * 100.0, 3) +
+         "%  manifold " + p0(sim.pMan / 1000.0, 3) + " kPa";
     if (sim.P.turbo.on && !stand) {
         const bool sc = sim.P.turbo.supercharger;
-        s += "\n boost " + std::string(sim.boostBar() >= 0.0 ? "+" : "") + numToStr(static_cast<float>(sim.boostBar()), 2) +
-             (sc ? " bar  plenum " + f0(sim.pCharge / 1000.0) + " kPa  drive " + f0(sim.chargerTorque * sim.omega / 1000.0) + " kW" +
-                       (sim.pInlet > sim.P.pAtm + 200.0 ? "  ram +" + f0(sim.pInlet - sim.P.pAtm) + " Pa" : "")
-                 : " bar  wastegate " + f0(sim.wastegate * 100.0) + "%  back pressure " + f0(sim.pExh / 1000.0) + " kPa") +
-             "\n charge " + f0(sim.tCharge - 273.15) + " C (compressor " + f0(sim.tComp - 273.15) + " C)  " +
+        s += "\n boost " + padLeft(std::string(sim.boostBar() >= 0.0 ? "+" : "") + numToStr(static_cast<float>(sim.boostBar()), 2), 5) +
+             (sc ? " bar  plenum " + p0(sim.pCharge / 1000.0, 3) + " kPa  drive " + p0(sim.chargerTorque * sim.omega / 1000.0, 3) + " kW" +
+                       (sim.pInlet > sim.P.pAtm + 200.0 ? "  ram " + padLeft("+" + f0(sim.pInlet - sim.P.pAtm), 5) + " Pa" : "")
+                 : " bar  wastegate " + p0(sim.wastegate * 100.0, 3) + "%  back pressure " + p0(sim.pExh / 1000.0, 3) + " kPa") +
+             "\n charge " + p0(sim.tCharge - 273.15, 3) + " C (compressor " + p0(sim.tComp - 273.15, 3) + " C)  " +
              (sc ? "bypass valve " : "blow-off valve ") + (!sim.P.turbo.bov ? "removed" : sim.bovOpen > 0.05 ? "VENTING" : "shut") +
              (sim.surge > 0.2 ? "  SURGE" : "");
     }
-    s += "\n torque " + numToStr(static_cast<float>(sim.brakeAvg), 1) + " N m  power " + numToStr(static_cast<float>(std::max(kw, 0.0)), 1);
-    if (stand) s += " kW (" + f0(std::max(kw, 0.0) * 1.341) + " hp)";
+    s += "\n torque " + p1(sim.brakeAvg, 6) + " N m  power " + p1(std::max(kw, 0.0), 5);
+    if (stand) s += " kW (" + p0(std::max(kw, 0.0) * 1.341, 3) + " hp)";
     else {
         // with wheelie control the drive force shown is the smoothed one that control works on
         double wheel = dv.P.wheelieAccel > 0.0 ? sim.wheelForceFilt : dv.wheelForce;
         // the clutch: in manual the driver's pedal / lever travel; when the box works it (automatic, a
         // car's manual DCT) how far it is engaged, and who is working it
         std::string clutchStr = dv.boxWorksClutch()
-            ? "clutch " + f0(dv.clutch * 100.0) + "% engaged (" + (dv.automatic ? "auto" : "DCT") + ")"
-            : std::string(w.clutch) + " " + f0((1.0 - dv.clutch) * 100.0) + "%";
-        s += " kW  wheels " + numToStr(static_cast<float>(wheel / 1000.0), 2) + " kN" + "\n " + clutchStr +
-             "  slip " + f0(slipRpm) + " rpm" + "\n hill " + (dv.grade >= 0 ? "+" : "") +
+            ? "clutch " + p0(dv.clutch * 100.0, 3) + "% engaged (" + (dv.automatic ? "auto" : "DCT") + ")"
+            : std::string(w.clutch) + " " + p0((1.0 - dv.clutch) * 100.0, 3) + "%";
+        s += " kW  wheels " + p2(wheel / 1000.0, 5) + " kN" + "\n " + clutchStr +
+             "  slip " + p0(slipRpm, 5) + " rpm" + "\n hill " + (dv.grade >= 0 ? "+" : "") +
              f0(dv.grade * 100.0) + "%  mass " + f0(dv.mass()) + " kg" + (dv.cargo > 0 ? std::string(" (") + w.load + ")" : "");
         if (v.exhaust)
-            s += "\n exhaust: headers ~" + std::to_string(v.exhaust->headerC()) + " C" +
-                 (v.exhaust->flapAt.on ? "  valve " + f0(v.exhaust->flap * 100.0) + "% open" : "") +
-                 (v.showTurbo ? (sim.P.turbo.supercharger ? "  supercharger " : "  turbo ") + f0(sim.turboRpm() / 1000.0) + "k rpm" : "");
+            s += "\n exhaust: headers " + padLeft("~" + std::to_string(v.exhaust->headerC()), 5) + " C" +
+                 (v.exhaust->flapAt.on ? "  valve " + p0(v.exhaust->flap * 100.0, 3) + "% open" : "") +
+                 (v.showTurbo ? (sim.P.turbo.supercharger ? "  supercharger " : "  turbo ") + p0(sim.turboRpm() / 1000.0, 3) + "k rpm" : "");
     }
-    s += (flags.empty() ? "" : "\n" + flags) + "\n shake 1st " + numToStr(static_cast<float>(sim.shake1() / 1000.0), 2) +
-         " kN  2nd " + numToStr(static_cast<float>(sim.shake2() / 1000.0), 2) + " kN  roll +-" + f0(sim.rollAmp()) + " N m" +
+    // the flags keep their line even when there are none, so the lines under it do not jump as
+    // FUEL CUT, REV CUT... come and go
+    s += "\n" + flags + "\n shake 1st " + p2(sim.shake1() / 1000.0, 5) +
+         " kN  2nd " + p2(sim.shake2() / 1000.0, 5) + " kN  roll +-" + p0(sim.rollAmp(), 4) + " N m" +
          "\n sound " + v.sound + "  shake view x" + f0(v.shakeView) + "  block " + (v.ghost ? "ghost" : "hidden") + "  blur " +
          (v.blur ? "on" : "off");
     if (type.hudFiringLine) s += "\n firing (" + hudFiring(type, eng) + "):";

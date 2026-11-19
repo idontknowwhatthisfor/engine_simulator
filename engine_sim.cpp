@@ -662,8 +662,8 @@ int main(int argc, char **argv) {
         if (opt.hud) {
         help.setPosition({10.f, float(winSize.y) - 66.f});
         credit.setPosition({float(winSize.x) - credit.getLocalBounds().size.x - 12.f, 8.f});
-        sf::Text angle(font, " crank " + numToStr(crankDegrees(eng, delta), 1) + " deg   cyl 1 cycle " +
-                                 numToStr(static_cast<float>(sim.theta / DEGR), 0) + " / 720", 16);
+        sf::Text angle(font, " crank " + numPad(crankDegrees(eng, delta), 1, 5) + " deg   cyl 1 cycle " +
+                                 numPad(static_cast<float>(sim.theta / DEGR), 0, 3) + " / 720", 16);
         angle.setPosition({0.f, text.getLocalBounds().size.y + 14.f});
         window.draw(text);
         window.draw(angle);
