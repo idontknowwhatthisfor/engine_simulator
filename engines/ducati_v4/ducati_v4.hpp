@@ -28,8 +28,15 @@ engineParams ducatiV4Params() {
     P.fmepA = 0.75e5; P.fmepB = 0.06e5; P.fmepC = 0.008e5;  // ~2.9 bar at 13000 rpm
     P.pedalRate = 10.0;             // twist grip
     // tuned intake and exhaust: soft low down, ~114% VE from 10000 to 12500 rpm (calibrated with
-    // --v4 --phystest to 124 N m at 10000-11000 and 155 kW at 13000 rpm)
-    P.veBase = 0.60; P.vePeak = 0.54; P.veRpm = 11200.0; P.veWidth = 6000.0;
+    // --v4 --phystest to 126 N m at 10500 and 153 kW at 12500 rpm)
+    P.veBase = 0.609; P.vePeak = 0.496; P.veRpm = 11200.0; P.veWidth = 6000.0;
+    // pressure-wave tuning (estimates): stack, oval 52 mm throttle body and long port, ~0.31 m in all,
+    // ram hardest at ~10000 rpm (the published torque peak), a smaller hump at ~6000; the headers
+    // (0.41-0.42 m, the drawn layout) and their pair merge reach the collector under the engine at
+    // ~0.74 m: the scavenging hump near 13500, its dip ~7000. Together a mid-range hole at
+    // 7000-8000 rpm and a hump near 4500
+    P.ramLen = 0.31; P.ramDia = 0.052; P.ramGain = 0.05;
+    P.scavLen = 0.74; P.scavGain = 0.035;
     P.residualMin = 0.55;           // big valve overlap: lots of exhaust left in at idle
     P.sparkLow = 10.0; P.sparkHigh = 36.0; P.sparkFrom = 1300.0; P.sparkSpan = 7000.0;
     P.mapMin = 35e3;
@@ -234,10 +241,10 @@ const engineType &ducatiV4Type() {
 // instead of on the stock limiter. The gearbox itself is stock.
 engineParams ducatiV4TunedParams() {
     engineParams P = ducatiV4Params();
-    // calibrated with --engine-type v4 --tuned yes --phystest: 130 N m at 11000 and 164.5 kW at
-    // 13000 rpm, against stock's 124 N m at 10500 and 155 kW; more everywhere, ~+1% at 4000-6000 rpm
+    // calibrated with --engine-type v4 --tuned yes --phystest: 132.5 N m at 10500 and 162 kW at
+    // 12500 rpm, against stock's 126 N m at 10500 and 153 kW; more everywhere, ~+1% at 4000-6000 rpm
     // growing to ~+7% at the top
-    P.veBase = 0.60; P.vePeak = 0.60; P.veRpm = 11400.0; P.veWidth = 6000.0;
+    P.veBase = 0.610; P.vePeak = 0.555; P.veRpm = 11400.0; P.veWidth = 6000.0;  // stock's wave tuning
     P.revLimit = 14500.0; P.revResume = 14100.0;  // the race map's limiter
     P.sparkHigh = 37.0;             // race map
     soundParams &S = P.sound;       // open race system, no exhaust valve

@@ -16,12 +16,28 @@ struct dynoSweep {
 
     // engine: a freshly set-up sim (its parameters and geometry are what matter, not its state)
     void start(const engineSim &engine) {
+        grid(engine);
+        worker = std::thread([this, s = engine]() mutable { run(s); });
+    }
+    // the speeds measured: 1000 rpm to the limiter, every 250 rpm (cars) or 500 rpm (bikes)
+    void grid(const engineSim &engine) {
         double top = engine.P.revLimit;
         double stepRpm = top <= 8000.0 ? 250.0 : 500.0;
         for (double r = 1000.0; r <= top + 1.0; r += stepRpm) rpm.push_back(static_cast<float>(r));
         torque.assign(rpm.size(), 0.f);
         kw.assign(rpm.size(), 0.f);
-        worker = std::thread([this, s = engine]() mutable { run(s); });
+    }
+    // --dyno (hidden): the same curve measured here and printed, with the pressure-wave tuning's
+    // share of the filling at each speed (engineSim::waveTuning), for calibrating the wave tuning
+    int print(const engineSim &engine) {
+        grid(engine);
+        engineSim s = engine;
+        run(s);
+        std::printf("    rpm   torque Nm   power kW   power hp   wave %%\n");
+        for (std::size_t k = 0; k < rpm.size(); k++)
+            std::printf("  %5.0f   %9.1f   %8.1f   %8.1f   %+6.1f\n", rpm[k], torque[k], kw[k], kw[k] * 1.341,
+                        100.0 * engine.waveTuning(rpm[k]));
+        return 0;
     }
     ~dynoSweep() {
         stop = true;

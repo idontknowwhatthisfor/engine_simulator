@@ -28,7 +28,13 @@ engineParams kawasakiZx10rParams() {
     // one cam, no ShiftCam: a broad curve that peaks toward the power peak. Calibrated with
     // --engine-type zx10r --phystest (no ram air) to Kawasaki's 114.9 N m at 11400 and 149.3 kW at 13200
     P.lowCam = false;
-    P.veBase = 0.60; P.vePeak = 0.55; P.veRpm = 11500.0; P.veWidth = 6000.0;
+    P.veBase = 0.606; P.vePeak = 0.491; P.veRpm = 11500.0; P.veWidth = 6000.0;
+    // pressure-wave tuning (estimates): stack, 47 mm throttle body and port, ~0.20 m, ram hardest at
+    // ~11500 rpm (the published torque peak); the 4-2-1 headers (0.46-0.51 m, the drawn layout) to
+    // the collector, ~0.71 m, scavenge best near 14000 with their dip at ~7000. Together a hole at
+    // 8000-8500 and a hump near 5000
+    P.ramLen = 0.20; P.ramDia = 0.047; P.ramGain = 0.05;
+    P.scavLen = 0.71; P.scavGain = 0.035;
     P.sparkSpan = 7500.0;
     P.rpmScale = 16000.0;
     P.counterweight = 0.0;          // flat-plane inline-4: 1st order cancels by symmetry
@@ -161,7 +167,7 @@ engineParams kawasakiZx10rTunedParams() {
     P.sparkHigh = 38.0;             // race fuel: the kit map runs more advance at the top
     // calibrated with --engine-type zx10r --tuned yes --phystest (no ram air): see the README table
     // a broad curve: the kit cam's peak near 13000 without losing the stock mid range
-    P.veBase = 0.60; P.vePeak = 0.62; P.veRpm = 12800.0; P.veWidth = 7500.0;
+    P.veBase = 0.617; P.vePeak = 0.555; P.veRpm = 12800.0; P.veWidth = 7500.0;  // stock's wave tuning
     soundParams &S = P.sound;       // race exhaust, valve deleted
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
     S.flapShutGain = 1.0;

@@ -9,7 +9,7 @@
 // engine: 85 mm bore, ~103 mm mean stroke (the model's throws are uneven: 108.4 mm on 1/4, 97.8 mm
 // on 2/3, measured from the mesh), 160 mm rods, flat-plane crank firing 1-3-4-2: 2.34 L. Tuned to
 // match a Honda K24Z3 (2008-12 Accord, 87 x 99 mm, 2.35 L, 10.5:1, 177 hp at 6500 rpm, 218 N m at
-// 4300 rpm). Calibrated with --phystest: idle 800 rpm, 223 N m at 4000-4500 rpm, 131 kW (176 hp)
+// 4300 rpm). Calibrated with --phystest: idle 800 rpm, 225 N m at 4000-4250 rpm, 132 kW (177 hp)
 // at 6500 rpm, limiter 6800 rpm. The bore stays at the mesh's 85 mm, so the swept volume matches.
 engineParams inline4FitParams() {
     engineParams P;
@@ -27,7 +27,14 @@ engineParams inline4FitParams() {
     P.starterMaxRpm = 300.0;
     P.revLimit = 6800.0; P.revResume = 6500.0;
     P.fmepA = 1.0e5; P.fmepB = 0.12e5; P.fmepC = 0.04e5;
-    P.veBase = 0.765; P.vePeak = 0.25; P.veRpm = 5200.0; P.veWidth = 3300.0;  // broad, high peak (K24 intake VTC)
+    P.veBase = 0.775; P.vePeak = 0.245; P.veRpm = 5600.0; P.veWidth = 3300.0;  // broad, high peak (K24 intake VTC)
+    // pressure-wave tuning (estimates): ~0.42 m from the plenum to the valve (runner + port) at the
+    // 45 mm runner bore rams hardest at ~4300 rpm, the dip after it lands near the limiter, a smaller
+    // hump at ~2600; the 4-2-1 header (0.30-0.38 m primaries + 0.17 m secondaries, the drawn layout)
+    // to its last merge scavenges weakly, mostly at the top. The smooth curve above was refitted
+    // around the ripple (keeping VE at idle, which the stall checks are sensitive to)
+    P.ramLen = 0.42; P.ramDia = 0.045; P.ramGain = 0.05;
+    P.scavLen = 0.50; P.scavGain = 0.035;
     P.sparkLow = 8.0; P.sparkHigh = 30.0; P.sparkFrom = 800.0; P.sparkSpan = 3500.0;
     P.rpmScale = 8000.0;
     P.blockMass = 150.0; P.blockRollInertia = 5.0;

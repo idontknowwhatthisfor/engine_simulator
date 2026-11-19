@@ -28,7 +28,13 @@ engineParams audiRs3Params() {
     P.fmepA = 1.05e5; P.fmepB = 0.12e5; P.fmepC = 0.035e5;
     // calibrated with --engine-type rs3 --phystest, with the boost target and charge limit below, to
     // Audi's 500 N m plateau and 294 kW at 5600-7000
-    P.veBase = 0.78; P.vePeak = 0.16; P.veRpm = 4600.0; P.veWidth = 3000.0;
+    P.veBase = 0.774; P.vePeak = 0.162; P.veRpm = 4600.0; P.veWidth = 3000.0;
+    // pressure-wave tuning (estimates), weak on a turbo engine: ~0.30 m runners from the charge-air
+    // plenum ram at ~5800 rpm (most of it is hidden on the plateau: the ECU's charge limit takes the
+    // ripple out); the short manifold primaries (0.13-0.26 m, the drawn layout) end at the turbine,
+    // which reflects little, so scavenging is a trace
+    P.ramLen = 0.30; P.ramDia = 0.045; P.ramGain = 0.03;
+    P.scavLen = 0.18; P.scavGain = 0.01;
     P.sparkLow = 8.0; P.sparkHigh = 30.0; P.sparkFrom = 750.0; P.sparkSpan = 3500.0;
     P.fuelCutRpm = 1500.0;
     P.rpmScale = 8000.0;
@@ -311,6 +317,7 @@ engineParams audiRs3TunedParams() {
     P.throttleArea = 5.0e-3;        // 80 mm throttle
     P.revLimit = 7400.0; P.revResume = 7150.0;
     P.veRpm = 5200.0;               // intake, downpipe and the turbo's freer exhaust breathe best higher up
+    P.veBase = 0.786; P.vePeak = 0.149;  // refitted around the wave tuning (same runners and manifold)
     P.sparkHigh = 31.0;
     turboParams &T = P.turbo;
     // calibrated with --engine-type rs3 --tuned yes --phystest: ~610 N m from 3500 rpm, ~410 kW (550 hp)

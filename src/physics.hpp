@@ -163,6 +163,16 @@ struct engineParams {
     // runs whichever lobe breathes better at this rpm. lowCam = false: one fixed cam (the curve above)
     bool lowCam = false;
     double veLowBase = 0.0, veLowPeak = 0.0, veLowRpm = 0.0, veLowWidth = 1.0;
+    // pressure-wave (resonance) tuning: ripples on top of the smooth VE curve above, from the waves
+    // that run up and down the intake runners and exhaust headers (engineSim::waveTuning explains the
+    // model). The lengths are effective acoustic lengths: the pipe plus the port and the open end's
+    // end correction. Gains are fractions of the trapped air; 0 switches a side off (the default).
+    double ramLen = 0.0, ramDia = 0.04;   // m: intake runner (velocity stack, throttle body, port), its bore
+    double ramSound = 345.0;              // m/s, speed of sound in the intake air (~ 25 C)
+    double ramGain = 0.0, ramDecay = 0.5; // ram amplitude at the first wave (x = 0.5); decay per period
+    double scavLen = 0.0;                 // m: exhaust header, port to the merge or collector that reflects
+    double scavSound = 500.0;             // m/s, speed of the pressure waves in the hot exhaust (~ 350 C)
+    double scavGain = 0.0, scavDecay = 0.5;
     double sparkLow = 8.0, sparkHigh = 30.0, sparkFrom = 800.0, sparkSpan = 3500.0;  // deg BTDC ramp
     double mapMin = 30e3;           // Pa, manifold pressure the drive-by-wire asks for at zero pedal
     double residualMin = 0.7;       // combustion effectiveness at very low load (residual gas dilution)
@@ -863,13 +873,61 @@ struct engineSim {
         return s.vClear + s.area * x;
     }
 
-    double volEffHigh(double r) const { return P.veBase + P.vePeak * std::exp(-std::pow((r - P.veRpm) / P.veWidth, 2.0)); }
-    double volEffLow(double r) const {
+    // Pressure-wave tuning: the dips and humps a real dyno curve has on top of its smooth hump. Both
+    // sides are the same picture: a valve event starts a pressure wave in a pipe, the wave rings back
+    // and forth, and what decides the filling is the sign of the pressure at the valve at one later
+    // moment. With x = (time from the event to that moment) / (the ringing's period):
+    //     wave(x) = gain * env(x) * -cos(2 pi x)
+    // a suction at the start, the opposite sign (a help) half a period later (x = 0.5, 1.5, 2.5 ...),
+    // the same sign again (a loss) at whole periods (x = 1, 2, ...). Each period the wave loses some
+    // of its energy (friction, leaks at the plenum or collector): env = exp(-decay (x - 0.5)). Lower
+    // rpm means more periods fit, so the higher-order humps at low rpm are weaker; below x = 0.5 the
+    // wave has not come back yet and env fades it out ((2x)^2). x scales as 1/rpm, so the humps sit at
+    // rpm_k = rpm(x = 0.5) / (2k + 1) and the dips halfway between, on a 1/rpm (not linear) spacing.
+    //   intake (inertial ram, Engelman's Helmholtz model): with the valve open, the air column in the
+    //     runner (length L, bore area A) bounces on the gas in the cylinder (volume V, taken at half
+    //     stroke) like a mass on a spring, at f = c / (2 pi) * sqrt(A / (L V)), Hz. The piston's pull
+    //     starts it at intake TDC (the valve opens close to it); a compression back at the valve as it
+    //     closes (IVC) packs extra air in. x = f * (time from TDC to IVC). Its first help, x = 1.5,
+    //     lands at about 2 bounces per crank revolution, the classic ram-tuned speed; x = 0.5 is far
+    //     above any limiter.
+    //   exhaust (scavenging): the blowdown pulse at EVO runs down the header at the wave speed c,
+    //     reflects at the open end (the merge or collector) as a rarefaction and comes back after
+    //     2 L / c: one half of the quarter-wave period 4 L / c. If it reaches the port during the valve
+    //     overlap (taken at TDC, 720 deg) it pulls the last burned gas out and the fresh charge in
+    //     after it; a pressure wave there instead pushes exhaust back into the cylinder (reversion).
+    //     x = (time from EVO to TDC) / (4 L / c).
+    // The result multiplies VE (both ShiftCam lobes, so the ECU's choice between them is unchanged).
+    static double waveTerm(double x, double gain, double decay) {
+        double env = x < 0.5 ? 4.0 * x * x : std::exp(-decay * (x - 0.5));
+        return -gain * env * std::cos(2.0 * 3.14159265358979323846 * x);
+    }
+    // one-entry cache: a physics step asks for the same rpm several times (flow, trapped air, boost)
+    mutable double waveAtRpm = -1.0, waveLast = 0.0;
+    double waveTuning(double r) const {
+        if (r == waveAtRpm) return waveLast;
+        waveAtRpm = r;
+        double w = std::fabs(r) * (2.0 * 3.14159265358979323846 / 60.0);  // rad/s
+        if (w < 1.0) return waveLast = 0.0;
+        double d = 0.0;
+        if (P.ramGain != 0.0 && P.ramLen > 0.0 && !cyl.empty()) {
+            double area = 0.25 * 3.14159265358979323846 * P.ramDia * P.ramDia;
+            double vol = cyl[0].vClear + 0.5 * cyl[0].vDisp;
+            double f = P.ramSound / (2.0 * 3.14159265358979323846) * std::sqrt(area / (P.ramLen * vol));
+            d += waveTerm(f * P.ivc / w, P.ramGain, P.ramDecay);
+        }
+        if (P.scavGain != 0.0 && P.scavLen > 0.0)
+            d += waveTerm((4.0 * 3.14159265358979323846 - P.evo) / w / (4.0 * P.scavLen / P.scavSound), P.scavGain, P.scavDecay);
+        return waveLast = d;
+    }
+    // the smooth curves of the two cam lobes; the wave tuning multiplies whichever runs
+    double veCurveHigh(double r) const { return P.veBase + P.vePeak * std::exp(-std::pow((r - P.veRpm) / P.veWidth, 2.0)); }
+    double veCurveLow(double r) const {
         return P.veLowBase + P.veLowPeak * std::exp(-std::pow((r - P.veLowRpm) / P.veLowWidth, 2.0));
     }
     // ShiftCam: the partial-load lobe while it breathes better (low and mid rpm), then the race lobe
-    bool onLowCam(double r) const { return P.lowCam && volEffLow(r) > volEffHigh(r); }
-    double volEff(double r) const { return onLowCam(r) ? volEffLow(r) : volEffHigh(r); }
+    bool onLowCam(double r) const { return P.lowCam && veCurveLow(r) > veCurveHigh(r); }
+    double volEff(double r) const { return (onLowCam(r) ? veCurveLow(r) : veCurveHigh(r)) * (1.0 + waveTuning(r)); }
 
     // manifold pressure the ECU aims for at full pedal with the turbo: boostMap, lowered at the top end
     // (boostFallRpm .. boostTopRpm) and capped by the charge (torque) limit, never below atmospheric

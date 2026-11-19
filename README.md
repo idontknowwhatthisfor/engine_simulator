@@ -4,6 +4,8 @@ A real-time 3D engine simulator. The crank, rods and pistons move on exact slide
 the crank speed comes from a physics model, not a fixed rate:
 
 - a pressure model for each cylinder (intake, compression, Wiebe combustion, expansion, blowdown);
+- how well each engine breathes over its rev range, with the pressure waves in its intake runners and
+  exhaust headers putting real humps and dips on the torque curve ([wave tuning](#wave-tuning));
 - the gas and reciprocating-mass torques on the crank;
 - friction, a starter motor and an ECU that controls the idle, the rev limiter and the fuel cut;
 - a clutch, a gearbox and the vehicle the engine pushes.
@@ -63,11 +65,12 @@ The original model, split into moving parts from the glTF.
 |---|---|
 | Engine | 85 mm bore, 160 mm rods, 10.5:1, flat-plane crank, firing 1-3-4-2. Tuned to match a Honda K24Z3 (2008–12 Accord: 2.35 L, 177 hp at 6500 rpm, 218 N·m at 4300 rpm) |
 | Stroke | The model's crank throws are uneven: 108.4 mm on cylinders 1/4 and 97.8 mm on 2/3 (~2.34 L). Each cylinder uses its own measured throw, so the parts stay joined. |
-| Output (sim) | 223 N·m at 4000–4500 rpm, 131 kW (176 hp) at 6500 rpm, idle 800 rpm, limiter 6800 rpm |
+| Output (sim) | 225 N·m at 4000–4250 rpm, 132 kW (177 hp) at 6500 rpm, idle 800 rpm, limiter 6800 rpm |
+| Wave tuning | ~0.42 m runners (45 mm bore) ram at ~4300 rpm; the 4-2-1 header to its last merge (~0.50 m) scavenges weakly. A dip at 3000–3250 rpm (−5% against the old smooth curve), a hump at 4000–4250 (+1%) and a smaller one at 2500 (estimates) |
 | Gearbox | 2nd-gen (2009–2013) Honda Fit 5MT: 3.308 / 1.870 / 1.303 / 0.949 / 0.727, reverse 3.308, final drive 4.62 |
 | Vehicle | 1300 kg car, 0.305 m tyres, CdA 0.65 |
 | Drivetrain | Friction clutch, automatic mode (shift schedule, kickdown, downshift under load, sport mode with rev-matched downshifts) or manual in two modes (Z): NORMAL (clutch pedal for every change, stalls if you dump it at idle) and DCT (see the RS 3) |
-| Results (sim) | 0–100 km/h in 6.8 s |
+| Results (sim) | 0–100 km/h in 6.9 s |
 | 3D | The see-through block, and a procedural 5-speed gearbox with a reverse idler behind the flywheel (the car gearbox drawing moves back, `gearboxModel::shiftFor`, for an engine whose crank or crankcase reaches past the inline-4's) |
 | Exhaust (3D) | Tubular 4-2-1 manifold (1+4, 2+3) on a cast flange, close-coupled catalyst, mid pipe, silencer and tailpipe running back beside the gearbox |
 
@@ -89,7 +92,8 @@ or a procedural one when that is not there (below).
 | Firing | 1-2-4-5-3, every 144°. No free 1st- or 2nd-order force; the rocking couples the test checks against the textbook (0.449 and 4.98 × the bore pitch) |
 | Turbo | One turbo: a small turbine nozzle so it spools from ~2000 rpm, a big wastegate, a high-pressure-ratio compressor with a wide map (its surge line well left of the engine's flow at 2000 rpm, no choke at 7000; the test checks it never surges at full throttle). Blow-off valve, front-mounted intercooler |
 | ECU boost | Up to 1.5 bar, but a charge (torque) limit holds the 500 N·m plateau with ~1.2–1.4 bar, and the target falls from 5500 rpm to ~1.1 bar at 7000 for the flat top-end power (`turboParams::chargeMax`, `boostFallRpm`…) |
-| Output (sim) | 492 N·m at 2000, 500–507 N·m at 2500–4500, 485 at 5500; 299–300 kW (~402 hp) at 6000–6500 and 289 kW at 7000 rpm (Audi: 500 N·m at 2250–5600, 294 kW / 400 PS at 5600–7000), idle 770 rpm, limiter 7100 rpm, peak cylinder pressure 150 bar |
+| Output (sim) | 492 N·m at 2000, 500–507 N·m at 2500–4500, 485 at 5500; 299–301 kW (~403 hp) at 6000–6500 and 286 kW at 7000 rpm (Audi: 500 N·m at 2250–5600, 294 kW / 400 PS at 5600–7000), idle 770 rpm, limiter 7100 rpm, peak cylinder pressure 150 bar |
+| Wave tuning | Weak on a turbo engine: ~0.30 m runners from the charge-air plenum ram at ~5800 rpm, and the short manifold primaries (0.13–0.26 m) end at the turbine, which reflects little. The charge limit takes the ripple out of the 500 N·m plateau, so it shows only off boost (−1 to −2% below 2000 rpm) and as a trace at the top (estimates) |
 | Gearbox | 7-speed S tronic (DQ500 dual clutch): 3.563 / 2.526 / 1.679 / 1.022 / 0.788 / 0.761 / 0.635, reverse 2.789, final drives 4.059 (1st, 4th, 5th, R) and 3.450 (2nd, 3rd, 6th, 7th): Audi's 8V figures, the same box. The sim has one final drive (3.450), so 1st, 4th, 5th and reverse carry the 4.059 / 3.450 step in their ratio. Shifts take 0.03 s out and 0.08 s in. Shifts the same in manual's DCT mode (any car: T for manual, then Z). Drawn as a dual-clutch box (`drivetrainParams::dualClutch`): two wet clutch packs nested in a crank-driven drum, the outer one for the odd gears, the inner one for the even gears and reverse, on two coaxial input shafts; the pack carrying the drive closes (its apply plate brass), and a shift hands over from one to the other |
 | Vehicle | 1570 kg + 75 kg driver, 265/30 R19 (0.325 m), CdA 0.72, quattro (the car model has no tyre grip limit, so all-wheel drive needs nothing extra) |
 | Exhaust (3D) | Five cast runners into a manifold over the turbine, the downpipe back under the car, catalyst, mid pipe with the sport exhaust's flap, rear silencer and two big tailpipes. Intake: airbox behind the turbo, charge pipe to a front-mounted intercooler, back up the other side to the throttle and a plenum along the head |
@@ -131,12 +135,13 @@ Built from the inline-4's piston and rod, scaled, on a new procedural crank and 
 |---|---|
 | Engine | 81 × 53.5 mm = 1103 cc, 14.0:1, 90° V tilted back 42°, counter-rotating crank |
 | Firing | Twin Pulse 0-90-290-380° |
-| Output (sim) | 124 N·m at 10500 rpm, 155 kW (208 hp) at 13000 rpm (Ducati: 124 N·m / 157 kW), limiter 14000 rpm, idle 1250 rpm |
+| Output (sim) | 126 N·m at 10500 rpm, 153 kW (205 hp) at 12500 rpm (Ducati: 124 N·m / 157 kW), limiter 14000 rpm, idle 1250 rpm |
+| Wave tuning | Stack, oval throttle body and port, ~0.31 m, ram at ~10000 rpm; the headers and pair merges reach the collector under the engine at ~0.74 m and scavenge best near 13500. Their dips meet in a mid-range hole at 7000–8000 rpm (−7 to −8% against the old smooth curve), with humps at ~4500 (+2%) and 10000–11000 (+1.5%) (estimates) |
 | Gearbox | Primary 54/30; gears 38/14, 36/17, 33/19, 32/21, 30/22, 30/24; chain 41/16; 200/55 ZR17 rear |
 | Vehicle | 278 kg with rider, CdA 0.32 |
 | Rider aids | Sequential 1-N-2-…-6 box, up/down quickshifter (rev-matched downshifts), slipper clutch, launch control, wheelie control |
 | Exhaust (3D) | Front-bank headers wrap down in front of the crankcase, rear-bank headers drop behind the gearbox; each bank's pair merges and both feed the black pre-silencer under the engine, with an exhaust valve and two short outlets on the right |
-| Results (sim) | 0–100 km/h 3.3 s, 0–200 km/h 6.8 s, top speed ~289 km/h |
+| Results (sim) | 0–100 km/h 3.3 s, 0–200 km/h 6.8 s, top speed ~293 km/h |
 | Sound | Its own Ducati voice. The Twin Pulse firing comes from the physics: pulses arrive in pairs, so the howl sits at the crank rate (rpm/60), an octave below an even-firing inline-4, with a loping, off-beat idle. On top of that:<br>• longer headers from both banks (lower, darker pipe modes)<br>• an idle burble that gives way to the radiated howl as the revs rise<br>• exhaust valve, airbox honk<br>• more overrun crackle than the BMW<br>• Desmo valvetrain clatter |
 
 #### Tuned (`--tuned yes`)
@@ -151,7 +156,8 @@ for top speed, a higher limiter and taller gearing (estimates, not Ducati's kit)
 gearbox stay stock. The changes:
 
 - the freer system and the map: more torque everywhere, from ~+1% at 4000–6000 rpm growing to ~+7% at
-  the top, and the map adds a little spark advance;
+  the top, and the map adds a little spark advance (same runners and header lengths, so the same humps
+  and dips);
 - the map's limiter is 500 rpm up, at 14500 rpm, and the full-throttle upshift moves to ~14100 rpm;
 - a 38-tooth rear sprocket in place of the 41 (16/38): every gear ~8% taller, so 6th now runs out where
   the power and the drag balance instead of on the stock limiter. The taller 1st makes a gentle 25%
@@ -163,14 +169,14 @@ gearbox stay stock. The changes:
 
 | | Stock | Tuned (sim) |
 |---|---|---|
-| Peak torque | 124 N·m at 10500 rpm | 130 N·m at 11000 rpm |
-| Peak power | 155 kW (208 hp) at 13000 rpm | 164.5 kW (221 hp) at 13000 rpm |
+| Peak torque | 126 N·m at 10500 rpm | 132.5 N·m at 10500 rpm |
+| Peak power | 153 kW (205 hp) at 12500 rpm | 162 kW (217 hp) at 12500 rpm |
 | Limiter | 14000 rpm | 14500 rpm |
 | Chain | 16/41 | 16/38 |
 | Top of 1st / 2nd / 3rd (from the gearing) | ~136 / 174 / 212 km/h | ~152 / 194 / 237 km/h |
 | 0–100 km/h | 3.3 s | 3.3 s |
-| 0–200 km/h | 6.8 s | 6.7 s |
-| After 30 s in 6th | ~290 km/h (on the 14000 limiter) | ~326 km/h |
+| 0–200 km/h | 6.8 s | 6.8 s |
+| After 30 s in 6th | ~293 km/h (on the 14000 limiter) | ~323 km/h |
 
 The HUD shows TUNED after the rpm.
 
@@ -184,12 +190,13 @@ crank.
 | Engine | 80.0 × 49.7 mm = 999 cc, 13.3:1, 103 mm rods, 180° flat-plane crank |
 | Firing | 1-2-4-3 |
 | ShiftCam | A partial-load intake lobe in the mid range, then the full lobe; the HUD shows which is active |
-| Output (sim) | 114.5 N·m at 11000 rpm, 153 kW at 14000–14500 rpm (BMW: 113 N·m / 154 kW at 13750), limiter 14600 rpm, idle 1250 rpm |
+| Output (sim) | 116 N·m at 11000–11500 rpm, 151.5 kW at 14000 rpm (BMW: 113 N·m / 154 kW at 13750), limiter 14600 rpm, idle 1250 rpm |
+| Wave tuning | On both cam lobes: funnel, throttle body and port, ~0.23 m, ram at ~11000 rpm; the 4-2-1 headers to the final collector, ~0.70 m, scavenge best near 14000. Their dips meet in the mid-range hole superbikes are known for, 7500–9000 rpm (−4 to −6% against the old smooth curve), with a hump at 4500–5000 (+2%) (estimates) |
 | Gearbox | Primary 76/46 (1.652); gears 45/17, 46/22, 38/22, 33/22, 34/25, 29/23; chain 46/17; 190/55 ZR17 rear |
 | Vehicle | 197 kg wet + 80 kg rider, CdA 0.31 |
 | Rider aids | Same as the V4: quickshifter with rev-matched downshifts, slipper clutch, launch control, wheelie control |
 | Exhaust (3D) | 4-2-1 titanium headers from the front of the inclined head, under the engine (1+4 and 2+3 merge), collector, link pipe with the exhaust flap, short silencer rising on the right behind the gearbox |
-| Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 6.9 s, 307 km/h in 6th |
+| Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 6.9 s, 308 km/h in 6th |
 | Sound | Its own voice (the inline-4 keeps the original one):<br>• radiated exhaust (brightens with revs) through a 4-2-1 quarter-wave pipe<br>• exhaust flap, shut at idle and open from ~5000 rpm or under throttle<br>• airbox honk at full throttle<br>• overrun crackle that fades out<br>• quickshifter bark<br>• straight-cut gear whine<br>• valvetrain tick |
 
 #### Tuned (`--tuned yes`)
@@ -211,11 +218,11 @@ lobe, the gearbox and the gearing stay stock. The changes:
 
 | | Stock | Tuned (sim) |
 |---|---|---|
-| Peak torque | 114.5 N·m at 11000 rpm | 115 N·m at 11000 rpm |
-| Peak power | 153 kW (205 hp) at 14500 rpm | 156 kW (209 hp) at 14500 rpm |
+| Peak torque | 116 N·m at 11500 rpm | 116.5 N·m at 11500 rpm |
+| Peak power | 151.5 kW (203 hp) at 14000 rpm | 154.5 kW (207 hp) at 14000 rpm |
 | Limiter | 14600 rpm | 15100 rpm |
 | 0–200 km/h | 6.9 s | 6.8 s |
-| After 30 s in 6th | ~307 km/h | ~319 km/h |
+| After 30 s in 6th | ~308 km/h | ~321 km/h |
 
 The sim's figures come from `--phystest` (no ram air), like the stock engine's. The HUD shows TUNED
 after the rpm.
@@ -229,7 +236,8 @@ Built like the S 1000 RR, plus a procedural centrifugal supercharger behind the 
 | Engine | 76.0 × 55.0 mm = 998 cc, 8.5:1, 107 mm rods (estimate), 180° flat-plane crank, block inclined 30° (estimate), forward-turning crank |
 | Firing | 1-2-4-3 |
 | Supercharger | Gear-driven from the crank at 9.2× crank speed (~129k rpm at 14000), 69 mm impeller with 6 blades and 6 splitters, no intercooler, ram air, a 4 L plenum over the throttle bodies with a relief valve that holds ~+1.0 bar from ~10500 rpm, and a bypass valve that vents the charge when the throttles snap shut |
-| Output (sim) | 133 N·m at 10500 rpm, 147.5 kW at 11000–11500 rpm with the charge hot (~100 °C) and no ram air (Kawasaki: 133.5 N·m at 10500 / 147.2 kW at 11000), limiter 14000 rpm, idle 1200 rpm |
+| Output (sim) | 132.5 N·m at 10500 rpm, 148 kW at 11000–11500 rpm with the charge hot (~100 °C) and no ram air (Kawasaki: 133.5 N·m at 10500 / 147.2 kW at 11000), limiter 14000 rpm, idle 1200 rpm |
+| Wave tuning | Smaller than on the unblown bikes (the supercharger's plenum damps the runners' waves): ~0.22 m from the plenum through the throttle bodies rams at ~10500 rpm; the 4-2-1 headers to the collector, ~0.71 m, scavenge best near 13500. A dip at 7000–8000 rpm (−6% against the old smooth curve) (estimates) |
 | Gearbox | Primary 74/50 (1.480); gears 51/16, 48/19, 45/22, 38/22, 32/21, 31/23; chain 44/18; 200/55 ZR17 rear |
 | Vehicle | 238 kg wet + 80 kg rider, CdA 0.33 |
 | Rider aids | Same as the other bikes; launch control holds ~7500–9500 rpm, where the boost is |
@@ -260,7 +268,7 @@ A top-end tune that moves the peak up toward the 14000 rpm redline. The block, s
 gearing and limiter stay stock; the changes are estimates of a race kit, not a published one:
 
 - higher-lift cams: the engine breathes best near 12000 rpm instead of 9000. It trades mid range for
-  top end: stock up to ~3000 rpm, then weaker up to ~10700 rpm (16–18% less torque at 6000–8000 rpm),
+  top end: stock up to ~3000 rpm, then weaker up to ~10700 rpm (13–15% less torque at 6000–8000 rpm),
   and stronger above it (+20–30% from 12000 rpm). It feels flat out of slow corners until ~11000 rpm;
 - the exhaust opens 10° earlier, so it blows down in time at 14000 rpm;
 - a stiffer spring in the plenum relief valve: about +1.2 bar at the top instead of +1.0;
@@ -272,11 +280,11 @@ gearing and limiter stay stock; the changes are estimates of a race kit, not a p
 
 | | Stock | Tuned (sim) |
 |---|---|---|
-| Peak torque | 133 N·m at 10500 rpm | 142 N·m at 12000 rpm |
-| Torque at 6000 / 8000 rpm | 96 / 117 N·m | 80 / 96 N·m |
-| Peak power | 147.5 kW (198 hp) at 11000 rpm | 186 kW (250 hp) at 13500 rpm |
+| Peak torque | 132.5 N·m at 10500 rpm | 142.5 N·m at 12000 rpm |
+| Torque at 6000 / 8000 rpm | 92 / 110 N·m | 80.5 / 93 N·m |
+| Peak power | 148 kW (199 hp) at 11500 rpm | 185 kW (248 hp) at 13500 rpm |
 | 0–200 km/h | 7.0 s | 6.8 s |
-| After 30 s in 6th | ~312 km/h | ~340 km/h |
+| After 30 s in 6th | ~312 km/h | ~338 km/h |
 
 The HUD shows TUNED after the rpm. `--tuned yes` works with `--phystest` (its own targets),
 `--wav` and screenshots; `make test` checks both versions.
@@ -290,12 +298,13 @@ bore and stroke, without the supercharger), on a procedural flat-plane crank, wi
 |---|---|
 | Engine | 76.0 × 55.0 mm = 998 cc, 13.0:1, 107 mm rods (estimate), 180° flat-plane crank, block inclined 30° (estimate), forward-turning crank, four 47 mm throttle bodies, finger-follower valvetrain, one cam (no variable timing) |
 | Firing | 1-2-4-3 |
-| Output (sim) | 115 N·m at 11000 rpm, 149 kW (200 hp) at 13500 rpm, no ram air (Kawasaki: 114.9 N·m at 11400 / 149.3 kW at 13200), limiter 14000 rpm, idle 1250 rpm |
+| Output (sim) | 116 N·m at 11500 rpm, 148.5 kW (199 hp) at 13000 rpm, no ram air (Kawasaki: 114.9 N·m at 11400 / 149.3 kW at 13200), limiter 14000 rpm, idle 1250 rpm |
+| Wave tuning | Stack, throttle body and port, ~0.20 m, ram at ~11500 rpm; the 4-2-1 headers to the collector, ~0.71 m, scavenge best near 14000. A hole at 7500–9000 rpm (−6 to −8% against the old smooth curve), a smaller dip at 6000 and a hump at 5000 (+1%) (estimates) |
 | Gearbox | Primary 79/47 (1.681); gears 39/15, 41/19, 32/17, 33/20, 31/21, 30/23; chain 41/17 (the 2021 bike's bigger rear sprocket); 190/55 ZR17 rear |
 | Vehicle | 207 kg wet + 80 kg rider, CdA 0.31 |
 | Rider aids | Same as the other bikes; launch control holds the clutch higher (~7500–9500 rpm) |
 | Exhaust (3D) | The S 1000 RR's 4-2-1 layout into a bigger dark silencer |
-| Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 7.0 s, ~317 km/h after 30 s in 6th (on the limiter; the real bike is limited to 299) |
+| Results (sim) | 0–100 km/h 3.5 s, 0–200 km/h 7.0 s, ~315 km/h after 30 s in 6th (on the limiter; the real bike is limited to 299) |
 | Sound | The inline-4 superbike voice with a longer pipe, a lower note, more airbox honk (the ram-air box sits under the rider) and a little more gear whine than the BMW |
 
 Its 1st gear is taller than the BMW's (10.5:1 overall against 11.8:1), so in the sim it peaks at
@@ -325,14 +334,14 @@ bodies, gearbox and gearing stay stock. The changes:
 
 | | Stock | Race kit (sim) |
 |---|---|---|
-| Peak torque | 115 N·m at 11000 rpm | 118 N·m at 12000 rpm |
-| Torque at 6000 / 8000 rpm | 90 / 103 N·m | 93 / 104 N·m |
-| Peak power | 149 kW (200 hp) at 13500 rpm | 171 kW (229 hp) at 15000–15500 rpm |
+| Peak torque | 116 N·m at 11500 rpm | 120.5 N·m at 12000 rpm |
+| Torque at 6000 / 8000 rpm | 85.5 / 95 N·m | 90 / 98 N·m |
+| Peak power | 148.5 kW (199 hp) at 13000 rpm | 168 kW (226 hp) at 14500 rpm |
 | Limiter | 14000 rpm | 15500 rpm |
 | Top of 1st / 2nd / 3rd (from the gearing) | ~161 / 194 / 223 km/h | ~179 / 215 / 247 km/h |
-| 0–100 km/h | 3.4 s | 3.4 s (the tall 1st and the wheelie limit cap it) |
+| 0–100 km/h | 3.5 s | 3.5 s (the tall 1st and the wheelie limit cap it) |
 | 0–200 km/h | 7.0 s | 6.8 s |
-| After 30 s in 6th | ~317 km/h | ~334 km/h |
+| After 30 s in 6th | ~315 km/h | ~333 km/h |
 
 The HUD shows RACE KIT after the rpm.
 
@@ -345,12 +354,13 @@ from the inline-4's scaled parts, the barrel laid 70° forward, a forward-turnin
 |---|---|
 | Engine | 57.0 × 58.7 mm = 149.7 cc, 10.4:1, SOHC four valves, liquid cooled, fuel injected, 98 mm rod (estimate) |
 | Firing | Single, every 720° |
-| Output (sim) | 13.9 N·m at 7000 rpm, 11.2 kW at 8000 rpm in the 1000 rpm sweep (the curve peaks ~8400) (Yamaha: 13.8 N·m at 7000 / 11.3 kW at 8500), limiter ~10300 rpm (estimate), idle 1400 rpm |
+| Output (sim) | 13.9 N·m at 7000–7500 rpm, 11.2 kW at 8000 rpm (Yamaha: 13.8 N·m at 7000 / 11.3 kW at 8500), limiter ~10300 rpm (estimate), idle 1400 rpm |
 | Gearbox | Five speeds: primary 73/24 (3.042); gears 34/12, 30/16, 30/22, 24/21, 22/23; chain 40/14; 120/70-17 rear |
 | Vehicle | 117 kg wet + 70 kg rider, CdA 0.42 |
 | Rider aids | None on the real bike. The sim's bike drivetrain still gives it the quickshifter and the automatic; no slipper clutch, launch or wheelie control |
 | Exhaust (3D) | One header out of the underside of the head, back under the crankcase into a black-shielded silencer on the right |
-| Results (sim) | 0–100 km/h 13.6 s, ~117 km/h after 30 s in 5th |
+| Wave tuning | Strong on a single (one big pulse per cycle): airbox boot, throttle body and port, ~0.27 m, ram at ~7000 rpm, the quoted torque peak; the header and the pipe into the silencer, ~0.80 m, scavenge best above the limiter. A dip at 5000–6000 rpm (−6 to −8% against the old smooth curve) and a hump at 4000 (+3%) (estimates) |
+| Results (sim) | 0–100 km/h 14.1 s, ~117 km/h after 30 s in 5th |
 | Sound | The superbike stages tuned for a single: one thump every other turn, a longer pipe, a small silencer with no exhaust valve, little crackle |
 
 The heavier crank (0.012 kg·m², flywheel included) idles with a ~200 rpm ripple, pulls away from a
@@ -374,7 +384,8 @@ every number is an estimate. The changes:
   piston shows. The cam cover is red;
 - 13.2:1, a race cam with more lift and overlap (intake closes ~70° after BDC, exhaust opens ~65°
   before BDC), stiffer valve springs and a 13000 rpm limiter;
-- a 32 mm throttle body, an open race filter and a race-fuel map;
+- a 32 mm throttle body on a short velocity stack (~0.16 m to the valve: it rams at ~10800 rpm), an
+  open race filter and a race-fuel map;
 - a lighter magneto rotor. It idles higher (1800 rpm) and lumpier, and needs a stronger starter for
   the compression;
 - an open race pipe: a fatter, heat-blued header that swells into an expansion chamber under the
@@ -387,14 +398,45 @@ every number is an estimate. The changes:
 |---|---|---|
 | Engine | 57.0 × 58.7 mm, 149.7 cc, 10.4:1 | 62.0 × 58.7 mm, 177 cc, 13.2:1 |
 | Peak torque | 13.9 N·m at 7000 rpm | 18.8 N·m at 11000 rpm |
-| Peak power | 11.2 kW (15 hp) at 8000 rpm | 22.0 kW (29.5 hp) at 11500 rpm |
+| Peak power | 11.2 kW (15 hp) at 8000 rpm | 22.1 kW (29.6 hp) at 11500 rpm |
 | Limiter | ~10300 rpm | 13000 rpm |
 | Idle | 1400 rpm | 1800 rpm |
-| 0–100 km/h | 13.6 s | 7.3 s |
+| 0–100 km/h | 14.1 s | 7.7 s |
 | After 30 s in 5th | ~117 km/h | ~163 km/h |
 
-It is peaky: below ~8000 rpm it makes less torque than the stock engine. The HUD shows RACE after
+It is peaky: from ~4000 to ~8500 rpm it makes less torque than the stock engine, with a deep hole at
+7500–8500 rpm where the expansion chamber's and the stack's dips meet, then it comes on hard. The HUD shows RACE after
 the rpm.
+
+### Wave tuning
+
+Each engine's breathing (volumetric efficiency: how full the cylinders get) is a smooth curve over
+rpm, calibrated to the published torque and power, with the pressure waves of its intake and exhaust
+on top (`engineSim::waveTuning`, `src/physics.hpp`). A valve event starts a wave in a pipe, the wave
+rings back and forth, and what counts is the sign of the pressure at the valve at one moment. With x
+the number of the ringing's periods that fit in between, the share of the filling it adds is
+`gain · env(x) · −cos(2πx)`: a help at x = 0.5, 1.5, 2.5…, a loss at whole periods, each period a
+little weaker (`env = exp(−decay (x − 0.5))`). x goes as 1/rpm, so the humps sit at rpm / 3, rpm / 5…
+below the first one, closer together and weaker toward idle.
+
+- **Intake ram** (Engelman's Helmholtz model). With the valve open, the air in the runner (length L,
+  bore area A) bounces on the gas in the cylinder (volume V at half stroke) like a mass on a spring,
+  at f = c / 2π · √(A / (L V)). The piston starts it at TDC; a compression back at the valve as it
+  closes (IVC) packs extra air in. Its main hump (x = 1.5, about two bounces per crank turn) is the
+  classic ram-tuned speed, and the engines' runner lengths put it at the published torque peak.
+- **Exhaust scavenging.** The blowdown pulse at exhaust valve opening runs down the header, comes back
+  from the open end (the merge or collector) as a suction after 2L / c, and pulls the cylinder clean
+  if it arrives during the valve overlap; a pressure wave there pushes exhaust back in (x = time from
+  EVO to TDC over 4L / c). The header lengths come from the drawn 3D layouts.
+
+The ripple multiplies both of ShiftCam's lobes and passes through the throttle like the rest of the
+breathing, so it also shows in the sound (each pulse scales with the air trapped). The effective
+lengths and gains are estimates (each engine's table lists them): a few percent on the unblown bikes
+and the inline-4, less on the boosted engines, and on the RS 3 the charge limit takes it out of the
+plateau. Where the ram's and the exhaust's dips meet the superbikes get their mid-range hole at
+~7000–9000 rpm. The HUD's dyno chart (D) shows the result; `--dyno` prints the same curve with the
+wave share at each speed. `engineParams::ramLen ramDia ramSound ramGain ramDecay` and
+`scavLen scavSound scavGain scavDecay` set it; a gain of 0 switches a side off.
 
 ### Exhaust
 
@@ -467,8 +509,9 @@ intercooler ahead of the crank snout; the cooled charge comes back up the intake
   when rendering a WAV. `--turbo yes --wav out.wav` drives the car through two full-throttle pulls
   with lift-offs (add `--bov no` to hear the flutter).
 - **What it does (sim).** Boost comes in at ~3000 rpm and is held at 0.58 bar to the limiter:
-  365 N·m at 4000–5000 rpm, 226 kW at 7000 rpm (223 N·m / 131 kW without). Floored at 3000 rpm, it
-  reaches 90% boost in 1.0 s. 0–100 km/h takes 4.7 s (6.8 s without); the car model has no
+  366 N·m at 4000–4500 rpm, 226 kW at 7000 rpm (225 N·m / 132 kW without). Floored at 3000 rpm, it
+  reaches 90% boost in 1.3 s (the intake's dip at 3000–3250 rpm starves the turbine a little).
+  0–100 km/h takes 4.7 s (6.9 s without); the car model has no
   wheelspin. The HUD shows the boost, wastegate, back pressure, charge and compressor-outlet
   temperatures, the blow-off valve and surge, and the shaft speed (~105–125k rpm on boost). The
   wheels are drawn turning at a readable speed in proportion to the shaft, since the real speed
@@ -526,6 +569,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 | `--synthtest N` | Hidden: test an N-cylinder inline engine built in memory (see [Testing](#testing)) |
 | `--dump-params` | Hidden: print every parameter of the selected engine, one `name = value` per line |
+| `--dyno` | Hidden: print the full-throttle dyno curve (the D chart's) and the wave tuning's share at each speed, with the calibration variables applied |
 
 ## Project layout
 
@@ -542,10 +586,10 @@ src/
   presets.hpp               starting points for a class of engine (the superbike engine and drivetrain)
   engine_type.hpp           engineType: what an engine provides; bikeSpec / carSpec (test targets); REGISTER_ENGINE
   engines.hpp               the registered engines for --engine-type, setupSim()
-  calibration.hpp           VE_*, FMEP_*, IDLE_*, SND_*... overrides for calibrating (every --phystest, --wav)
+  calibration.hpp           VE_*, RAM_*, SCAV_*, FMEP_*, IDLE_*, SND_*... overrides for calibrating (every --phystest, --wav)
   hud.hpp                   the HUD and help line, built from what the engine has
   sound.hpp, wav.hpp        sound synthesis + audio stream, --wav rendering
-  dyno.hpp                  the WOT dyno curve (D), measured in the background
+  dyno.hpp                  the WOT dyno curve (D), measured in the background (and --dyno)
   bike_gearbox.hpp          the bikes' sequential gearbox (3D)
   test_bike.hpp             --phystest for the bikes, checked against each engine's bikeSpec
   test_car.hpp              --phystest for the cars, checked against each car's carSpec
@@ -644,11 +688,13 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
 5. **Calibrate.** Put the published figures in `bikeSpec` or `carSpec` and run
    `./engine_sim --engine-type <name> --phystest` until it passes. Environment variables override
    parameters while you try values, for every engine: `VE_BASE VE_PEAK VE_RPM VE_WIDTH` (and `VEL_*`
-   for a low-cam lobe), `FMEP_A FMEP_B FMEP_C`, `RESID ETA INERTIA STARTER`,
+   for a low-cam lobe), the wave tuning `RAM_LEN RAM_DIA RAM_C RAM_GAIN RAM_DECAY SCAV_LEN SCAV_C
+   SCAV_GAIN SCAV_DECAY`, `FMEP_A FMEP_B FMEP_C`, `RESID ETA INERTIA STARTER`,
    `IDLE_KP IDLE_KI IDLE_SG IDLE_BASE IDLE_SPARK IDLE_MIN`, `SC_PR SC_FLOW SC_CHOKE SC_RELIEF`,
    `TURBO_AREA TURBO_WG TURBO_BOOST TURBO_INERTIA TURBO_KNOCK TURBO_FALL TURBO_TOPRPM TURBO_TOP
    TURBO_CHARGE` and, for
-   `--wav`, `SND_*` (`src/calibration.hpp` lists them).
+   `--wav`, `SND_*` (`src/calibration.hpp` lists them). `--dyno` (hidden) prints the full-throttle
+   curve with them applied, every 250 rpm (cars) or 500 rpm (bikes), in under a second.
 
 ## Testing
 

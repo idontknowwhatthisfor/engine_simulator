@@ -26,10 +26,16 @@ engineParams bmwS1000rrParams() {
     P.fmepC = 0.0045e5;             // finger followers, small 80 mm bore: less friction at the top end
     P.revLimit = 14600.0; P.revResume = 14200.0;
     // race lobe peaks high; the ShiftCam partial-load lobe fills the mid-range (calibrated with
-    // --s1000rr --phystest to 113 N m at ~11000 rpm and ~154 kW at 13500-14000 rpm)
-    P.veBase = 0.50; P.vePeak = 0.64; P.veRpm = 11600.0; P.veWidth = 8000.0;
+    // --s1000rr --phystest to 116 N m at 11000-11500 rpm and ~151.5 kW at 14000 rpm)
+    P.veBase = 0.636; P.vePeak = 0.459; P.veRpm = 11600.0; P.veWidth = 8000.0;
     P.lowCam = true;
-    P.veLowBase = 0.62; P.veLowPeak = 0.38; P.veLowRpm = 7500.0; P.veLowWidth = 5000.0;
+    P.veLowBase = 0.616; P.veLowPeak = 0.377; P.veLowRpm = 7500.0; P.veLowWidth = 5000.0;
+    // pressure-wave tuning (estimates), on both lobes: funnel, 48 mm throttle body and port, ~0.23 m,
+    // ram hardest at ~11000 rpm (the published torque peak); the 4-2-1 headers (0.45-0.50 m, the
+    // drawn layout) to the final collector, ~0.70 m, scavenge best near 14000 with their dip at ~7000.
+    // The ram's next dip lands there too: the mid-range hole at 7500-8500 rpm superbikes are known for
+    P.ramLen = 0.23; P.ramDia = 0.048; P.ramGain = 0.05;
+    P.scavLen = 0.70; P.scavGain = 0.035;
     P.sparkSpan = 7500.0;
     P.rpmScale = 16000.0;
     P.counterweight = 0.0;          // flat-plane inline-4: 1st order cancels by symmetry
@@ -144,9 +150,9 @@ engineParams bmwS1000rrTunedParams() {
     P.ivc = 250.0 * DEGR;           // longer race lobe: intake closes 70 deg after BDC
     P.evo = 475.0 * DEGR;           // exhaust opens 5 deg earlier: blows down in time at 15000 rpm
     P.revLimit = 15100.0; P.revResume = 14700.0;
-    // calibrated with --engine-type s1000rr --tuned yes --phystest: ~115 N m at 11000 rpm and ~156 kW
-    // at 14500, the stock mid-range kept (the ShiftCam lobe below 9000 is unchanged)
-    P.veBase = 0.50; P.vePeak = 0.655; P.veRpm = 11800.0; P.veWidth = 8000.0;
+    // calibrated with --engine-type s1000rr --tuned yes --phystest: ~116.5 N m at 11500 rpm and ~154.5 kW
+    // at 14000, the stock mid-range kept (the ShiftCam lobe below 9000 is unchanged)
+    P.veBase = 0.641; P.vePeak = 0.467; P.veRpm = 11800.0; P.veWidth = 8000.0;  // stock's wave tuning
     soundParams &S = P.sound;       // race exhaust, valve deleted
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
     S.flapShutGain = 1.0;
