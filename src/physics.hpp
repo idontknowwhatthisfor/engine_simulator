@@ -170,7 +170,12 @@ struct engineParams {
     double ramLen = 0.0, ramDia = 0.04;   // m: intake runner (velocity stack, throttle body, port), its bore
     double ramSound = 345.0;              // m/s, speed of sound in the intake air (~ 25 C)
     double ramGain = 0.0, ramDecay = 0.5; // ram amplitude at the first wave (x = 0.5); decay per period
-    double scavLen = 0.0;                 // m: exhaust header, port to the merge or collector that reflects
+    // m: exhaust header, valve to the merge, collector or widening that reflects. 0 (the default): setupSim
+    // measures it on the engine's drawn exhaust layout (headerLength, src/exhaust.hpp) and adds the port
+    // in the head (scavPortLen) and the open end's correction (0.6 x the header's radius); an engine (or
+    // SCAV_LEN) may set it outright instead
+    double scavLen = 0.0;
+    double scavPortLen = 0.05;            // m: the exhaust port in the head, valve seat to the head face
     double scavSound = 500.0;             // m/s, speed of the pressure waves in the hot exhaust (~ 350 C)
     double scavGain = 0.0, scavDecay = 0.5;
     double sparkLow = 8.0, sparkHigh = 30.0, sparkFrom = 800.0, sparkSpan = 3500.0;  // deg BTDC ramp

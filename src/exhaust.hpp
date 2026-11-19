@@ -472,3 +472,49 @@ struct exhaustModel {
         }
     }
 };
+
+// the exhaust headers' acoustic length for the pressure-wave tuning (engineParams::scavLen), measured
+// on the drawn layout: the mean, over the cylinders, of the distance along the pipes' centrelines from
+// each port to where its exhaust pulse reflects back as suction. That is the first pipe downstream that
+// either carries every cylinder's gas (the final collector of a 4-2-1, a turbo engine's manifold
+// merge) or opens up to at least `widen` times the header's radius (a silencer, catalyst, expansion
+// chamber or turbine housing); with neither, the open tailpipe end. Returns metres; 0 for a layout with
+// no headers. Only the centrelines are measured: no meshes are built.
+double headerLength(const exhaustLayout &L, int nCyl, float widen = 1.6f, double *meanRadius = nullptr) {
+    std::size_t n = L.pipes.size();
+    std::vector<float> len(n, 0.f);
+    std::vector<std::vector<float>> dist(n, std::vector<float>(nCyl, -1.f));  // mm, port c -> pipe k's start
+    std::vector<float> runnerR(nCyl, 0.f);
+    for (std::size_t k = 0; k < n; k++) {
+        const pipeSpec &sp = L.pipes[k];
+        std::vector<vec3> c = exhaustModel::centreline(sp.pts);
+        for (std::size_t j = 1; j < c.size(); j++) len[k] += length(c[j] - c[j - 1]);
+        if (sp.cyl >= 0 && sp.cyl < nCyl) {
+            dist[k][sp.cyl] = 0.f;
+            runnerR[sp.cyl] = sp.r0;
+        }
+        for (int f : sp.from)
+            if (f >= 0 && f < static_cast<int>(k))
+                for (int cy = 0; cy < nCyl; cy++)
+                    if (dist[f][cy] >= 0.f) dist[k][cy] = std::max(dist[k][cy], dist[f][cy] + len[f]);
+    }
+    double sum = 0.0, rSum = 0.0;
+    int counted = 0;
+    for (int cy = 0; cy < nCyl; cy++) {
+        if (runnerR[cy] <= 0.f) continue;  // no header for this cylinder
+        float best = -1.f, open = 0.f;
+        for (std::size_t k = 0; k < n; k++) {
+            if (dist[k][cy] < 0.f) continue;
+            open = std::max(open, dist[k][cy] + len[k]);  // the furthest open end, if nothing reflects first
+            if (dist[k][cy] <= 0.f) continue;             // its own header
+            bool all = nCyl > 1;
+            for (int o = 0; o < nCyl && all; o++) all = dist[k][o] >= 0.f;
+            if ((all || L.pipes[k].r0 >= widen * runnerR[cy]) && (best < 0.f || dist[k][cy] < best)) best = dist[k][cy];
+        }
+        sum += best >= 0.f ? best : open;
+        rSum += runnerR[cy];
+        counted++;
+    }
+    if (meanRadius) *meanRadius = counted ? rSum / counted * 1e-3 : 0.0;  // m
+    return counted ? sum / counted * 1e-3 : 0.0;
+}

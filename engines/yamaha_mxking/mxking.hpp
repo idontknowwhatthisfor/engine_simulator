@@ -33,10 +33,11 @@ engineParams mxkingParams() {
     P.veBase = 0.556; P.vePeak = 0.465; P.veRpm = 7600.0; P.veWidth = 3300.0;
     // pressure-wave tuning (estimates), strong on a single (one big pulse per cycle, nothing to blur
     // it): airbox boot, 28 mm throttle body and port, ~0.27 m, ram hardest at ~7000 rpm (the quoted
-    // torque peak), a smaller hump at ~4200; the header (0.52 m, the drawn layout) and the pipe under
-    // the engine into the silencer, ~0.80 m, scavenge best above the limiter, their dip at ~6000
+    // torque peak), a smaller hump at ~4200; the header into the silencer, 0.58 m acoustically
+    // (measured on the drawn layout by setupSim: 0.52 m of pipe plus the port and the open end).
+    // Together a hump at 6000-7000 rpm (+3%) and a fall toward the limiter (-6% at 9500-10000)
     P.ramLen = 0.27; P.ramDia = 0.028; P.ramGain = 0.06;
-    P.scavLen = 0.80; P.scavGain = 0.04;
+    P.scavGain = 0.04;
     P.fmepC = 0.03e5;              // a little less than the superbikes' at the top: 10,000 rpm, not 14,000
     P.sparkSpan = 5000.0;
     P.rpmScale = 12000.0;
@@ -224,14 +225,15 @@ engineParams mxkingTunedParams() {
     P.starterTorque = 45.0;         // 13.2:1 is harder to crank over
     P.revLimit = 13000.0; P.revResume = 12700.0;
     P.pedalRate = 10.0;
-    // calibrated with --engine-type mxking --tuned yes --phystest: 18.8 N m at 11000 and 22.1 kW
-    // (29.6 hp) at 11500 rpm, against stock's 13.9 N m at 7000 and 11.2 kW at 8000; peaky below 8500
-    P.veBase = 0.556; P.vePeak = 0.645; P.veRpm = 11300.0; P.veWidth = 3400.0;
+    // calibrated with --engine-type mxking --tuned yes --phystest: 17.8 N m at 11000 and 20.8 kW
+    // (27.9 hp) at 11500 rpm, against stock's 13.9 N m at 7000 and 11.2 kW at 8000; peaky below 8500
+    P.veBase = 0.59; P.vePeak = 0.645; P.veRpm = 11300.0; P.veWidth = 3400.0;
     // wave tuning (estimates): a short velocity stack on the 32 mm body, ~0.16 m, rams at ~10800 rpm;
-    // the expansion chamber's header, ~0.75 m, scavenges best at the limiter, its dip near 7000: with
-    // the ram's dip at ~8200 a deep hole at 7500-8500 rpm, then the race build's hit
+    // the expansion chamber's header, 0.49 m acoustically (measured on the race exhaust's drawn layout
+    // by setupSim). Together dips at ~5500 (-4%) and 8000-9000 rpm (-4%) around a hump at 6500 (+5%),
+    // then the race build's hit
     P.ramLen = 0.156; P.ramDia = 0.032; P.ramGain = 0.07;
-    P.scavLen = 0.75; P.scavGain = 0.05;
+    P.scavGain = 0.05;
     P.sparkFrom = 1800.0; P.sparkSpan = 6000.0;
     P.rpmScale = 14000.0;
     P.fuelCutRpm = 2800.0;

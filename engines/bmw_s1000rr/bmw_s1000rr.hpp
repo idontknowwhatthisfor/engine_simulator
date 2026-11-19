@@ -31,11 +31,13 @@ engineParams bmwS1000rrParams() {
     P.lowCam = true;
     P.veLowBase = 0.616; P.veLowPeak = 0.377; P.veLowRpm = 7500.0; P.veLowWidth = 5000.0;
     // pressure-wave tuning (estimates), on both lobes: funnel, 48 mm throttle body and port, ~0.23 m,
-    // ram hardest at ~11000 rpm (the published torque peak); the 4-2-1 headers (0.45-0.50 m, the
-    // drawn layout) to the final collector, ~0.70 m, scavenge best near 14000 with their dip at ~7000.
-    // The ram's next dip lands there too: the mid-range hole at 7500-8500 rpm superbikes are known for
+    // ram hardest at ~11000 rpm (the published torque peak); the 4-2-1 headers to the final
+    // collector, 0.65 m acoustically (measured on the drawn layout by setupSim: 0.58 m of pipe plus
+    // the port and the open end), scavenge best above 14000 with their dip at ~7500. The ram's next
+    // dip lands there too: the mid-range hole at 7500-9000 rpm (-5%) superbikes are known for, and a
+    // hump at 11000-12000 (+4%)
     P.ramLen = 0.23; P.ramDia = 0.048; P.ramGain = 0.05;
-    P.scavLen = 0.70; P.scavGain = 0.035;
+    P.scavGain = 0.035;
     P.sparkSpan = 7500.0;
     P.rpmScale = 16000.0;
     P.counterweight = 0.0;          // flat-plane inline-4: 1st order cancels by symmetry

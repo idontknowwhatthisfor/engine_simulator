@@ -59,6 +59,15 @@ void setupSim(engineSim &sim, const engineModel &e, const engineType &type, doub
         throw std::runtime_error(std::string(type.id) + ": engineType::boost (" + boostName(type.boost) +
                                  ") disagrees with engineParams::turbo.supercharger");
     sim.P.turbo.on = turbo || type.boost != builtInBoost::none;
+    // the exhaust's pressure-wave tuning: its header length from the drawn layout (the one the window
+    // shows: --turbo yes has its own), unless the engine gives one
+    if (sim.P.scavGain != 0.0 && sim.P.scavLen <= 0.0) {
+        exhaustLayout L;
+        if (turbo && type.exhaustTurbo) L = type.exhaustTurbo(e);
+        else if (type.exhaust) L = type.exhaust(e);
+        double r = 0.0, h = headerLength(L, static_cast<int>(e.cyls.size()), 1.6f, &r);
+        if (h > 0.0) sim.P.scavLen = h + sim.P.scavPortLen + 0.6 * r;
+    }
     if (turbo && !sim.P.turbo.supercharger) sim.drive.P.clutchCapacity *= 1.5;  // --turbo yes on an engine built without
     sim.drive.P.qsMaxRpm = sim.P.revLimit;  // no quickshift / DCT shift down past the limiter
     if (type.bike) {

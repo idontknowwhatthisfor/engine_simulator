@@ -31,10 +31,11 @@ engineParams audiRs3Params() {
     P.veBase = 0.774; P.vePeak = 0.162; P.veRpm = 4600.0; P.veWidth = 3000.0;
     // pressure-wave tuning (estimates), weak on a turbo engine: ~0.30 m runners from the charge-air
     // plenum ram at ~5800 rpm (most of it is hidden on the plateau: the ECU's charge limit takes the
-    // ripple out); the short manifold primaries (0.13-0.26 m, the drawn layout) end at the turbine,
-    // which reflects little, so scavenging is a trace
+    // ripple out); the short manifold primaries end at the merge over the turbine, 0.25 m
+    // acoustically (measured on the drawn layout by setupSim), which reflects little, so scavenging
+    // is a trace
     P.ramLen = 0.30; P.ramDia = 0.045; P.ramGain = 0.03;
-    P.scavLen = 0.18; P.scavGain = 0.01;
+    P.scavGain = 0.01;
     P.sparkLow = 8.0; P.sparkHigh = 30.0; P.sparkFrom = 750.0; P.sparkSpan = 3500.0;
     P.fuelCutRpm = 1500.0;
     P.rpmScale = 8000.0;

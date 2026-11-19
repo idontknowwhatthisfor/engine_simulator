@@ -30,11 +30,12 @@ engineParams kawasakiZx10rParams() {
     P.lowCam = false;
     P.veBase = 0.606; P.vePeak = 0.491; P.veRpm = 11500.0; P.veWidth = 6000.0;
     // pressure-wave tuning (estimates): stack, 47 mm throttle body and port, ~0.20 m, ram hardest at
-    // ~11500 rpm (the published torque peak); the 4-2-1 headers (0.46-0.51 m, the drawn layout) to
-    // the collector, ~0.71 m, scavenge best near 14000 with their dip at ~7000. Together a hole at
-    // 8000-8500 and a hump near 5000
+    // ~11500 rpm (the published torque peak); the 4-2-1 headers to the collector, 0.66 m
+    // acoustically (measured on the drawn layout by setupSim: 0.60 m of pipe plus the port and the open
+    // end), their dip at ~7500. Together a hole at 7500-9000 rpm (-4.5%), a hump near 5000 and one at
+    // 12000 (+5%)
     P.ramLen = 0.20; P.ramDia = 0.047; P.ramGain = 0.05;
-    P.scavLen = 0.71; P.scavGain = 0.035;
+    P.scavGain = 0.035;
     P.sparkSpan = 7500.0;
     P.rpmScale = 16000.0;
     P.counterweight = 0.0;          // flat-plane inline-4: 1st order cancels by symmetry

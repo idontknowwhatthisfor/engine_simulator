@@ -32,7 +32,7 @@ struct paramDumper {
 // a field added to a parameter struct must be added to its dump below; these trip when one is not
 static_assert(sizeof(soundParams) == 240, "soundParams changed: update dumpSound()");
 static_assert(sizeof(turboParams) == 328, "turboParams changed: update dumpTurbo()");
-static_assert(sizeof(engineParams) == 1144, "engineParams changed: update dumpEngine()");
+static_assert(sizeof(engineParams) == 1152, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 448, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
 static_assert(sizeof(carSpec) == 536, "carSpec changed: update dumpCarSpec()");
@@ -74,7 +74,7 @@ void dumpEngine(const paramDumper &d, const engineParams &P) {
     DUMP(d, P, fmepB); DUMP(d, P, fmepC); DUMP(d, P, pedalRate); DUMP(d, P, veBase); DUMP(d, P, vePeak);
     DUMP(d, P, veRpm); DUMP(d, P, veWidth); DUMP(d, P, lowCam); DUMP(d, P, veLowBase); DUMP(d, P, veLowPeak);
     DUMP(d, P, veLowRpm); DUMP(d, P, veLowWidth); DUMP(d, P, ramLen); DUMP(d, P, ramDia); DUMP(d, P, ramSound);
-    DUMP(d, P, ramGain); DUMP(d, P, ramDecay); DUMP(d, P, scavLen); DUMP(d, P, scavSound); DUMP(d, P, scavGain);
+    DUMP(d, P, ramGain); DUMP(d, P, ramDecay); DUMP(d, P, scavLen); DUMP(d, P, scavPortLen); DUMP(d, P, scavSound); DUMP(d, P, scavGain);
     DUMP(d, P, scavDecay); DUMP(d, P, sparkLow); DUMP(d, P, sparkHigh);
     DUMP(d, P, sparkFrom); DUMP(d, P, sparkSpan); DUMP(d, P, mapMin); DUMP(d, P, residualMin);
     DUMP(d, P, counterweight); DUMP(d, P, rpmScale); DUMP(d, P, fuelCutRpm); DUMP(d, P, blockMass);

@@ -30,11 +30,13 @@ engineParams inline4FitParams() {
     P.veBase = 0.775; P.vePeak = 0.245; P.veRpm = 5600.0; P.veWidth = 3300.0;  // broad, high peak (K24 intake VTC)
     // pressure-wave tuning (estimates): ~0.42 m from the plenum to the valve (runner + port) at the
     // 45 mm runner bore rams hardest at ~4300 rpm, the dip after it lands near the limiter, a smaller
-    // hump at ~2600; the 4-2-1 header (0.30-0.38 m primaries + 0.17 m secondaries, the drawn layout)
-    // to its last merge scavenges weakly, mostly at the top. The smooth curve above was refitted
-    // around the ripple (keeping VE at idle, which the stall checks are sensitive to)
+    // hump at ~2600; the 4-2-1 header to its last merge, 0.57 m acoustically (measured on the drawn
+    // layout by setupSim: 0.51 m of pipe plus the port and the open end), scavenges weakly. Together a
+    // dip at 3000-3500 rpm, a hump at 4500-5000 (+3%) and a fall toward the limiter (-5%). The smooth
+    // curve above was refitted around the ripple (keeping VE at idle, which the stall checks are
+    // sensitive to)
     P.ramLen = 0.42; P.ramDia = 0.045; P.ramGain = 0.05;
-    P.scavLen = 0.50; P.scavGain = 0.035;
+    P.scavGain = 0.035;
     P.sparkLow = 8.0; P.sparkHigh = 30.0; P.sparkFrom = 800.0; P.sparkSpan = 3500.0;
     P.rpmScale = 8000.0;
     P.blockMass = 150.0; P.blockRollInertia = 5.0;

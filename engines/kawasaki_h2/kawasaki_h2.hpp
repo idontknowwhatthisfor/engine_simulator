@@ -38,10 +38,11 @@ engineParams kawasakiH2Params() {
     P.veBase = 0.66; P.vePeak = 0.225; P.veRpm = 9000.0; P.veWidth = 4500.0;
     // pressure-wave tuning (estimates), smaller than on the unblown bikes: the supercharger's plenum
     // damps the runners' waves. ~0.22 m from the plenum through the 50 mm throttle bodies rams best
-    // at ~10500 rpm; the 4-2-1 headers (0.46-0.51 m, the drawn layout) to the collector, ~0.71 m,
-    // scavenge best near 13500, their dip at ~7000
+    // at ~10500 rpm; the 4-2-1 headers to the collector, 0.66 m acoustically (measured on the drawn
+    // layout by setupSim: 0.60 m of pipe plus the port and the open end), their dip at ~7500. Together
+    // a dip at 7000-8500 rpm (-3%) and a hump at 11000 (+3%)
     P.ramLen = 0.22; P.ramDia = 0.050; P.ramGain = 0.03;
-    P.scavLen = 0.71; P.scavGain = 0.025;
+    P.scavGain = 0.025;
     P.veLowBase = 0.62; P.veLowPeak = 0.38; P.veLowRpm = 7500.0; P.veLowWidth = 5000.0;  // unused (lowCam off)
     P.sparkLow = 16.0; P.sparkHigh = 34.0; P.sparkFrom = 1300.0; P.sparkSpan = 7000.0;  // 8.5:1 takes more advance off boost; less with boost (knockRetard)
     P.rpmScale = 16000.0;
@@ -205,9 +206,9 @@ const engineType &kawasakiH2Type() {
 engineParams kawasakiH2TunedParams() {
     engineParams P = kawasakiH2Params();
     P.evo = 480.0 * DEGR;           // exhaust opens 10 deg earlier: blows down in time at 14000 rpm
-    // calibrated with --engine-type h2 --tuned yes --phystest (hot charge, no ram air): 142.5 N m at
-    // 12000 and 185 kW (248 hp) at 13500 rpm, against stock's 132.5 N m at 10500 and 148 kW at 11500
-    P.veBase = 0.695; P.vePeak = 0.204; P.veRpm = 12000.0; P.veWidth = 4000.0;  // stock's wave tuning
+    // calibrated with --engine-type h2 --tuned yes --phystest (hot charge, no ram air): 144 N m at
+    // 12000 and 187 kW (251 hp) at 13500 rpm, against stock's 132.5 N m at 10500 and 148 kW at 11500
+    P.veBase = 0.705; P.vePeak = 0.204; P.veRpm = 12000.0; P.veWidth = 4000.0;  // stock's wave tuning
     turboParams &T = P.turbo;
     T.reliefP = 225e3;              // stiffer relief spring: ~+1.2 bar at the top, against stock's ~+1.0
     T.knockRetard = 2.5;            // race fuel
