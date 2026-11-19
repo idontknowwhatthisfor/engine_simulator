@@ -640,8 +640,10 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
 - `scripts/regress.sh baseline` then, after a change, `scripts/regress.sh check` proves a refactor
   changed nothing: for every engine and version (from `--engine-type list --ids`) it compares `--dump-params`, the full `--selftest`
   and `--phystest` output, the `--wav` render (sha256), screenshots (engine, scene, HUD, running, on a
-  stand, with options) pixel by pixel, the meshes' sha256 and the engine list. Output goes to
-  `regress/` (not in git).
+  stand, with options, in manual and manual DCT) pixel by pixel, the meshes' sha256 and the engine
+  list. A screenshot within `JITTER_PIXELS` pixels and `JITTER_LEVELS` levels (50, 8) passes as GPU
+  jitter; a shot the baseline does not have yet is listed as NEW. Everything it prints is also saved
+  in `regress/<baseline|check>/report.txt`. Output goes to `regress/` (not in git).
 
 ## Credits
 

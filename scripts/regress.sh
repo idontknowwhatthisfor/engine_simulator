@@ -11,9 +11,11 @@
 #     to prove that, and falls back to duration + RMS within 0.1% if the two renders differ)
 #   - screenshots: the engine alone (--engine-only), the whole scene (gearbox, exhaust), the scene with
 #     the HUD, a running engine with the HUD (glow, flames, exhaust heat), the HUD and help on a stand
-#     (--engine-only) and with HUD-changing options, compared over every pixel
+#     (--engine-only), with HUD-changing options, and in manual and manual DCT, compared over every
+#     pixel (a few pixels a few levels apart pass as GPU jitter: JITTER_PIXELS, JITTER_LEVELS)
 # and the sha256 of every generated .mesh and the --engine-type list output.
-# `check` prints PASS / FAIL per item and exits 1 if anything failed. Output goes to regress/ (gitignored).
+# `check` prints PASS / FAIL per item and exits 1 if anything failed; everything printed is also saved
+# in regress/<mode>/report.txt. Output goes to regress/ (gitignored).
 set -u
 cd "$(dirname "$0")/.."
 
@@ -30,6 +32,11 @@ OUT=regress/$MODE
 rm -rf "$OUT"
 mkdir -p "$OUT"
 BIN=./engine_sim
+# everything printed also goes to $OUT/report.txt, so a long check can be read in full afterwards
+exec > >(tee "$OUT/report.txt") 2>&1
+# a screenshot passes as GPU jitter when at most this many pixels differ, by at most this many levels
+JITTER_PIXELS=50
+JITTER_LEVELS=8
 
 # name|arguments: every engine and version of one, from `--engine-type list --ids` ("h2 --variant tuned"
 # -> "h2-tuned|--engine-type h2 --variant tuned", "inline4 --turbo yes" -> "inline4-turbo|...")
@@ -53,6 +60,9 @@ SHOTS=(
     # HUD and help on a stand (the bikes' --engine-only) and with the options that change HUD lines
     "stand|--noblur --mute --engine-only --simtime 3 --start --throttle 0.5 --stopat 370"
     "options|--noblur --mute --no-wheelie --grade 5 --sport --bov no --simtime 3 --start --throttle 0.3 --stopat 370"
+    # manual (a car: NORMAL, then DCT; a bike: its manual box, --dct does nothing): HUD gear line, help, message
+    "manual|--noblur --mute --manual --simtime 3 --start --throttle 0.3 --stopat 370"
+    "dct|--noblur --mute --manual --dct --simtime 3 --start --throttle 0.3 --stopat 370"
 )
 
 wav_stats() {  # duration and RMS of a 16-bit mono WAV
@@ -102,7 +112,7 @@ if [[ "$MODE" == baseline ]]; then
     done
     echo "$nondet" >"$OUT/wav_nondeterministic"
     [[ $nondet == 0 ]] && echo "  WAV renders are deterministic (two runs byte-identical)"
-    echo "baseline written to $OUT/"
+    echo "baseline written to $OUT/ (report: $OUT/report.txt)"
     exit 0
 fi
 
@@ -162,12 +172,15 @@ for v in "${VARIANTS[@]}"; do
         f=$name.$shot.png
         if [[ ! -f $OUT/$f ]]; then
             result FAIL "screenshot $shot" "not written"
+        elif [[ ! -f $B/$f ]]; then
+            result NEW "screenshot $shot" "not in the baseline (a shot added since): run baseline again to compare it"
         elif cmp -s "$B/$f" "$OUT/$f"; then
             result PASS "screenshot $shot" "identical"
         else
             d=$(python3 -I scripts/pngdiff.py "$B/$f" "$OUT/$f")
-            # GPU noise: a few pixels a level or two apart now and then (seen run to run on the same build)
-            if python3 -I -c "import sys; n,m=int(sys.argv[1]),int(sys.argv[2]); sys.exit(0 if n<=50 and m<=2 else 1)" \
+            # GPU noise: a few pixels a few levels apart. The same code built and shot at different times
+            # differed by up to 8 pixels, 3 levels; a real change moves hundreds of pixels by tens of levels
+            if python3 -I -c "import sys; n,m=int(sys.argv[1]),int(sys.argv[2]); sys.exit(0 if n<=$JITTER_PIXELS and m<=$JITTER_LEVELS else 1)" \
                 "$(echo "$d" | cut -d' ' -f1)" "$(echo "$d" | sed 's/.*max channel diff //')" 2>/dev/null; then
                 result PASS "screenshot $shot" "tiny GPU difference: $d"
             else
@@ -193,4 +206,5 @@ if [[ $fails == 0 ]]; then
 else
     echo "regress: FAIL ($fails item(s) differ from the baseline)"
 fi
+echo "report: $OUT/report.txt"
 [[ $fails == 0 ]]
