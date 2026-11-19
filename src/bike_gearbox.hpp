@@ -54,7 +54,9 @@ struct bikeGearboxModel {
     void build(const drivetrainParams &dp, renderer &ren) {
         layout();
         float rPc = MOD_P * N_PC / 2.f, rPb = MOD_P * N_PB / 2.f;
-        crankGear = makeGear(rPc, N_PC, 14.f, 14.f);
+        // 16 wide: the crank mesh's primary hub (tools/meshlib.py build_crank) is 14 wide at Z_PRIMARY,
+        // so a 14-wide gear put its faces in the hub's planes and they z-fought (streaks across the gear)
+        crankGear = makeGear(rPc, N_PC, 16.f, 14.f);
         basket = makeGear(rPb, N_PB, 14.f, 46.f);
         clutchPack = makeGear(52.f, 12, 30.f, 16.f);  // the plate stack's tabs show it turning
         mainShaft = makeCylinder(11.f, -112.f, Z_PRIMARY + 47.f);
