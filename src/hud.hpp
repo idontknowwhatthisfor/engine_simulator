@@ -105,8 +105,13 @@ std::string hudText(const engineSim &sim, const engineType &type, const engineMo
     else {
         // with wheelie control the drive force shown is the smoothed one that control works on
         double wheel = dv.P.wheelieAccel > 0.0 ? sim.wheelForceFilt : dv.wheelForce;
-        s += " kW  wheels " + numToStr(static_cast<float>(wheel / 1000.0), 2) + " kN" + "\n " + w.clutch + " " +
-             f0((1.0 - dv.clutch) * 100.0) + "%  slip " + f0(slipRpm) + " rpm" + "\n hill " + (dv.grade >= 0 ? "+" : "") +
+        // the clutch: in manual the driver's pedal / lever travel; when the box works it (automatic, a
+        // car's manual DCT) how far it is engaged, and who is working it
+        std::string clutchStr = dv.boxWorksClutch()
+            ? "clutch " + f0(dv.clutch * 100.0) + "% engaged (" + (dv.automatic ? "auto" : "DCT") + ")"
+            : std::string(w.clutch) + " " + f0((1.0 - dv.clutch) * 100.0) + "%";
+        s += " kW  wheels " + numToStr(static_cast<float>(wheel / 1000.0), 2) + " kN" + "\n " + clutchStr +
+             "  slip " + f0(slipRpm) + " rpm" + "\n hill " + (dv.grade >= 0 ? "+" : "") +
              f0(dv.grade * 100.0) + "%  mass " + f0(dv.mass()) + " kg" + (dv.cargo > 0 ? std::string(" (") + w.load + ")" : "");
         if (v.exhaust)
             s += "\n exhaust: headers ~" + std::to_string(v.exhaust->headerC()) + " C" +
