@@ -191,8 +191,9 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
 
     // 7. a boosted engine: the turbo against the ECU's target, spool, blow-off valve
     if (boosted) {
-        int mid = at(3000.0), top = static_cast<int>(rpms.size()) - 1;
-        check("boost at 3000 rpm vs the ECU's target", mid < 0 ? 9.0 : boostAt[mid] - targetAt[mid], -0.08, 0.05, "bar");
+        int mid = at(S.boostCheckRpm), top = static_cast<int>(rpms.size()) - 1;
+        std::snprintf(what, sizeof what, "boost at %.0f rpm vs the ECU's target", S.boostCheckRpm);
+        check(what, mid < 0 ? 9.0 : boostAt[mid] - targetAt[mid], -0.08, 0.05, "bar");
         std::snprintf(what, sizeof what, "boost at %.0f rpm vs the ECU's target", rpms[top]);
         check(what, boostAt[top] - targetAt[top], -0.08, 0.05, "bar");
         check("full throttle: no compressor surge (dyno)", maxSurge, 0.0, 0.05, "");

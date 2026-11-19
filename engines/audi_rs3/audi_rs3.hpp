@@ -262,6 +262,8 @@ exhaustLayout audiRs3Exhaust(const engineModel &e) {
     return L;
 }
 
+const engineType &audiRs3TunedType();  // --tuned yes, below
+
 const engineType &audiRs3Type() {
     static const engineType T = [] {
         engineType t;
@@ -288,6 +290,117 @@ const engineType &audiRs3Type() {
         t.turboFallbackMeshFile = "engines/audi_rs3/rs3_turbo.mesh";
         t.turboCredit = "turbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0";
         t.hudFiringLine = true;
+        t.variants = {{"tuned", audiRs3TunedType}};
+        return t;
+    }();
+    return T;
+}
+
+// ---- --tuned yes: a big-turbo build, 500+ hp on the stock bore and stroke --------------------------------
+// What a typical big-turbo RS 3 build does (estimates, not one tuner's car); the engine keeps its 82.5 x
+// 92.8 mm, 2480 cc and its 10.0:1:
+//   - a larger hybrid turbo: a bigger compressor wheel (a higher pressure ratio and more flow) and a
+//     bigger turbine housing, so it breathes at 7000+ rpm but comes on boost ~3000-3500 rpm, not ~2000;
+//   - an ECU map for an ethanol blend: ~1.8 bar, a higher torque limit, less spark retard per bar of
+//     boost (the ethanol resists knock), more advance at the top;
+//   - forged rods and pistons (the same dimensions): the limiter goes to 7400 rpm;
+//   - a bigger intercooler, an 80 mm throttle and intake, a catless downpipe and a valved cat-back;
+//   - a gearbox tune: more clutch clamping, later shifts, a higher launch rpm. Gear ratios stay stock.
+engineParams audiRs3TunedParams() {
+    engineParams P = audiRs3Params();
+    P.throttleArea = 5.0e-3;        // 80 mm throttle
+    P.revLimit = 7400.0; P.revResume = 7150.0;
+    P.veRpm = 5200.0;               // intake, downpipe and the turbo's freer exhaust breathe best higher up
+    P.sparkHigh = 31.0;
+    turboParams &T = P.turbo;
+    // calibrated with --engine-type rs3 --tuned yes --phystest: ~610 N m from 3500 rpm, ~410 kW (550 hp)
+    // at 7000, peak cylinder pressure under 180 bar
+    T.boostMap = 290e3;             // up to ~1.9 bar
+    T.chargeMax = 2.3;              // the torque limit: ~610 N m
+    T.boostFallRpm = 6000.0; T.boostTopRpm = 7400.0; T.boostTop = 270e3;
+    T.turbineArea = 0.70e-3;        // bigger turbine housing: less back pressure, later spool
+    T.prRef = 4.6; T.flowPeakRef = 0.11;  // bigger compressor wheel; still clear of surge at full throttle
+    T.inertia = 4.5e-5;             // the bigger wheels spool slower
+    T.maxRpm = 190000.0;
+    T.icDrop = 0.5e5;               // bigger intercooler core
+    T.icEffStill = 0.6; T.icEffMoving = 0.9;
+    T.knockRetard = 5.5;            // ethanol blend
+    T.tExhFull = 1230.0;
+    soundParams &S = P.sound;       // catless downpipe, valved cat-back: louder, more crackle, more turbo
+    S.flapOpenRpm = 2500.0;
+    S.flapShutGain = 0.7;
+    S.popChance = 0.65;
+    S.drive = 0.38;
+    S.pipeLength = 2.3;
+    S.intakeGain = 0.8;
+    S.turboGain = 1.2;
+    return P;
+}
+
+drivetrainParams audiRs3TunedDriveParams() {
+    drivetrainParams P = audiRs3DriveParams();
+    P.clutchCapacity = 950.0;       // the TCU tune's clutch clamping for ~610 N m
+    P.upPedal = 5200.0;             // full pedal: change up at 7200, just under the 7400 limiter
+    P.sportUp = 7200.0;
+    P.downMax = 6800.0; P.kickMax = 6700.0;
+    P.launchPedal = 3000.0;         // launch control a little higher, where the bigger turbo spools
+    return P;
+}
+
+carSpec audiRs3TunedCar() {
+    carSpec S = audiRs3Car();
+    S.name = "Audi RS 3 2.5 TFSI (big turbo)";
+    S.toLimiterLo = 0.4; S.toLimiterHi = 3.5;
+    S.sweepTo = 7000;
+    S.torqueWhat = "peak torque (big turbo)"; S.torqueLo = 580; S.torqueHi = 660;
+    S.torqueRpmLo = 3000; S.torqueRpmHi = 5000;
+    S.powerWhat = "peak power (500 hp = 373 kW at least)"; S.powerLo = 373; S.powerHi = 440;
+    S.powerRpmLo = 6000; S.powerRpmHi = 7000;
+    S.torqueAt = {{3500, 580, 660}, {5500, 560, 640}};
+    S.powerAt = {{6500, 373, 440}, {7000, 373, 440}};
+    S.plateauFrom = 3500; S.plateauTo = 5500; S.plateauMax = 40;
+    S.cylMaxLo = 120; S.cylMaxHi = 185;            // forged pistons and rods
+    S.turboMaxLo = 100; S.turboMaxHi = 190;
+    S.boostCheckRpm = 4000;                         // the bigger turbo is on full boost from ~3500
+    S.spoolRpm = 3500; S.spoolLo = 0.3; S.spoolHi = 3.0;
+    S.carWhat = "1645 kg with driver, 7-speed S tronic (tuned), quattro, big turbo";
+    S.zeroTo100What = "0-100 km/h, no launch control (big turbo)"; S.zeroTo100Lo = 3.0; S.zeroTo100Hi = 4.8;
+    S.launchTo100What = "0-100 km/h, launch control (big turbo)"; S.launchTo100Lo = 2.8; S.launchTo100Hi = 3.8;
+    S.zeroTo200What = "0-200 km/h (big turbo)"; S.zeroTo200Lo = 8.0; S.zeroTo200Hi = 13.0;
+    S.launchLo = 2500; S.launchHi = 5500;
+    S.wotUpLo = 6700;
+    return S;
+}
+
+// the big-turbo car's exhaust: the stock route with a catless downpipe a size up (a straight pipe where
+// the catalyst was), and bigger blued titanium tips
+exhaustLayout audiRs3TunedExhaust(const engineModel &e) {
+    exhaustLayout L = audiRs3Exhaust(e);
+    const std::array<float, 4> STEEL{0.55f, 0.53f, 0.50f, 1.f}, BLUED{0.42f, 0.40f, 0.55f, 1.f};
+    for (pipeSpec &p : L.pipes) {
+        if (p.r0 == 36.f && p.r1 == 36.f) { p.r0 = p.r1 = 40.f; }                 // the downpipe, 3.5 in
+        else if (p.r0 == 62.f && p.r1 == 62.f) {                                  // the catalyst: a test pipe
+            p.r0 = p.r1 = 40.f; p.rgba = STEEL; p.capStart = p.capEnd = false;
+        } else if (p.r0 == 48.f && p.r1 == 48.f) { p.r0 = p.r1 = 52.f; p.rgba = BLUED; p.metal = 0.95f; p.rough = 0.25f; }
+    }
+    for (outletSpec &o : L.outlets) o.r = 48.f;
+    return L;
+}
+
+const engineType &audiRs3TunedType() {
+    static const engineType T = [] {
+        engineType t = audiRs3Type();
+        t.id = "rs3-tuned";
+        t.name = "Audi RS 3 (big turbo)";
+        t.summary = "Audi RS 3 2.5 TFSI, big-turbo build: hybrid turbo, ~1.8 bar on ethanol, forged internals, 7400 limiter, ~550 hp";
+        t.label = "Audi RS 3 2.5 TFSI inline-5, 2480 cc, BIG TURBO";
+        t.windowTitle = "Audi RS 3 2.5 TFSI (big turbo)";
+        t.hudTag = "BIG TURBO";
+        t.engine = audiRs3TunedParams;
+        t.drive = audiRs3TunedDriveParams;
+        t.car = audiRs3TunedCar;
+        t.exhaust = audiRs3TunedExhaust;
+        t.variants.clear();  // a variant has no variants of its own
         return t;
     }();
     return T;

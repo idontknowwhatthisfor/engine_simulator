@@ -91,6 +91,7 @@ struct carSpec {
     // a boosted engine (engineType::boost): turbo checks
     double cylMaxLo = 80.0, cylMaxHi = 150.0;    // highest cylinder pressure on the dyno, bar
     double turboMaxLo = 80.0, turboMaxHi = 180.0;  // highest shaft speed on the dyno, krpm
+    double boostCheckRpm = 3000.0;               // the dyno's boost must meet the ECU's target from here up
     double spoolRpm = 2500.0;                    // floored from part pedal at this held speed...
     double spoolLo = 0.3, spoolHi = 2.5;         // ... s to 90% of the boost target
     // the car

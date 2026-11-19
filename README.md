@@ -102,6 +102,27 @@ or a procedural one when that is not there (below).
 the centre housing, and see-through scrolls with their four ports where the downloaded model has them,
 so the same exhaust and intake pipes fit either.
 
+#### Tuned (`--tuned yes`): big turbo
+
+```bash
+./engine_sim --engine-type rs3 --tuned yes
+```
+
+A typical big-turbo build (estimates, not one tuner's car) on the stock 82.5 × 92.8 mm, 2480 cc and
+10.0:1: only what bolts on, the map and forged internals of the same dimensions change.
+
+| | |
+|---|---|
+| Turbo | A larger hybrid: a bigger compressor wheel (pressure ratio 4.6 at the reference speed, more flow, still clear of surge at full throttle) and a bigger turbine housing, so it breathes to 7400 rpm but comes on boost at ~3000–3500 rpm |
+| ECU | Ethanol blend: up to ~1.9 bar, the torque limit raised to ~610 N·m, 5.5° of knock retard per bar (stock 7), a little more advance; the boost eases off above 6000 rpm |
+| Engine | Forged rods and pistons (same dimensions): limiter 7400 rpm. 80 mm throttle and intake, bigger intercooler, catless downpipe, valved cat-back |
+| Output (sim) | 613 N·m at 3500, ~600 N·m to 5500, 417 kW (559 hp) at 7000 rpm (stock: 507 N·m, 300 kW); peak cylinder pressure 179 bar |
+| Gearbox | Stock ratios; a gearbox tune: more clutch clamping (950 N·m), full-throttle upshifts at ~7300 rpm, launch control a little higher (~4900 rpm on 1.5 bar) |
+| Results (sim) | 0–100 km/h 3.0 s with launch control (3.6 s floored from idle), 0–200 km/h 10.8 s |
+| 3D | The downpipe a size up with a straight pipe where the catalyst was, bigger blued titanium tips |
+| Sound | Louder, flaps open from 2500 rpm, more crackle, more turbo |
+
+
 ### `v4`: Ducati Desmosedici Stradale (Panigale V4)
 
 Built from the inline-4's piston and rod, scaled, on a new procedural crank and crankcase.
@@ -500,7 +521,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--grade pct --reverse --sport --manual --dct --no-wheelie` | Starting conditions (`--manual`: start in manual, in neutral; `--dct`: a car's manual mode is DCT) |
 | `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below; the RS 3 always has its own). With `--phystest`, runs the turbo checks; with `--wav`, plays the turbo drive |
 | `--bov yes\|no` | With the turbo: fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
-| `--variant name` | Another version of the engine (`v4`, `s1000rr`, `h2`, `zx10r` and `mxking` have one: `tuned`) |
+| `--variant name` | Another version of the engine (`rs3`, `v4`, `s1000rr`, `h2`, `zx10r` and `mxking` have one: `tuned`) |
 | `--tuned yes\|no` | Same as `--variant tuned` (default `no`) |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 | `--synthtest N` | Hidden: test an N-cylinder inline engine built in memory (see [Testing](#testing)) |

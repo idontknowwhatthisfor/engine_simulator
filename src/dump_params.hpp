@@ -35,7 +35,7 @@ static_assert(sizeof(turboParams) == 328, "turboParams changed: update dumpTurbo
 static_assert(sizeof(engineParams) == 1072, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 448, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
-static_assert(sizeof(carSpec) == 528, "carSpec changed: update dumpCarSpec()");
+static_assert(sizeof(carSpec) == 536, "carSpec changed: update dumpCarSpec()");
 
 void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, pipeLowHz); DUMP(d, S, pipeResHz); DUMP(d, S, pipeResGain); DUMP(d, S, masterHz);
@@ -115,7 +115,7 @@ void dumpCarSpec(const paramDumper &d, const carSpec &S) {
     for (std::size_t k = 0; k < S.powerAt.size(); k++)
         d.put(("powerAt[" + std::to_string(k) + "]").c_str(), std::vector<double>{S.powerAt[k].rpm, S.powerAt[k].lo, S.powerAt[k].hi});
     DUMP(d, S, plateauFrom); DUMP(d, S, plateauTo); DUMP(d, S, plateauMax); DUMP(d, S, cylMaxLo); DUMP(d, S, cylMaxHi);
-    DUMP(d, S, turboMaxLo); DUMP(d, S, turboMaxHi); DUMP(d, S, spoolRpm); DUMP(d, S, spoolLo); DUMP(d, S, spoolHi);
+    DUMP(d, S, turboMaxLo); DUMP(d, S, turboMaxHi); DUMP(d, S, boostCheckRpm); DUMP(d, S, spoolRpm); DUMP(d, S, spoolLo); DUMP(d, S, spoolHi);
     DUMP(d, S, carWhat); DUMP(d, S, zeroTo100What); DUMP(d, S, zeroTo100Lo); DUMP(d, S, zeroTo100Hi);
     DUMP(d, S, zeroTo200What); DUMP(d, S, zeroTo200Lo); DUMP(d, S, zeroTo200Hi); DUMP(d, S, launchLo);
     DUMP(d, S, launchHi); DUMP(d, S, launchTo100What); DUMP(d, S, launchTo100Lo); DUMP(d, S, launchTo100Hi); DUMP(d, S, wotUpLo); DUMP(d, S, lightUpLo); DUMP(d, S, lightUpHi); DUMP(d, S, hillPedal);
