@@ -10,7 +10,7 @@ the crank speed comes from a physics model, not a fixed rate:
 
 The sound is synthesised from the same simulation.
 
-It has four engines. `engine_sim` is the single entry point, and you pick the engine with
+It has six engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
 
 | `--engine-type` | Engine | Drives | Also accepted |
@@ -19,6 +19,7 @@ It has four engines. `engine_sim` is the single entry point, and you pick the en
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
 | `h2` | Kawasaki Ninja H2 supercharged inline-4, 998 cc | a Ninja H2 (bike) | `kawasaki`, `kawasaki-h2`, `ninja-h2` |
+| `zx10r` | Kawasaki Ninja ZX-10R inline-4, 998 cc | a ZX-10R (bike) | `zx-10r`, `ninja-zx10r`, `ninja-zx-10r`, `zx10`, `kawasaki-zx10r` |
 | `mxking` | Yamaha MX King 150 single, 149.7 cc | an MX King underbone (bike) | `mx-king`, `jupiter-mx`, `t150`, `yamaha150` |
 
 ```bash
@@ -47,7 +48,7 @@ optional, so without it everything builds and only `--turbo yes` is unavailable.
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
 meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run ENGINE=<id>`
-or `make run-<id>` (`make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-mxking`; aliases work too). `make test` runs
+or `make run-<id>` (`make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-mxking`; aliases work too). `make test` runs
 the headless checks for every engine and version of one (`./engine_sim --engine-type list --ids`), and
 fails if any of them fails.
 
@@ -216,6 +217,61 @@ gearing and limiter stay stock; the changes are estimates of a race kit, not a p
 The HUD shows TUNED after the rpm. `--tuned yes` works with `--phystest` (its own targets),
 `--wav` and screenshots; `make test` checks both versions.
 
+### `zx10r`: Kawasaki Ninja ZX-10R (2021-)
+
+Built like the S 1000 RR: the inline-4's piston and rod scaled to the 76 mm bore (the H2 shares the
+bore and stroke, without the supercharger), on a procedural flat-plane crank, with a green cam cover.
+
+| | |
+|---|---|
+| Engine | 76.0 × 55.0 mm = 998 cc, 13.0:1, 107 mm rods (estimate), 180° flat-plane crank, block inclined 30° (estimate), forward-turning crank, four 47 mm throttle bodies, finger-follower valvetrain, one cam (no variable timing) |
+| Firing | 1-2-4-3 |
+| Output (sim) | 115 N·m at 11000 rpm, 149 kW (200 hp) at 13500 rpm, no ram air (Kawasaki: 114.9 N·m at 11400 / 149.3 kW at 13200), limiter 14000 rpm, idle 1250 rpm |
+| Gearbox | Primary 79/47 (1.681); gears 39/15, 41/19, 32/17, 33/20, 31/21, 30/23; chain 41/17 (the 2021 bike's bigger rear sprocket); 190/55 ZR17 rear |
+| Vehicle | 207 kg wet + 80 kg rider, CdA 0.31 |
+| Rider aids | Same as the other bikes; launch control holds the clutch higher (~7500–9500 rpm) |
+| Exhaust (3D) | The S 1000 RR's 4-2-1 layout into a bigger dark silencer |
+| Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 7.0 s, ~317 km/h after 30 s in 6th (on the limiter; the real bike is limited to 299) |
+| Sound | The inline-4 superbike voice with a longer pipe, a lower note, more airbox honk (the ram-air box sits under the rider) and a little more gear whine than the BMW |
+
+Its 1st gear is taller than the BMW's (10.5:1 overall against 11.8:1), so in the sim it peaks at
+~1.05 g on a launch, short of the test's 1.15 g "front in the air" mark. It sets
+`bikeSpec::liftsFront = false` for that check, and its wheelie control still cuts in. The same tall 1st makes a
+25% take-off bog to ~640 rpm (`takeoffMinRpm = 600`).
+
+#### Tuned (`--tuned yes`): race kit
+
+```bash
+./engine_sim --engine-type zx10r --tuned yes
+```
+
+A Superstock-style race build on the ZX-10RR's engine, the version Kawasaki homologates for racing.
+It is no one team's engine, and every number beyond the RR's parts is an estimate. The block, throttle
+bodies, gearbox and gearing stay stock. The changes:
+
+- the RR's Pankl titanium rods and lighter pistons and pins (less reciprocating mass);
+- Kawasaki's race kit ECU and kit cams: more lift and duration (intake closes 10° later, exhaust opens
+  10° earlier), so the engine breathes best near 13000 rpm, with the limiter at 15500 rpm (stock 14000,
+  RR 14700). The full-throttle upshift moves to ~15200 rpm;
+- high-compression kit pistons (13.6:1) on race fuel, with more spark at the top. The mid range is no
+  weaker than stock, unlike the road-going RR;
+- a titanium race exhaust: the stock 4-2-1 route with heat-blued headers a size up (41 mm), no exhaust
+  valve, and a short titanium can with a carbon end cap in place of the dark silencer. It's louder, with
+  more crackle, a higher note and more intake honk from the open kit airbox.
+
+| | Stock | Race kit (sim) |
+|---|---|---|
+| Peak torque | 115 N·m at 11000 rpm | 118 N·m at 12000 rpm |
+| Torque at 6000 / 8000 rpm | 90 / 103 N·m | 93 / 104 N·m |
+| Peak power | 149 kW (200 hp) at 13500 rpm | 171 kW (229 hp) at 15000–15500 rpm |
+| Limiter | 14000 rpm | 15500 rpm |
+| Top of 1st / 2nd / 3rd (from the gearing) | ~161 / 194 / 223 km/h | ~179 / 215 / 247 km/h |
+| 0–100 km/h | 3.4 s | 3.4 s (the tall 1st and the wheelie limit cap it) |
+| 0–200 km/h | 7.0 s | 6.8 s |
+| After 30 s in 6th | ~317 km/h | ~334 km/h |
+
+The HUD shows RACE KIT after the rpm.
+
 ### `mxking`: Yamaha MX King 150 (2015-2020)
 
 The Indonesian underbone (Jupiter MX King, T150 engine), made from the engine template: a single
@@ -353,7 +409,8 @@ housing, rotor and bearing by geometry and writes `turbo.mesh`. `make` builds it
 there.
 
 **Estimates.** These values are not published: the V4 rod length; the S 1000 RR bore spacing (92 mm);
-the H2's rod length, bore spacing (84 mm), cylinder incline and supercharger compressor map;
+the H2's rod length, bore spacing (84 mm), cylinder incline and supercharger compressor map; the same
+three for the ZX-10R;
 and the crank inertia, reciprocating mass, friction and cam timing of both bikes. They are estimates,
 calibrated so that the published torque and power come out of the physics.
 
@@ -384,7 +441,7 @@ calibrated so that the published torque and power come out of the physics.
 
 | Option | |
 |---|---|
-| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `v4`, `s1000rr`, `h2`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
+| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `v4`, `s1000rr`, `h2`, `zx10r`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
@@ -394,7 +451,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--grade pct --reverse --sport --no-wheelie` | Starting conditions |
 | `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below). With `--phystest`, runs the turbo checks; with `--wav`, plays the turbo drive |
 | `--bov yes\|no` | With the turbo: fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
-| `--variant name` | Another version of the engine (`v4`, `s1000rr`, `h2` and `mxking` have one: `tuned`) |
+| `--variant name` | Another version of the engine (`v4`, `s1000rr`, `h2`, `zx10r` and `mxking` have one: `tuned`) |
 | `--tuned yes\|no` | Same as `--variant tuned` (default `no`) |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 | `--synthtest N` | Hidden: test an N-cylinder inline engine built in memory (see [Testing](#testing)) |
@@ -436,6 +493,8 @@ engines/
                             build_s1000rr.py, s1000rr.mesh
   kawasaki_h2/              kawasaki_h2.hpp (engine, supercharger, sound, gearing, test targets, demo ride,
                             type), build_h2.py, h2.mesh, h2_supercharger.mesh
+  kawasaki_zx10r/            kawasaki_zx10r.hpp (engine, sound, gearing, test targets, demo ride, type),
+                            build_zx10r.py, zx10r.mesh
   yamaha_mxking/            mxking.hpp (engine, sound, gearing, test targets, type, race version),
                             build_mxking.py, mxking.mesh, mxking_race.mesh
   _template/                a new engine to copy (not built): myengine.hpp, build_myengine.py, engine.mk
@@ -503,7 +562,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    - the `engineType`: id, labels, mesh path, physics test, for bikes the gearbox placement and an
      optional `ride` for `--wav`; other versions of the engine go in `variants` (`--variant <name>`).
 4. **Register.** The header ends with `REGISTER_ENGINE(<type function>, <key>)`; the key orders
-   `--engine-type list` (inline4 10, v4 20, s1000rr 30, h2 40, mxking 50), pick a free one. `engine.mk` lists the
+   `--engine-type list` (inline4 10, v4 20, s1000rr 30, h2 40, zx10r 45, mxking 50), pick a free one. `engine.mk` lists the
    header and the mesh rule. Nothing outside the folder needs an edit: the Makefile includes every
    `engine.mk` and generates `engines/all.hpp`, `make test` picks the engine up, and the help line
    and HUD follow from what it has (bike or car, boost, wheelie control).
