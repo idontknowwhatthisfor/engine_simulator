@@ -1,14 +1,14 @@
-// --engine-type inline4 --turbo yes --phystest: the inline-4 with the optional turbocharger. (The plain
+// --engine-type inline4 --tuned yes --phystest: the turbocharged inline-4 (its tuned version). (The plain
 // engine and car run the shared car test, src/test_car.hpp, against inline4FitCar)
 #pragma once
 #include "../../src/engines.hpp"
 
-// --engine-type inline4 --turbo yes --phystest: the same engine with the turbocharger. Start and idle
+// --engine-type inline4 --tuned yes --phystest: the same engine with the turbocharger. Start and idle
 // (no boost), the WOT dyno sweep with the turbo settled at each speed, spool-up from part load, the
 // wastegate holding the target, back to idle after a lift-off, and 0-100 km/h in the car.
 int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
     engineSim sim;
-    setupSim(sim, e, type, e.cyls[0].theta0, false, true);
+    setupSim(sim, e, type, e.cyls[0].theta0);
     applyCalibrationEnv(sim.P);
     sim.drive.reset(false);
     auto run = [&](double seconds, auto &&each) {

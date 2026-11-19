@@ -67,7 +67,7 @@ struct engineSound {
     double sinceLift = 1e9;           // s since the throttle was snapped shut
     bool lastQs = false;
     double primaryPhase = 0.0, gearMeshPhase = 0.0;
-    // turbo (--turbo yes): compressor whistle, intake whoosh, blow-off valve, surge flutter
+    // turbo: compressor whistle, intake whoosh, blow-off valve, surge flutter
     biquad whoosh, bovBand, bovHigh, flutterBand, flutterThump;
     double whistlePhase = 0.0, splitterPhase = 0.0;
 

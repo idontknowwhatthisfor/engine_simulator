@@ -1,7 +1,7 @@
 // --dump-params (hidden): every parameter the selected engine runs with, one `name = value` per line,
 // doubles with %.17g and floats with %.9g so they round-trip exactly. scripts/regress.sh diffs this
 // output before and after a change to prove nothing was recalibrated. The values are the effective
-// ones, after setupSim (--tuned and --turbo applied). When a field is added to one of the parameter
+// ones, after setupSim (for the version --tuned / --variant picks). When a field is added to one of the parameter
 // structs, add it here too: the sizeof checks below fail to compile until the list is updated.
 #pragma once
 #include "engines.hpp"
@@ -214,8 +214,7 @@ void dumpType(const paramDumper &d, const engineType &t, const engineModel &e) {
     d.put("firing", hudFiring(t, e)); DUMP(d, t, windowTitle); DUMP(d, t, hudTag); DUMP(d, t, credit); DUMP(d, t, meshFile);
     DUMP(d, t, buildHint); DUMP(d, t, bike); d.put("boost", boostName(t.boost));
     d.set("engine", t.engine); d.set("drive", t.drive); d.set("physTest", t.physTest);
-    d.set("physTestTurbo", t.physTestTurbo); d.set("spec", t.spec); d.set("exhaust", t.exhaust);
-    d.set("exhaustTurbo", t.exhaustTurbo);
+    d.set("spec", t.spec); d.set("exhaust", t.exhaust);
     if (t.bike) d.put("zPrimary", primaryGearZ(e));  // from the mesh
     DUMP(d, t, gearboxSide); DUMP(d, t, primaryModule);
     DUMP(d, t, turboMeshFile); DUMP(d, t, turboFallbackMeshFile); DUMP(d, t, turboBuildHint); DUMP(d, t, turboCredit); DUMP(d, t, hudFiringLine);
@@ -230,9 +229,9 @@ void dumpType(const paramDumper &d, const engineType &t, const engineModel &e) {
 }
 
 // everything for one engine type, as setupSim leaves it
-int dumpParams(const engineModel &e, const engineType &t, bool turbo, bool bov) {
+int dumpParams(const engineModel &e, const engineType &t, bool bov) {
     engineSim sim;
-    setupSim(sim, e, t, e.cyls[0].theta0, false, turbo);
+    setupSim(sim, e, t, e.cyls[0].theta0);
     sim.P.turbo.bov = bov;
     paramDumper root;
     dumpType(root.sub("type."), t, e);
@@ -244,7 +243,7 @@ int dumpParams(const engineModel &e, const engineType &t, bool turbo, bool bov) 
     dumpMesh(root.sub("mesh."), e);
     if (t.exhaust) {
         try {
-            dumpExhaust(root.sub("exhaust."), turbo ? t.exhaustTurbo(e) : t.exhaust(e));
+            dumpExhaust(root.sub("exhaust."), t.exhaust(e));
         } catch (const std::exception &ex) {
             root.put("exhaust.error", ex.what());  // e.g. a mesh from before v3 without supercharger_at
         }

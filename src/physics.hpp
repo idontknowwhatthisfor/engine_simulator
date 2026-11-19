@@ -54,7 +54,7 @@ struct soundParams {
     double burbleFadeFrom = 0.0, burbleFadeSpan = 0.0, burbleHigh = 1.0;
     double tick = 0.0;              // valvetrain: a click as each cam lobe snaps a valve shut
     double tickHz = 3200.0;         // ... centred here (a Desmo's rocker clatter sits lower)
-    double turboGain = 1.0;         // the turbo's whistle, whoosh, blow-off and flutter (--turbo yes)
+    double turboGain = 1.0;         // the turbo's whistle, whoosh, blow-off and flutter
     // the turbulent rasp (broadband noise on the exhaust flow, around 1.2 kHz). It follows the summed
     // outflow squared, so with many cylinders whose exhaust strokes overlap (a V10: about three at
     // once) the flow hardly drops between pulses and the rasp drowns the firing note: turn it down
@@ -63,7 +63,7 @@ struct soundParams {
                                     // engine's idle firing rate (dcBlockCutoff in src/sound.hpp)
 };
 
-// turbocharger (--turbo yes), a mean-value model:
+// turbocharger (the RS 3's, the tuned inline-4's), a mean-value model:
 //   - exhaust: the gas fills the exhaust manifold and leaves through the turbine and the wastegate;
 //     the turbine's power spins the shaft against the compressor's and the bearings'
 //   - compressor (Greitzer): the air in the inlet duct has inertia and is pushed by the pressure

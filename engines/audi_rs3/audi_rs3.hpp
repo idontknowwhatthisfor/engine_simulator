@@ -311,7 +311,8 @@ const engineType &audiRs3Type() {
 //   - an ECU map for an ethanol blend: ~1.8 bar, a higher torque limit, less spark retard per bar of
 //     boost (the ethanol resists knock), more advance at the top;
 //   - forged rods and pistons (the same dimensions): the limiter goes to 7400 rpm;
-//   - a bigger intercooler, an 80 mm throttle and intake, a catless downpipe and a valved cat-back;
+//   - a bigger intercooler, an 80 mm throttle and intake, a catless downpipe and a straight pipe
+//     (no silencer, no flap) to the tips;
 //   - a gearbox tune: more clutch clamping, later shifts, a higher launch rpm. Gear ratios stay stock.
 engineParams audiRs3TunedParams() {
     engineParams P = audiRs3Params();
@@ -334,11 +335,14 @@ engineParams audiRs3TunedParams() {
     T.icEffStill = 0.6; T.icEffMoving = 0.9;
     T.knockRetard = 5.5;            // ethanol blend
     T.tExhFull = 1230.0;
-    soundParams &S = P.sound;       // catless downpipe, valved cat-back: louder, more crackle, more turbo
-    S.flapOpenRpm = 2500.0;
-    S.flapShutGain = 0.7;
-    S.popChance = 0.65;
-    S.drive = 0.38;
+    // catless downpipe and a straight pipe: no silencer and no flap, so always open; the pipe rings
+    // harder, louder, more crackle, more turbo
+    soundParams &S = P.sound;
+    S.flapOpenRpm = -1e6; S.flapShutGain = 1.0;  // nothing to shut
+    S.pipeReflect = 0.65;
+    S.pipeLowHz = 2300.0;
+    S.popChance = 0.75;
+    S.drive = 0.42;
     S.pipeLength = 2.3;
     S.intakeGain = 0.8;
     S.turboGain = 1.2;
@@ -380,17 +384,21 @@ carSpec audiRs3TunedCar() {
     return S;
 }
 
-// the big-turbo car's exhaust: the stock route with a catless downpipe a size up (a straight pipe where
-// the catalyst was), and bigger blued titanium tips
+// the big-turbo car's exhaust: straight pipe. The stock route with the catless downpipe a size up, a
+// straight pipe where the catalyst was, the mid pipe a size up without its flap, a straight pipe where
+// the rear silencer was, and bigger blued titanium tips
 exhaustLayout audiRs3TunedExhaust(const engineModel &e) {
     exhaustLayout L = audiRs3Exhaust(e);
     const std::array<float, 4> STEEL{0.55f, 0.53f, 0.50f, 1.f}, BLUED{0.42f, 0.40f, 0.55f, 1.f};
     for (pipeSpec &p : L.pipes) {
         if (p.r0 == 36.f && p.r1 == 36.f) { p.r0 = p.r1 = 40.f; }                 // the downpipe, 3.5 in
-        else if (p.r0 == 62.f && p.r1 == 62.f) {                                  // the catalyst: a test pipe
+        else if ((p.r0 == 62.f && p.r1 == 62.f) || (p.r0 == 82.f && p.r1 == 82.f)) {  // catalyst, silencer: straight pipe
             p.r0 = p.r1 = 40.f; p.rgba = STEEL; p.capStart = p.capEnd = false;
-        } else if (p.r0 == 48.f && p.r1 == 48.f) { p.r0 = p.r1 = 52.f; p.rgba = BLUED; p.metal = 0.95f; p.rough = 0.25f; }
+        } else if (p.r0 == 34.f && p.r1 == 34.f) { p.r0 = p.r1 = 40.f; }          // the mid pipe
+        else if (p.r0 == 30.f && p.r1 == 30.f && !p.from.empty()) { p.r0 = p.r1 = 36.f; }  // the links to the tips
+        else if (p.r0 == 48.f && p.r1 == 48.f) { p.r0 = p.r1 = 52.f; p.rgba = BLUED; p.metal = 0.95f; p.rough = 0.25f; }
     }
+    L.flap.on = false;              // no exhaust flap
     for (outletSpec &o : L.outlets) o.r = 48.f;
     return L;
 }
@@ -400,7 +408,7 @@ const engineType &audiRs3TunedType() {
         engineType t = audiRs3Type();
         t.id = "rs3-tuned";
         t.name = "Audi RS 3 (big turbo)";
-        t.summary = "Audi RS 3 2.5 TFSI, big-turbo build: hybrid turbo, ~1.8 bar on ethanol, forged internals, 7400 limiter, ~550 hp";
+        t.summary = "Audi RS 3 2.5 TFSI, big-turbo build: hybrid turbo, ~1.8 bar on ethanol, forged internals, straight pipe, 7400 limiter, ~550 hp";
         t.label = "Audi RS 3 2.5 TFSI inline-5, 2480 cc, BIG TURBO";
         t.windowTitle = "Audi RS 3 2.5 TFSI (big turbo)";
         t.hudTag = "BIG TURBO";

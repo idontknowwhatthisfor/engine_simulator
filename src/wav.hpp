@@ -4,9 +4,9 @@
 #include "sound.hpp"
 
 // headless: run a start / idle / rev / lift-off / ignition-off sequence and write it as a WAV (--wav)
-int renderWav(const engineModel &e, const engineType &type, const std::string &path, bool turbo = false, bool bov = true) {
+int renderWav(const engineModel &e, const engineType &type, const std::string &path, bool bov = true) {
     engineSim sim;
-    setupSim(sim, e, type, e.cyls[0].theta0, type.bike, turbo);  // a bike engine revs on its stand
+    setupSim(sim, e, type, e.cyls[0].theta0, type.bike);  // a bike engine revs on its stand
     sim.P.turbo.bov = bov;
     applyCalibrationEnv(sim.P);  // SND_* for the voice, and the engine overrides (src/calibration.hpp)
     engineSound snd(1.0 / PHYS_DT, sim);
@@ -64,12 +64,12 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
                 surgePeak = std::max(surgePeak, sim.surge);
                 boostPeak = std::max(boostPeak, sim.boostBar());
             }
-            if (turbo || type.boost == builtInBoost::turbo)
+            if (type.boost == builtInBoost::turbo)
                 std::printf("           at %4.1f s: %5.0f rpm  gear %d  %3.0f km/h  peak boost %+.2f bar  BOV %.3f kg/s  surge %.2f\n",
                             sim.time, sim.rpm(), sim.drive.gear, sim.drive.v * 3.6, boostPeak, bovPeak, surgePeak);
             from = sg.until;
         };
-        if (turbo || type.boost == builtInBoost::turbo) for (const segment &sg : TURBO_SCRIPT) play(sg);
+        if (type.boost == builtInBoost::turbo) for (const segment &sg : TURBO_SCRIPT) play(sg);
         else for (const segment &sg : SCRIPT) play(sg);
     }
     // resample 40 kHz -> 44.1 kHz, linear

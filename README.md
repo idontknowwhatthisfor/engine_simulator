@@ -17,7 +17,7 @@ It has eight engines. `engine_sim` is the single entry point, and you pick the e
 
 | `--engine-type` | Engine | Drives | Also accepted |
 |---|---|---|---|
-| `inline4` (default) | 2.3 L inline-4 (the Sketchfab model) | a car with Honda Fit 5-speed gearing | `fit`, `honda-fit`, `inline4-fit`, `i4` |
+| `inline4` (default) | 2.3 L inline-4 (the Sketchfab model); `--tuned yes`: turbocharged, straight pipe | a car with Honda Fit 5-speed gearing | `fit`, `honda-fit`, `inline4-fit`, `i4` |
 | `rs3` | Audi RS 3 2.5 TFSI turbocharged inline-5, 2480 cc | an RS 3 (8Y) with the 7-speed S tronic | `audi`, `audi-rs3`, `rs-3`, `inline5`, `i5`, `2.5tfsi`, `daza` |
 | `lfa` | Lexus LFA 1LR-GUE 72° V10, 4805 cc | an LFA with the 6-speed ASG | `lexus`, `lexus-lfa`, `v10`, `1lr-gue`, `1lr` |
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
@@ -44,7 +44,8 @@ repo's GitHub release (`Assets-1`) on first run, verified by checksum, using onl
 standard library. To fetch it by hand: `make assets`. If the repo is private, export a token first:
 `export GITHUB_TOKEN=$(gh auth token)`. The file list lives in `assets.json`. The turbocharger's
 14 MB `engines/inline4_fit/turbocharger/scene.bin` comes the same way from release `Assets-2`; it is
-optional, so without it everything builds and only `--turbo yes` is unavailable.
+optional: without it everything builds, and the tuned inline-4 and the RS 3 draw a procedural turbo
+in its place.
 
 ```bash
 ./engine_sim --engine-type s1000rr
@@ -75,6 +76,21 @@ The original model, split into moving parts from the glTF.
 | 3D | The see-through block, and a procedural 5-speed gearbox with a reverse idler behind the flywheel (the car gearbox drawing moves back, `gearboxModel::shiftFor`, for an engine whose crank or crankcase reaches past the inline-4's) |
 | Exhaust (3D) | Tubular 4-2-1 manifold (1+4, 2+3) on a cast flange, close-coupled catalyst, mid pipe, silencer and tailpipe running back beside the gearbox |
 
+#### Tuned (`--tuned yes`): turbo, straight pipe
+
+```bash
+./engine_sim --tuned yes
+```
+
+The same engine with a turbocharger and a straight pipe: everything under
+[Turbocharger](#turbocharger-the-tuned-inline-4) below (this was `--turbo yes` before). After the
+turbine the exhaust is a straight pipe: no catalyst or silencer, the 3 in downpipe carried straight
+back to a big burnt-titanium tip. The physics is unchanged by it (past the turbine the gas goes to the
+air either way in the model, and the header's waves reflect at the merge over the turbine), so the
+output is the turbo's: 366 N·m, 226 kW, 0–100 km/h in 4.7 s. The voice is louder and brighter with the
+pipe's ring left in (~3 dB at idle and on lift-off, ~2 dB at full throttle); the turbine takes the edge
+off the pulses, so it is a loud, raw drone rather than a scream. The clutch is 1.5× the stock one.
+
 ### `rs3`: Audi RS 3 (8Y, 2021-), 2.5 TFSI turbocharged inline-5
 
 ```bash
@@ -84,8 +100,8 @@ The original model, split into moving parts from the glTF.
 The five-cylinder, built like the superbikes from the inline-4's piston and rod (scaled to the 82.5 mm
 bore and the 144 mm rod) on a procedural crank with its pins 72° apart, with a red RS cam cover. It is
 the only engine that is always turbocharged (`engineType::boost = builtInBoost::turbo`; the H2 is
-`supercharger`): the turbo is on without `--turbo yes` and is drawn with the inline-4's turbo model,
-or a procedural one when that is not there (below).
+`supercharger`; the tuned inline-4 is turbocharged too): the turbo is always on and is drawn with the
+inline-4's turbo model, or a procedural one when that is not there (below).
 
 | | |
 |---|---|
@@ -101,8 +117,8 @@ or a procedural one when that is not there (below).
 | Results (sim) | 0–100 km/h 3.7 s with launch control (S and full throttle, then let go of S: held at ~4500 rpm on 1.2 bar; Audi: 3.8 s), 4.3 s floored from idle (the turbo spools on the way), 0–200 km/h 14.0 s, full-throttle upshifts at ~7000 rpm |
 | Sound | The detailed voice (`soundParams::detailed`, the bikes' stages) on a car: a long pipe for the deep five-cylinder note and its idle burble, the sport exhaust's flaps opening from ~3500 rpm, overrun crackle (with flames), the turbo's whistle and the blow-off valve |
 
-`--turbo yes` is refused (it already has one). Without the downloaded turbo model (the optional
-`Assets-2` download) the RS 3 draws a procedural turbo instead (`build_rs3_turbo.py` ->
+Without the downloaded turbo model (the optional `Assets-2` download) the RS 3 (and the tuned
+inline-4) draws a procedural turbo instead (`build_rs3_turbo.py` ->
 `rs3_turbo.mesh`, `engineType::turboFallbackMeshFile`): turbine and compressor wheels on their shaft,
 the centre housing, and see-through scrolls with their four ports where the downloaded model has them,
 so the same exhaust and intake pipes fit either.
@@ -120,12 +136,12 @@ A typical big-turbo build (estimates, not one tuner's car) on the stock 82.5 × 
 |---|---|
 | Turbo | A larger hybrid: a bigger compressor wheel (pressure ratio 4.6 at the reference speed, more flow, still clear of surge at full throttle) and a bigger turbine housing, so it breathes to 7400 rpm but comes on boost at ~3000–3500 rpm |
 | ECU | Ethanol blend: up to ~1.9 bar, the torque limit raised to ~610 N·m, 5.5° of knock retard per bar (stock 7), a little more advance; the boost eases off above 6000 rpm |
-| Engine | Forged rods and pistons (same dimensions): limiter 7400 rpm. 80 mm throttle and intake, bigger intercooler, catless downpipe, valved cat-back |
+| Engine | Forged rods and pistons (same dimensions): limiter 7400 rpm. 80 mm throttle and intake, bigger intercooler, catless downpipe and a straight pipe (no silencer, no flap) |
 | Output (sim) | 613 N·m at 3500, ~600 N·m to 5500, 417 kW (559 hp) at 7000 rpm (stock: 507 N·m, 300 kW); peak cylinder pressure 179 bar |
 | Gearbox | Stock ratios; a gearbox tune: more clutch clamping (950 N·m), full-throttle upshifts at ~7300 rpm, launch control a little higher (~4900 rpm on 1.5 bar) |
 | Results (sim) | 0–100 km/h 3.0 s with launch control (3.6 s floored from idle), 0–200 km/h 10.8 s |
-| 3D | The downpipe a size up with a straight pipe where the catalyst was, bigger blued titanium tips |
-| Sound | Louder, flaps open from 2500 rpm, more crackle, more turbo |
+| 3D | Straight pipe: the downpipe and the mid pipe a size up, straight pipes where the catalyst and the rear silencer were, no flap, bigger blued titanium tips. The physics is unchanged by it (the header's waves reflect at the manifold's merge over the turbine, upstream) |
+| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~4 dB at idle, ~2–3 dB on lift-off, under 1 dB at full throttle, which stays the loudest), more crackle, more turbo |
 
 
 ### `lfa`: Lexus LFA (2010-2012), 1LR-GUE 72° V10
@@ -476,8 +492,8 @@ below the first one, closer together and weaker toward idle.
   the pipes from each port to the first pipe that carries every cylinder's gas (the final collector,
   a turbo manifold's merge) or widens to 1.6× the header (a silencer, catalyst, expansion chamber),
   plus the port in the head (`scavPortLen`, 0.05 m) and the open end's correction (0.6 × the header's
-  radius). Reshape an exhaust and its scavenging moves with it; `--turbo yes` and the tuned versions
-  measure their own exhausts.
+  radius). Reshape an exhaust and its scavenging moves with it; the tuned versions measure their own
+  exhausts.
 
 The ripple multiplies both of ShiftCam's lobes and passes through the throttle like the rest of the
 breathing, so it also shows in the sound (each pulse scales with the air trapped). The effective
@@ -508,18 +524,18 @@ built from the engine's layout (`src/exhaust.hpp`), and they move with the engin
   under gravity. They run on simulated time, so slow motion slows them too. The inline-4 makes no pops, so
   it has no flames.
 
-### Turbocharger (`--turbo yes`, inline-4)
+### Turbocharger (the tuned inline-4)
 
-This section is the inline-4's optional turbo; the RS 3 (`rs3`) uses the same model, always on, with
-its own sizing.
+This section is the tuned inline-4's turbo (`--tuned yes`; it was `--turbo yes` before); the RS 3
+(`rs3`) uses the same model with its own sizing.
 
 ```bash
-./engine_sim --turbo yes
+./engine_sim --tuned yes
 ```
 
-The inline-4's exhaust then feeds a turbocharger (the Sketchfab "Car Turbocharger" model) hung beside
+The inline-4's exhaust feeds a turbocharger (the Sketchfab "Car Turbocharger" model) hung beside
 the block with its shaft along the car. The two header pairs merge above the turbine inlet, the
-downpipe leaves the turbine forward and turns back under the turbo to the catalyst, and the
+downpipe leaves the turbine forward and turns back under the turbo into the straight pipe, and the
 compressor draws through a cone filter and blows through a charge pipe into a front-mounted
 intercooler ahead of the crank snout; the cooled charge comes back up the intake side.
 
@@ -537,7 +553,7 @@ intercooler ahead of the crank snout; the cooled charge comes back up the intake
     (`chargeMax`: the most air per cycle, so the torque plateaus where the turbo could give more), as
     the RS 3 does; both are off here;
   - the spark backs off 8° per bar of boost, and 0.1° per K of charge over 320 K, against knock;
-    the clutch is made 1.5× stronger.
+    the clutch is 1.5× the stock one.
 - **Compressor and surge.** The air in the compressor's inlet duct has inertia and is pushed by
   the compressor map (a Greitzer model): the pressure rise peaks at the surge line and falls away
   on both sides. In normal running the compressor sits right of the peak and is stable. Shut the
@@ -557,7 +573,7 @@ intercooler ahead of the crank snout; the cooled charge comes back up the intake
 - **Sound.** On top of the engine's voice: the compressor whistle (its 6 blades and 6 splitters
   at the shaft speed, louder with the air it moves), the rush of air through it, the blow-off
   valve's hiss on each lift-off, and the surge flutter's chuffs without it. `SND_TURBO` scales them
-  when rendering a WAV. `--turbo yes --wav out.wav` drives the car through two full-throttle pulls
+  when rendering a WAV. `--tuned yes --wav out.wav` drives the car through two full-throttle pulls
   with lift-offs (add `--bov no` to hear the flutter).
 - **What it does (sim).** Boost comes in at ~3000 rpm and is held at 0.58 bar to the limiter:
   366 N·m at 4000–4500 rpm, 226 kW at 7000 rpm (225 N·m / 132 kW without). Floored at 3000 rpm, it
@@ -566,7 +582,7 @@ intercooler ahead of the crank snout; the cooled charge comes back up the intake
   wheelspin. The HUD shows the boost, wastegate, back pressure, charge and compressor-outlet
   temperatures, the blow-off valve and surge, and the shaft speed (~105–125k rpm on boost). The
   wheels are drawn turning at a readable speed in proportion to the shaft, since the real speed
-  would just strobe. `./engine_sim --turbo yes --phystest` checks all this.
+  would just strobe. `./engine_sim --tuned yes --phystest` checks all this.
 
 `engines/inline4_fit/build_turbo.py` splits the model (`engines/inline4_fit/turbocharger/`) into
 housing, rotor and bearing by geometry and writes `turbo.mesh`. `make` builds it when the model is
@@ -595,7 +611,7 @@ calibrated so that the published torque and power come out of the physics.
 | V | Wheelie control on/off (bikes) |
 | H / J | Hill up / down |
 | L | Cargo (car) / passenger (bikes) |
-| F | Blow-off valve on/off (`--turbo yes`); bypass valve on/off (`h2`) |
+| F | Blow-off valve on/off (`rs3`, the tuned `inline4`); bypass valve on/off (`h2`) |
 | `[` / `]` | Slow motion / back toward real time (×1 … ×0.01) |
 | `,` / `.` | When paused: step the crank by 1° |
 | G / B / M / D / X | See-through block / motion blur / mute / full-throttle dyno chart / shake view (×1, ×20, ×100) |
@@ -605,17 +621,16 @@ calibrated so that the published torque and power come out of the physics.
 
 | Option | |
 |---|---|
-| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `rs3`, `v4`, `s1000rr`, `h2`, `zx10r`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
+| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `rs3`, `lfa`, `v4`, `s1000rr`, `h2`, `zx10r`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
-| `--wav out.wav` | Render a scripted run to a WAV file. The bikes play a ride: start, blips, limiter, launch through the gears, braking with rev-matched downshifts. The inline-4 plays a start / rev / lift-off script; the RS 3 (and the inline-4 with `--turbo yes`) two full-throttle pulls in the car with lift-offs. |
+| `--wav out.wav` | Render a scripted run to a WAV file. The bikes play a ride: start, blips, limiter, launch through the gears, braking with rev-matched downshifts. The inline-4 plays a start / rev / lift-off script; the RS 3 (and the tuned inline-4) two full-throttle pulls in the car with lift-offs. |
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
 | `--grade pct --reverse --sport --manual --dct --no-wheelie` | Starting conditions (`--manual`: start in manual, in neutral; `--dct`: a car's manual mode is DCT) |
-| `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below; the RS 3 always has its own). With `--phystest`, runs the turbo checks; with `--wav`, plays the turbo drive |
-| `--bov yes\|no` | With the turbo: fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
-| `--variant name` | Another version of the engine (`rs3`, `v4`, `s1000rr`, `h2`, `zx10r` and `mxking` have one: `tuned`) |
+| `--bov yes\|no` | A turbo engine (`rs3`, the tuned `inline4`): fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
+| `--variant name` | Another version of the engine (every engine has one: `tuned`) |
 | `--tuned yes\|no` | Same as `--variant tuned` (default `no`) |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 | `--synthtest N` | Hidden: test an N-cylinder inline engine built in memory (see [Testing](#testing)) |
@@ -632,7 +647,7 @@ src/
   render.hpp                OpenGL 2.1 renderer, combustion glow, motion blur, gear meshes
   exhaust.hpp               exhaust systems (3D): swept tubes from each engine's layout, heat, gas pulses, valve, crackle fire
   exhaust_layouts.hpp       layouts more than one engine uses (the inline superbike 4-2-1)
-  turbo.hpp                 the turbocharger (--turbo yes): see-through housings, spinning rotor, spool
+  turbo.hpp                 the turbocharger (rs3, the tuned inline4): see-through housings, spinning rotor, spool
   physics.hpp               engine model, ECU, drivetrain, vehicle (parameter structs + engineSim)
   presets.hpp               starting points for a class of engine (the superbike engine and drivetrain)
   engine_type.hpp           engineType: what an engine provides; bikeSpec / carSpec (test targets); REGISTER_ENGINE
@@ -650,7 +665,7 @@ engines/
   all.hpp                   generated by the Makefile: includes every engine's header (not in git)
   <type>/engine.mk          each engine's part of the Makefile: its header, meshes and mesh rule
   inline4_fit/              inline4_fit.hpp (engine + Honda Fit gearing + car spec + type), gearbox_manual.hpp
-                            (3D car gearbox, single or dual clutch), test_inline4.hpp (--turbo yes test), extract_parts.py, scene.gltf/.bin, license.txt,
+                            (3D car gearbox, single or dual clutch), test_inline4.hpp (the tuned version's turbo test), extract_parts.py, scene.gltf/.bin, license.txt,
                             engine.mesh, tests/ (pixel baselines), build_turbo.py, turbocharger/
                             (turbo model), turbo.mesh
   audi_rs3/                 audi_rs3.hpp (engine, turbo, sound, S tronic gearing, exhaust, car spec, type),
@@ -771,7 +786,7 @@ The 3D model is ["Inline-4 Engine" by rafaelaraujo55](engines/inline4_fit/licens
 CC-BY-4.0. The credit line is shown on screen. The V4, S 1000 RR, H2, ZX-10R, MX King and RS 3 are built from its parts.
 
 The turbocharger is ["Car Turbocharger" by ml-design](engines/inline4_fit/turbocharger/license.txt),
-licensed CC-BY-4.0; its credit line is shown on screen with `--turbo yes` and on the RS 3.
+licensed CC-BY-4.0; its credit line is shown on screen on the tuned inline-4 and on the RS 3.
 
 Published figures come from Ducati, BMW Motorrad (technical data and press material), Audi (RS 3 press
 and technical data) and Honda's 2010 Fit specifications. This is a simulation, not manufacturer data.

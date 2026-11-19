@@ -49,8 +49,8 @@ const engineType *findEngineType(std::string name) {
 }
 
 // load the engine's parameter sets, then init. stand: a bike engine on a stand, nothing downstream
-// of the crank (manual, neutral). turbo: --turbo yes (the clutch gets a stronger spring for the boost)
-void setupSim(engineSim &sim, const engineModel &e, const engineType &type, double theta1, bool stand = false, bool turbo = false) {
+// of the crank (manual, neutral)
+void setupSim(engineSim &sim, const engineModel &e, const engineType &type, double theta1, bool stand = false) {
     sim.P = type.engine();
     sim.drive.P = type.drive();
     validateDrivetrain(sim.drive.P);
@@ -58,17 +58,15 @@ void setupSim(engineSim &sim, const engineModel &e, const engineType &type, doub
     if ((type.boost == builtInBoost::supercharger) != sim.P.turbo.supercharger)
         throw std::runtime_error(std::string(type.id) + ": engineType::boost (" + boostName(type.boost) +
                                  ") disagrees with engineParams::turbo.supercharger");
-    sim.P.turbo.on = turbo || type.boost != builtInBoost::none;
-    // the exhaust's pressure-wave tuning: its header length from the drawn layout (the one the window
-    // shows: --turbo yes has its own), unless the engine gives one
+    sim.P.turbo.on = type.boost != builtInBoost::none;
+    // the exhaust's pressure-wave tuning: its header length from the drawn layout, unless the engine
+    // gives one
     if (sim.P.scavGain != 0.0 && sim.P.scavLen <= 0.0) {
         exhaustLayout L;
-        if (turbo && type.exhaustTurbo) L = type.exhaustTurbo(e);
-        else if (type.exhaust) L = type.exhaust(e);
+        if (type.exhaust) L = type.exhaust(e);
         double r = 0.0, h = headerLength(L, static_cast<int>(e.cyls.size()), 1.6f, &r);
         if (h > 0.0) sim.P.scavLen = h + sim.P.scavPortLen + 0.6 * r;
     }
-    if (turbo && !sim.P.turbo.supercharger) sim.drive.P.clutchCapacity *= 1.5;  // --turbo yes on an engine built without
     sim.drive.P.qsMaxRpm = sim.P.revLimit;  // no quickshift / DCT shift down past the limiter
     if (type.bike) {
         sim.standalone = stand;

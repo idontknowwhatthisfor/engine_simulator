@@ -86,7 +86,7 @@ drivetrainParams inline4FitDriveParams() {
 // catalyst, a mid pipe, the silencer and a tailpipe, run back beside the gearbox. The model has no
 // head, so the runners leave the block's side face just under the deck (mesh +x, "up" is -y, rear +z).
 //
-// With --turbo yes the two pairs merge above a turbocharger hung beside the block, shaft along the car:
+// The tuned version (--tuned yes): the two pairs merge above a turbocharger hung beside the block, shaft along the car:
 // the turbine inlet faces up into the merge, the turbine outlet faces forward and the downpipe turns
 // down and back under the turbo to the catalyst. The compressor (rear) draws through a cone filter
 // and blows out sideways into a charge pipe that runs forward to a front-mounted intercooler; the
@@ -160,6 +160,16 @@ exhaustLayout inline4FitExhaustWith(const engineModel &e, bool turbo) {
         pipe({{IC_L + 20.f, 150.f, IC_Z1 - 10.f}, {IC_L + 20.f, 150.f, IC_Z1 + 40.f}, {IC_L + 30.f, 40.f, -300.f},
               {IC_L + 40.f, -120.f, -240.f}, {IC_L + 45.f, -200.f, -200.f}}, 30.f, 30.f, {}, ALU, true);
     }
+    if (turbo) {
+        // straight pipe: no catalyst or silencer, the downpipe's 3 in carried straight back to a big
+        // burnt-titanium tip
+        const std::array<float, 4> BURNT{0.42f, 0.38f, 0.52f, 1.f};
+        int run = pipe({{240.f, lineY, 200.f}, {240.f, lineY, 480.f}, {240.f, lineY, 700.f}}, 30.f, 30.f, {col}, STEEL);
+        pipe({{240.f, lineY, 695.f}, {240.f, lineY, 765.f}}, 40.f, 42.f, {run}, BURNT, true);
+        L.pipes.back().metal = 0.95f; L.pipes.back().rough = 0.25f;
+        L.outlets.push_back({{240.f, lineY, 765.f}, {0.f, 0.f, 1.f}, 40.f});
+        return L;
+    }
     int cat = pipe({{240.f, lineY, 200.f}, {240.f, lineY, 360.f}}, 55.f, 55.f, {col}, ALU, true);
     int mid = pipe({{240.f, lineY, 355.f}, {240.f, lineY, 480.f}}, 25.f, 25.f, {cat}, ALU);
     int muf = pipe({{240.f, lineY, 475.f}, {240.f, lineY, 665.f}}, 66.f, 66.f, {mid}, ALU, true);
@@ -169,6 +179,8 @@ exhaustLayout inline4FitExhaustWith(const engineModel &e, bool turbo) {
 }
 exhaustLayout inline4FitExhaust(const engineModel &e) { return inline4FitExhaustWith(e, false); }
 exhaustLayout inline4FitTurboExhaust(const engineModel &e) { return inline4FitExhaustWith(e, true); }
+
+const engineType &inline4FitTunedType();  // --tuned yes, below
 
 const engineType &inline4FitType() {
     static const engineType T = [] {
@@ -187,13 +199,58 @@ const engineType &inline4FitType() {
         t.drive = inline4FitDriveParams;
         t.physTest = physicsTestCar;
         t.car = inline4FitCar;
-        t.physTestTurbo = physicsTestInline4Turbo;
         t.exhaust = inline4FitExhaust;
-        t.exhaustTurbo = inline4FitTurboExhaust;
-        t.turboMeshFile = "engines/inline4_fit/turbo.mesh";
-        t.turboBuildHint = "python3 -I engines/inline4_fit/build_turbo.py";
-        t.turboCredit = "turbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0";
         t.hudFiringLine = false;   // the car's HUD lists the strokes without the order's name
+        t.variants = {{"tuned", inline4FitTunedType}};
+        return t;
+    }();
+    return T;
+}
+
+// ---- --tuned yes: the turbocharged inline-4 -----------------------------------------------------------
+// The same engine with a turbo hung beside the block (src/physics.hpp turboParams' defaults: ~0.6 bar)
+// and the front-mounted intercooler, always on, and a straight-pipe exhaust after the turbine: no
+// catalyst or silencer. Its own test: physicsTestInline4Turbo. The straight pipe changes the sound
+// only: past the turbine the gas goes to the atmosphere either way in the model (stepTurbo), and the
+// header's waves reflect at the merge over the turbine, upstream of it.
+engineParams inline4FitTunedParams() {
+    engineParams P = inline4FitParams();
+    // no silencer: louder and brighter, the pipe's ring left in. The turbine takes the edge off the
+    // pulses, so it is a loud, raw drone rather than a scream
+    soundParams &S = P.sound;
+    S.pipeLowHz = 1300.0;
+    S.pipeResGain = 1.8;
+    S.masterHz = 9000.0;
+    S.drive = 0.85;
+    return P;
+}
+
+drivetrainParams inline4FitTunedDriveParams() {
+    drivetrainParams P = inline4FitDriveParams();
+    P.clutchCapacity *= 1.5;        // a stronger clutch spring for the boost
+    return P;
+}
+
+const engineType &inline4FitTunedType() {
+    static const engineType T = [] {
+        engineType t = inline4FitType();
+        t.id = "inline4-tuned";
+        t.name = "inline-4 (turbo)";
+        t.summary = "2.3 L inline-4 with a turbocharger (~0.6 bar), front-mounted intercooler and a straight pipe, Honda Fit gearing";
+        t.label = "inline-4, 2.3 L turbo, straight pipe";
+        t.windowTitle = "inline-4 engine (turbo)";
+        t.hudTag = "TURBO";
+        t.boost = builtInBoost::turbo;  // always on
+        t.engine = inline4FitTunedParams;
+        t.drive = inline4FitTunedDriveParams;
+        t.physTest = physicsTestInline4Turbo;
+        t.exhaust = inline4FitTurboExhaust;
+        t.turboMeshFile = "engines/inline4_fit/turbo.mesh";
+        t.turboBuildHint = "python3 -I engines/inline4_fit/build_turbo.py (needs make assets)";
+        // without that optional download: the RS 3's procedural turbo, its ports in the same places
+        t.turboFallbackMeshFile = "engines/audi_rs3/rs3_turbo.mesh";
+        t.turboCredit = "turbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0";
+        t.variants.clear();  // a variant has no variants of its own
         return t;
     }();
     return T;

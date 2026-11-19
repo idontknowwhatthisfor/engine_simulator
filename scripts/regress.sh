@@ -39,13 +39,12 @@ JITTER_PIXELS=50
 JITTER_LEVELS=8
 
 # name|arguments: every engine and version of one, from `--engine-type list --ids` ("h2 --variant tuned"
-# -> "h2-tuned|--engine-type h2 --variant tuned", "inline4 --turbo yes" -> "inline4-turbo|...")
+# -> "h2-tuned|--engine-type h2 --variant tuned")
 [[ -x $BIN ]] || make engine_sim >/dev/null || exit 2
 VARIANTS=()
 while read -r id extra; do
     name=$id
     case "$extra" in
-        "--turbo yes") name=$id-turbo ;;
         --variant\ *) name=$id-${extra#--variant } ;;
     esac
     VARIANTS+=("$name|--engine-type $id${extra:+ $extra}")

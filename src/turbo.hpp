@@ -1,4 +1,4 @@
-// the turbocharger (--turbo yes): the Sketchfab "Car Turbocharger" model, split by
+// the turbocharger (the tuned inline-4's and the RS 3's): the Sketchfab "Car Turbocharger" model, split by
 // engines/inline4_fit/build_turbo.py into turbo.mesh. The housings are drawn see-through like the
 // engine block (hidden with it, G), so the compressor wheel, shaft, bearing and turbine wheel show.
 // The rotor turns at the shaft speed of the physics' turbo (engineSim::stepTurbo), which makes the boost.

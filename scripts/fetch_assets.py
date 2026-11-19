@@ -64,7 +64,7 @@ def main():
     failed = False
     for a in manifest["files"]:
         tag = a.get("tag", manifest["tag"])  # a file can live on its own release
-        optional = a.get("optional", False)  # e.g. the turbo model: missing only disables --turbo yes
+        optional = a.get("optional", False)  # e.g. the turbo model: missing, the procedural turbo is drawn
         dest = os.path.join(ROOT, a["path"])
         if not force and os.path.exists(dest) and sha256(dest) == a["sha256"]:
             print(f"ok       {a['path']}")

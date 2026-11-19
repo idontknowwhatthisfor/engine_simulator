@@ -45,7 +45,6 @@ struct options {
     bool sport = false;      // automatic sport mode
     bool manual = false;     // start in manual (neutral), not automatic
     bool dct = false;        // a car's manual mode starts in DCT (Z switches)
-    bool turbo = false;      // --turbo yes: a turbocharger in the exhaust (inline-4)
     bool bov = true;         // --bov no: the turbo without its blow-off valve (it surges on lift-off)
     std::string variant;     // --variant name: another version of the engine (--tuned yes = --variant tuned)
     std::string wav;         // --wav out.wav: render a scripted run to a file and quit
@@ -89,12 +88,6 @@ options parseArgs(int argc, char **argv) {
         else if (a == "--sport") o.sport = true;
         else if (a == "--manual") o.manual = true;
         else if (a == "--dct") o.dct = true;
-        else if (a == "--turbo" || a.rfind("--turbo=", 0) == 0) {
-            std::string v = a == "--turbo" ? next() : a.substr(8);
-            if (v == "yes") o.turbo = true;
-            else if (v == "no") o.turbo = false;
-            else throw std::runtime_error("--turbo takes yes or no, not \"" + v + "\"");
-        }
         else if (a == "--tuned" || a.rfind("--tuned=", 0) == 0) {
             std::string v = a == "--tuned" ? next() : a.substr(8);
             if (v == "yes") {
@@ -136,7 +129,6 @@ options parseArgs(int argc, char **argv) {
 void listEngineIds(std::FILE *out) {
     for (const engineType *t : engineTypes()) {
         std::fprintf(out, "%s\n", t->id);
-        if (t->exhaustTurbo && t->physTestTurbo) std::fprintf(out, "%s --turbo yes\n", t->id);
         for (const engineVariant &v : t->variants) std::fprintf(out, "%s --variant %s\n", t->id, v.name);
     }
 }
@@ -160,7 +152,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type %s] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
                              "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--manual] [--dct] [--no-wheelie]\n"
-                             "                  [--turbo yes|no] [--bov yes|no] [--tuned yes|no] [--variant name]\n"
+                             "                  [--bov yes|no] [--tuned yes|no] [--variant name]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
                              "       engine_sim --engine-type list [--ids]\n", ex.what(), ids.c_str());
@@ -203,18 +195,6 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s: %s\n", type.name, ex.what());
         return 1;
     }
-    if (opt.turbo && !type.exhaustTurbo) {
-        if (type.boost != builtInBoost::none)
-            std::fprintf(stderr, "--turbo yes: the %s already has its %s\n", type.name, boostName(type.boost));
-        else {
-            std::string have;  // the engines that do have a turbo layout
-            for (const engineType *t : engineTypes())
-                if (t->exhaustTurbo) have += std::string(have.empty() ? "" : ", ") + t->id;
-            std::fprintf(stderr, "--turbo yes: the %s has no turbo layout (%s)\n", type.name,
-                         have.empty() ? "no engine has one" : ("only " + have + " has one").c_str());
-        }
-        return 1;
-    }
 
     engineModel eng;
     try {
@@ -223,10 +203,10 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s (run: %s, or make)\n", ex.what(), type.buildHint);
         return 1;
     }
-    if (opt.dumpParams) return dumpParams(eng, type, opt.turbo, opt.bov);
+    if (opt.dumpParams) return dumpParams(eng, type, opt.bov);
     if (opt.dyno) {
         engineSim s;
-        setupSim(s, eng, type, eng.cyls[0].theta0, false, opt.turbo);
+        setupSim(s, eng, type, eng.cyls[0].theta0);
         applyCalibrationEnv(s.P);
         return dynoSweep{}.print(s);
     }
@@ -235,13 +215,13 @@ int main(int argc, char **argv) {
         if (type.spec) pattern = type.spec().pattern;
         return selfTest(eng, type.name, pattern);
     }
-    if (opt.phystest) return opt.turbo ? type.physTestTurbo(eng, type) : type.physTest(eng, type);
-    if (!opt.wav.empty()) return renderWav(eng, type, opt.wav, opt.turbo, opt.bov);
+    if (opt.phystest) return type.physTest(eng, type);
+    if (!opt.wav.empty()) return renderWav(eng, type, opt.wav, opt.bov);
 
     // engine state; theta of cylinder 1 starts at the model's rest pose unless --crank says otherwise
     const double THETA0 = opt.crankDeg < 0.f ? eng.cyls[0].theta0 : opt.crankDeg * DEGR;
     engineSim sim;
-    setupSim(sim, eng, type, THETA0, type.bike && opt.engineOnly, opt.turbo);
+    setupSim(sim, eng, type, THETA0, type.bike && opt.engineOnly);
     sim.P.turbo.bov = opt.bov;
     // the full-throttle dyno curve (D), measured in the background on a copy of the engine
     dynoSweep dyno;
@@ -310,12 +290,12 @@ int main(int argc, char **argv) {
     turboModel turbo;
     bool turboModelCredit = true;  // the turbo drawn is the one turboCredit names (not a fallback)
     bool showExhaust = !opt.engineOnly && type.exhaust;
-    // the turbo, the supercharger, or a factory turbo
-    bool showTurbo = showExhaust && (opt.turbo || type.boost != builtInBoost::none);
+    // the turbo or the supercharger the engine is built with
+    bool showTurbo = showExhaust && type.boost != builtInBoost::none;
     if (showExhaust) {
         exhaustLayout layout;
         try {
-            layout = opt.turbo ? type.exhaustTurbo(eng) : type.exhaust(eng);
+            layout = type.exhaust(eng);
             exhaust.build(layout, static_cast<int>(eng.cyls.size()));
         } catch (const std::exception &ex) {
             std::fprintf(stderr, "%s\n", ex.what());
@@ -417,7 +397,7 @@ int main(int argc, char **argv) {
     sf::Text text(font, "", 16);
     sf::Text help(font, helpText(sim), 14);
     help.setFillColor(sf::Color(150, 150, 160));
-    sf::Text credit(font, std::string(type.credit) + (showTurbo && turboModelCredit && (opt.turbo || type.boost == builtInBoost::turbo) && *type.turboCredit ? std::string("\n") + type.turboCredit : ""), 12);
+    sf::Text credit(font, std::string(type.credit) + (showTurbo && turboModelCredit && type.boost == builtInBoost::turbo && *type.turboCredit ? std::string("\n") + type.turboCredit : ""), 12);
     credit.setFillColor(sf::Color(110, 110, 120));
 
     std::vector<mat4> modelOf;

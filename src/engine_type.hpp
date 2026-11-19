@@ -157,14 +157,13 @@ struct engineType {
     const char *meshFile = "";             // relative to the project root
     const char *buildHint = "";            // how to make the mesh when it is missing
     bool bike = false;                     // bike drivetrain, bike gearbox, superbike tests
-    // the boost the engine is built with, always on (the H2's supercharger, the RS 3's turbo): its
-    // exhaust() places turboMeshFile, drawn and spun like --turbo yes. It must agree with
-    // engine().turbo.supercharger (setupSim checks). none: --turbo yes may still fit one (exhaustTurbo)
+    // the boost the engine is built with, always on (the H2's supercharger, the RS 3's and the tuned
+    // inline-4's turbo): its exhaust() places turboMeshFile, drawn and spun with the engine. It must
+    // agree with engine().turbo.supercharger (setupSim checks)
     builtInBoost boost = builtInBoost::none;
     engineParams (*engine)() = nullptr;    // engine physics and sound
     drivetrainParams (*drive)() = nullptr; // clutch, gearbox and vehicle
     int (*physTest)(const engineModel &, const engineType &) = nullptr;  // --phystest
-    int (*physTestTurbo)(const engineModel &, const engineType &) = nullptr;  // --turbo yes --phystest
     bikeSpec (*spec)() = nullptr;          // bikes: --phystest targets
     carSpec (*car)() = nullptr;            // cars on physicsTestCar: --phystest targets
     // bike gearbox drawing (src/bike_gearbox.hpp): which side of the crank the box goes (+1 toward +x,
@@ -173,13 +172,11 @@ struct engineType {
     float gearboxSide = 1.f, primaryModule = 2.6f;
     // the exhaust system (src/exhaust.hpp): headers from the ports to the tailpipe, in mesh space
     exhaustLayout (*exhaust)(const engineModel &) = nullptr;
-    // --turbo yes: the exhaust with a turbocharger in it (its turboSpec places src/turbo.hpp's model)
-    exhaustLayout (*exhaustTurbo)(const engineModel &) = nullptr;
     const char *turboMeshFile = "";        // relative to the project root
     const char *turboFallbackMeshFile = "";  // drawn when turboMeshFile cannot be loaded (the RS 3's procedural
                                            // turbo, in place of the optional downloaded model); "": none
     const char *turboBuildHint = "";
-    const char *turboCredit = "";          // --turbo yes: the turbo model's licence line, under credit
+    const char *turboCredit = "";          // a turbo engine: the turbo model's licence line, under credit
     bool hudFiringLine = true;             // the HUD names the firing order above the cylinders' strokes
     std::vector<rideStep> ride;            // bikes: the --wav demo ride (empty: the stand script)
     std::vector<engineVariant> variants;   // other versions of this engine (--variant name)
