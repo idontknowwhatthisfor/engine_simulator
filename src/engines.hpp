@@ -54,8 +54,11 @@ void setupSim(engineSim &sim, const engineModel &e, const engineType &type, doub
     sim.P = type.engine();
     sim.drive.P = type.drive();
     validateDrivetrain(sim.drive.P);
-    // a supercharged engine, or a factory turbo engine, always has it
-    sim.P.turbo.on = turbo || sim.P.turbo.supercharger || type.turbocharged;
+    // an engine built with a turbo or a supercharger always has it
+    if ((type.boost == builtInBoost::supercharger) != sim.P.turbo.supercharger)
+        throw std::runtime_error(std::string(type.id) + ": engineType::boost (" + boostName(type.boost) +
+                                 ") disagrees with engineParams::turbo.supercharger");
+    sim.P.turbo.on = turbo || type.boost != builtInBoost::none;
     if (turbo && !sim.P.turbo.supercharger) sim.drive.P.clutchCapacity *= 1.5;  // --turbo yes on an engine built without
     sim.drive.P.qsMaxRpm = sim.P.revLimit;  // no quickshift / DCT shift down past the limiter
     if (type.bike) {

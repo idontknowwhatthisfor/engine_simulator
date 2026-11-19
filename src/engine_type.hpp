@@ -61,6 +61,57 @@ struct bikeSpec {
     double downshiftMaxMs = 200.0;                     // a rev-matched quickshift down takes at most this
 };
 
+// what the car physics test (physicsTestCar, src/test_car.hpp) expects from a car (published figures,
+// with tolerance). The engine's balance and firing order are checked against its own geometry, so
+// they need no targets; the turbo checks run for an engine with its boost always on.
+struct rpmTarget {
+    double rpm, lo, hi;                    // the WOT dyno at rpm (a multiple of 500) must read lo .. hi
+};
+struct carSpec {
+    const char *name = "";
+    double dispLo = 0.0, dispHi = 0.0;     // cc
+    // on the stand, in neutral
+    double crankLo = 150.0, crankHi = 350.0;     // cranking speed with the ignition off, mean rpm
+    double flareLo = 850.0, flareHi = 2000.0;    // start flare, peak rpm
+    double idleLo = 750.0, idleHi = 850.0;       // idle speed, mean rpm
+    double idleMapLo = 20.0, idleMapHi = 50.0;   // idle manifold pressure, kPa
+    double toLimiterLo = 0.5, toLimiterHi = 2.5; // s from idle to the limiter, full throttle
+    double limiterOver = 400.0;                  // peak rpm on the limiter: revLimit .. revLimit + this
+    double liftLo = 700.0, liftHi = 950.0;       // rpm 4 s after lifting off the limiter
+    // WOT dyno, speed locked, from 1000 rpm in 500 rpm steps
+    double sweepTo = 7000.0;
+    const char *torqueWhat = "peak torque";
+    double torqueLo = 0.0, torqueHi = 0.0;       // N m
+    double torqueRpmLo = 0.0, torqueRpmHi = 0.0;
+    const char *powerWhat = "peak power";
+    double powerLo = 0.0, powerHi = 0.0;         // kW
+    double powerRpmLo = 0.0, powerRpmHi = 0.0;
+    std::vector<rpmTarget> torqueAt, powerAt;    // more points on the curves (N m, kW)
+    double plateauFrom = 0.0, plateauTo = 0.0, plateauMax = 0.0;  // torque max - min over this range (0: none)
+    // a boosted engine (engineType::boost): turbo checks
+    double cylMaxLo = 80.0, cylMaxHi = 150.0;    // highest cylinder pressure on the dyno, bar
+    double turboMaxLo = 80.0, turboMaxHi = 180.0;  // highest shaft speed on the dyno, krpm
+    double spoolRpm = 2500.0;                    // floored from part pedal at this held speed...
+    double spoolLo = 0.3, spoolHi = 2.5;         // ... s to 90% of the boost target
+    // the car
+    const char *carWhat = "";                    // headline for the car section
+    const char *zeroTo100What = "0-100 km/h at full throttle";
+    double zeroTo100Lo = 0.0, zeroTo100Hi = 0.0;  // s
+    const char *zeroTo200What = nullptr;         // nullptr: no 0-200 check
+    double zeroTo200Lo = 0.0, zeroTo200Hi = 0.0;
+    double launchLo = 0.0, launchHi = 0.0;       // peak rpm in the first 0.6 s of a WOT launch (0: no check)
+    double wotUpLo = 0.0;                        // lowest WOT upshift rpm (at most the limiter + 100)
+    double lightUpLo = 2000.0, lightUpHi = 3500.0;  // first upshift at 20% pedal, rpm
+    double hillPedal = 0.35, hillGrade = 0.12;   // cruise at this pedal 15 s, then this grade...
+    int flatGearLo = 3, flatGearHi = 5;          // ... the gear it cruises in on the flat
+    double coastDownLo = 0.0, coastDownHi = 0.0;  // normal mode, coasting: first downshift rpm (0: no check)
+    bool dumpStalls = true;                      // manual: dumping the clutch at idle in 1st stalls it
+    double reverseLo = -40.0, reverseHi = -5.0;  // km/h after 4 s in R at 25% pedal
+};
+
+struct engineType;
+int physicsTestCar(const engineModel &e, const engineType &t);  // src/test_car.hpp
+
 // one step of a scripted ride for --wav (bikes): hold these controls until `until` seconds
 struct rideStep {
     double until;
@@ -72,6 +123,11 @@ struct rideStep {
 };
 
 struct engineType;
+
+enum class builtInBoost { none, turbo, supercharger };
+const char *boostName(builtInBoost b) {
+    return b == builtInBoost::turbo ? "turbo" : b == builtInBoost::supercharger ? "supercharger" : "none";
+}
 int physicsTestBike(const engineModel &e, const engineType &t);  // src/test_bike.hpp
 
 // another version of an engine (--variant name): a whole engineType of its own (params, test targets,
@@ -95,16 +151,16 @@ struct engineType {
     const char *meshFile = "";             // relative to the project root
     const char *buildHint = "";            // how to make the mesh when it is missing
     bool bike = false;                     // bike drivetrain, bike gearbox, superbike tests
-    bool supercharged = false;             // always boosted (engine().turbo.supercharger): its exhaust() places
-                                           // turboMeshFile, drawn and spun like --turbo yes
-    bool turbocharged = false;             // always has its exhaust turbo (a factory turbo engine, the Audi
-                                           // RS 3): the turbo is on without --turbo yes, and exhaust() places
-                                           // turboMeshFile. A missing turbo mesh only leaves the turbo undrawn
+    // the boost the engine is built with, always on (the H2's supercharger, the RS 3's turbo): its
+    // exhaust() places turboMeshFile, drawn and spun like --turbo yes. It must agree with
+    // engine().turbo.supercharger (setupSim checks). none: --turbo yes may still fit one (exhaustTurbo)
+    builtInBoost boost = builtInBoost::none;
     engineParams (*engine)() = nullptr;    // engine physics and sound
     drivetrainParams (*drive)() = nullptr; // clutch, gearbox and vehicle
     int (*physTest)(const engineModel &, const engineType &) = nullptr;  // --phystest
     int (*physTestTurbo)(const engineModel &, const engineType &) = nullptr;  // --turbo yes --phystest
     bikeSpec (*spec)() = nullptr;          // bikes: --phystest targets
+    carSpec (*car)() = nullptr;            // cars on physicsTestCar: --phystest targets
     // bike gearbox drawing (src/bike_gearbox.hpp): which side of the crank the box goes (+1 toward +x,
     // -1 toward -x) and the primary gear module. Where the crank's primary gear sits along the crank
     // comes from the mesh (zPrimary, see primaryGearZ)
@@ -114,6 +170,8 @@ struct engineType {
     // --turbo yes: the exhaust with a turbocharger in it (its turboSpec places src/turbo.hpp's model)
     exhaustLayout (*exhaustTurbo)(const engineModel &) = nullptr;
     const char *turboMeshFile = "";        // relative to the project root
+    const char *turboFallbackMeshFile = "";  // drawn when turboMeshFile cannot be loaded (the RS 3's procedural
+                                           // turbo, in place of the optional downloaded model); "": none
     const char *turboBuildHint = "";
     const char *turboCredit = "";          // --turbo yes: the turbo model's licence line, under credit
     bool hudFiringLine = true;             // the HUD names the firing order above the cylinders' strokes

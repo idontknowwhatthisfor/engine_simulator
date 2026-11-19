@@ -43,7 +43,7 @@ engineParams ducatiV4Params() {
     // longer headers from both banks (lower, darker pipe modes), a bigger bass body, an exhaust
     // valve, the airbox under the tank, crackle on the overrun and the Desmo valvetrain's clatter
     soundParams &S = P.sound;
-    S.superbike = true;
+    S.detailed = true;
     S.pipeLength = 1.45;            // front and rear bank headers merge under the engine, ~1.45 m to the tail
     S.pipeReflect = 0.6; S.pipeDampHz = 2800.0;
     S.pipeLowHz = 4500.0; S.pipeResHz = 150.0; S.pipeResGain = 0.2;

@@ -38,7 +38,7 @@ engineParams kawasakiZx10rParams() {
     // the rider), crackle on the overrun, straight-cut gear whine
     P.sound = soundParams();        // its own voice, from the defaults
     soundParams &S = P.sound;
-    S.superbike = true;
+    S.detailed = true;
     S.pipeLowHz = 2400.0; S.pipeResHz = 210.0; S.pipeResGain = 0.6;
     S.pipeLength = 1.2;
     S.masterHz = 11500.0;

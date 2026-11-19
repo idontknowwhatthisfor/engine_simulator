@@ -52,7 +52,7 @@ struct engineSound {
     biquad dcBlock, pipeLow, pipeRes, turbulence, intake, clatter, master;
     std::uint32_t rng = 0x12345678u;
     double gearPhase = 0.0, armaturePhase = 0.0;
-    // superbike stages
+    // the detailed voice's stages (soundParams::detailed)
     std::vector<double> pipeBuf;      // round trip of the exhaust pipe
     std::size_t pipePos = 0;
     double pipeFrac = 0.0, pipeDampZ = 0.0, pipeDampA = 0.0;
@@ -85,7 +85,7 @@ struct engineSound {
         bovHigh = biquad::make(biquad::HIGHPASS, fs, 1200.0, 0.707);
         flutterBand = biquad::make(biquad::BANDPASS, fs, 900.0, 1.2);
         flutterThump = biquad::make(biquad::LOWPASS, fs, 160.0, 0.707);
-        if (sp.superbike) {
+        if (sp.detailed) {
             // the quarter-wave pipe: one round trip (2L / c) of delay with an inverting, lossy
             // reflection at the open end
             double delay = 2.0 * sp.pipeLength / sp.gasSpeed * fs;
@@ -128,7 +128,7 @@ struct engineSound {
         const double TWO_PI = 2.0 * 3.14159265358979323846;
         double exhaust = 0.0, intakeFlow = 0.0, heat = 0.0;
         int opened = 0;  // exhaust valves that opened this sample
-        if (sp.superbike && lastRegion.size() != sim.cyl.size()) lastRegion.assign(sim.cyl.size(), -1);
+        if (sp.detailed && lastRegion.size() != sim.cyl.size()) lastRegion.assign(sim.cyl.size(), -1);
         for (int c = 0; c < sim.cylCount(); c++) {
             const cylinderState &s = sim.cyl[c];
             double x, dx, d2x;
@@ -142,7 +142,7 @@ struct engineSound {
                 double fullCharge = sim.P.pAtm * s.vDisp / (sim.P.rGas * sim.P.tIntake);
                 double charge = std::sqrt(std::clamp(s.mAir / fullCharge, 0.0, 1.0));
                 double blow = (dp >= 0.0 ? 1.0 : -0.5) * std::sqrt(std::fabs(dp));
-                if (sp.superbike) {
+                if (sp.detailed) {
                     // the valve takes ~30 deg to lift: the blowdown swells in instead of stepping
                     // (a step would radiate as a click on every opening)
                     double since = std::fmod(sim.phase(c) - sim.P.evo + 4.0 * CYCLE, CYCLE) / DEGR;
@@ -153,13 +153,13 @@ struct engineSound {
             }
             if (s.region == 0) intakeFlow += std::max(0.0, pistonSpeed) * sim.pMan / sim.P.pAtm;
             heat += s.heatRate;
-            if (sp.superbike) {
+            if (sp.detailed) {
                 if (s.region == 2 && lastRegion[c] != 2 && lastRegion[c] >= 0) opened++;
                 lastRegion[c] = s.region;
             }
         }
         double ex = dcBlock.run(exhaust);
-        if (!sp.superbike) {
+        if (!sp.detailed) {
             double body = pipeLow.run(ex) + sp.pipeResGain * pipeRes.run(ex);
             double rasp = 0.6 * turbulence.run(noise() * exhaust);
             double induction = intake.run(0.4 * intakeFlow + 3.0 * sim.throttleFlow * noise());
@@ -168,7 +168,7 @@ struct engineSound {
             return static_cast<float>(0.8 * std::tanh(sp.drive * mix));
         }
 
-        // ---- superbike voice -------------------------------------------------------------------
+        // ---- detailed voice (soundParams::detailed) ----------------------------------------------
         double rpm = std::fabs(sim.rpm());
         double demand = std::max(sim.pedal, sim.blip);
         // exhaust flap: opens with revs or throttle (a servo, ~0.3 s)

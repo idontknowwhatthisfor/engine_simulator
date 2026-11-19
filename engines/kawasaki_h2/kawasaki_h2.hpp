@@ -73,7 +73,7 @@ engineParams kawasakiH2Params() {
     // over everything (src/sound.hpp turboVoice: blade pass of the 6 blades and 6 splitters, the
     // rush of air, the bypass valve's chirp when the throttles snap shut)
     soundParams &S = P.sound;
-    S.superbike = true;
+    S.detailed = true;
     S.pipeResGain = 0.6;
     S.masterHz = 12000.0;
     S.drive = 0.25;
@@ -154,7 +154,7 @@ const engineType &kawasakiH2Type() {
         t.meshFile = "engines/kawasaki_h2/h2.mesh";
         t.buildHint = "python3 -I engines/kawasaki_h2/build_h2.py";
         t.bike = true;
-        t.supercharged = true;
+        t.boost = builtInBoost::supercharger;
         t.engine = kawasakiH2Params;
         t.drive = kawasakiH2DriveParams;
         t.physTest = physicsTestBike;

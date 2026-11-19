@@ -33,12 +33,13 @@ struct paramDumper {
 static_assert(sizeof(soundParams) == 240, "soundParams changed: update dumpSound()");
 static_assert(sizeof(turboParams) == 328, "turboParams changed: update dumpTurbo()");
 static_assert(sizeof(engineParams) == 1072, "engineParams changed: update dumpEngine()");
-static_assert(sizeof(drivetrainParams) == 440, "drivetrainParams changed: update dumpDrive()");
+static_assert(sizeof(drivetrainParams) == 448, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
+static_assert(sizeof(carSpec) == 504, "carSpec changed: update dumpCarSpec()");
 
 void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, pipeLowHz); DUMP(d, S, pipeResHz); DUMP(d, S, pipeResGain); DUMP(d, S, masterHz);
-    DUMP(d, S, superbike); DUMP(d, S, pipeLength); DUMP(d, S, gasSpeed); DUMP(d, S, pipeReflect);
+    DUMP(d, S, detailed); DUMP(d, S, pipeLength); DUMP(d, S, gasSpeed); DUMP(d, S, pipeReflect);
     DUMP(d, S, pipeDampHz); DUMP(d, S, flapOpenRpm); DUMP(d, S, flapSpan); DUMP(d, S, flapShutHz);
     DUMP(d, S, flapOpenHz); DUMP(d, S, flapShutGain); DUMP(d, S, airboxHz); DUMP(d, S, intakeHowlHz);
     DUMP(d, S, intakeGain); DUMP(d, S, popRpm); DUMP(d, S, popChance); DUMP(d, S, whineGain);
@@ -91,7 +92,7 @@ void dumpDrive(const paramDumper &d, const drivetrainParams &P) {
     DUMP(d, P, clutchReleaseRate); DUMP(d, P, openRpm); DUMP(d, P, idleOpenRpm); DUMP(d, P, biteSpan);
     DUMP(d, P, launchPedal); DUMP(d, P, upBase); DUMP(d, P, upPedal); DUMP(d, P, upMargin);
     DUMP(d, P, downMax); DUMP(d, P, kickRpm); DUMP(d, P, kickMax); DUMP(d, P, loadDownMax);
-    DUMP(d, P, pickRpm); DUMP(d, P, pickMax); DUMP(d, P, slipper); DUMP(d, P, quickshiftTime);
+    DUMP(d, P, pickRpm); DUMP(d, P, pickMax); DUMP(d, P, slipper); DUMP(d, P, quickshiftTime); DUMP(d, P, dualClutch);
     DUMP(d, P, qsUnloadTorque); DUMP(d, P, qsMatchTol); DUMP(d, P, qsMatchTimeout); DUMP(d, P, qsMaxRpm);
     DUMP(d, P, wheelieAccel);
     for (int g = 1; g <= P.gears; g++) {
@@ -100,6 +101,26 @@ void dumpDrive(const paramDumper &d, const drivetrainParams &P) {
         d.put(("teethOut[" + std::to_string(g) + "]").c_str(), tooth(P.teethOut));
     }
     DUMP(d, P, primaryIn); DUMP(d, P, primaryOut); DUMP(d, P, sprocketTeeth);
+}
+
+void dumpCarSpec(const paramDumper &d, const carSpec &S) {
+    DUMP(d, S, name); DUMP(d, S, dispLo); DUMP(d, S, dispHi); DUMP(d, S, crankLo); DUMP(d, S, crankHi);
+    DUMP(d, S, flareLo); DUMP(d, S, flareHi); DUMP(d, S, idleLo); DUMP(d, S, idleHi); DUMP(d, S, idleMapLo);
+    DUMP(d, S, idleMapHi); DUMP(d, S, toLimiterLo); DUMP(d, S, toLimiterHi); DUMP(d, S, limiterOver);
+    DUMP(d, S, liftLo); DUMP(d, S, liftHi); DUMP(d, S, sweepTo); DUMP(d, S, torqueWhat); DUMP(d, S, torqueLo);
+    DUMP(d, S, torqueHi); DUMP(d, S, torqueRpmLo); DUMP(d, S, torqueRpmHi); DUMP(d, S, powerWhat);
+    DUMP(d, S, powerLo); DUMP(d, S, powerHi); DUMP(d, S, powerRpmLo); DUMP(d, S, powerRpmHi);
+    for (std::size_t k = 0; k < S.torqueAt.size(); k++)
+        d.put(("torqueAt[" + std::to_string(k) + "]").c_str(), std::vector<double>{S.torqueAt[k].rpm, S.torqueAt[k].lo, S.torqueAt[k].hi});
+    for (std::size_t k = 0; k < S.powerAt.size(); k++)
+        d.put(("powerAt[" + std::to_string(k) + "]").c_str(), std::vector<double>{S.powerAt[k].rpm, S.powerAt[k].lo, S.powerAt[k].hi});
+    DUMP(d, S, plateauFrom); DUMP(d, S, plateauTo); DUMP(d, S, plateauMax); DUMP(d, S, cylMaxLo); DUMP(d, S, cylMaxHi);
+    DUMP(d, S, turboMaxLo); DUMP(d, S, turboMaxHi); DUMP(d, S, spoolRpm); DUMP(d, S, spoolLo); DUMP(d, S, spoolHi);
+    DUMP(d, S, carWhat); DUMP(d, S, zeroTo100What); DUMP(d, S, zeroTo100Lo); DUMP(d, S, zeroTo100Hi);
+    DUMP(d, S, zeroTo200What); DUMP(d, S, zeroTo200Lo); DUMP(d, S, zeroTo200Hi); DUMP(d, S, launchLo);
+    DUMP(d, S, launchHi); DUMP(d, S, wotUpLo); DUMP(d, S, lightUpLo); DUMP(d, S, lightUpHi); DUMP(d, S, hillPedal);
+    DUMP(d, S, hillGrade); DUMP(d, S, flatGearLo); DUMP(d, S, flatGearHi); DUMP(d, S, coastDownLo);
+    DUMP(d, S, coastDownHi); DUMP(d, S, dumpStalls); DUMP(d, S, reverseLo); DUMP(d, S, reverseHi);
 }
 
 void dumpBikeSpec(const paramDumper &d, const bikeSpec &S) {
@@ -189,13 +210,13 @@ void dumpMesh(const paramDumper &d, const engineModel &e) {
 void dumpType(const paramDumper &d, const engineType &t, const engineModel &e) {
     DUMP(d, t, id); DUMP(d, t, aliases); DUMP(d, t, name); DUMP(d, t, summary); DUMP(d, t, label);
     d.put("firing", hudFiring(t, e)); DUMP(d, t, windowTitle); DUMP(d, t, hudTag); DUMP(d, t, credit); DUMP(d, t, meshFile);
-    DUMP(d, t, buildHint); DUMP(d, t, bike); DUMP(d, t, supercharged); DUMP(d, t, turbocharged);
+    DUMP(d, t, buildHint); DUMP(d, t, bike); d.put("boost", boostName(t.boost));
     d.set("engine", t.engine); d.set("drive", t.drive); d.set("physTest", t.physTest);
     d.set("physTestTurbo", t.physTestTurbo); d.set("spec", t.spec); d.set("exhaust", t.exhaust);
     d.set("exhaustTurbo", t.exhaustTurbo);
     if (t.bike) d.put("zPrimary", primaryGearZ(e));  // from the mesh
     DUMP(d, t, gearboxSide); DUMP(d, t, primaryModule);
-    DUMP(d, t, turboMeshFile); DUMP(d, t, turboBuildHint); DUMP(d, t, turboCredit); DUMP(d, t, hudFiringLine);
+    DUMP(d, t, turboMeshFile); DUMP(d, t, turboFallbackMeshFile); DUMP(d, t, turboBuildHint); DUMP(d, t, turboCredit); DUMP(d, t, hudFiringLine);
     d.put("ride", static_cast<int>(t.ride.size()));
     for (std::size_t k = 0; k < t.ride.size(); k++) {
         const rideStep &r = t.ride[k];
@@ -217,6 +238,7 @@ int dumpParams(const engineModel &e, const engineType &t, bool turbo, bool bov) 
     root.put("engine.sound.dcBlockCutoff", dcBlockCutoff(sim.P.sound, sim.P.idleRpm, sim.cylCount()));  // effective, Hz
     dumpDrive(root.sub("drive."), sim.drive.P);
     if (t.spec) dumpBikeSpec(root.sub("spec."), t.spec());
+    if (t.car) dumpCarSpec(root.sub("car."), t.car());
     dumpMesh(root.sub("mesh."), e);
     if (t.exhaust) {
         try {

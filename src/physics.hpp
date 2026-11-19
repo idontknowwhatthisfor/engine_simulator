@@ -21,11 +21,14 @@ double wrapCycle(double a) {
     return a < 0.0 ? a + CYCLE : a;
 }
 
-// how an engine sounds (see engineSound). The defaults are the original voice the inline-4 and
-// the V4 use; `superbike` switches on the extra stages tuned for the BMW S 1000 RR.
+// how an engine sounds (see engineSound). The defaults are the original, simpler voice the inline-4
+// uses; `detailed` switches on the extra stages, first tuned for the BMW S 1000 RR and now used by
+// every other engine, bike or car: valve-lift shaped blowdown, the exhaust as a ringing quarter-wave
+// pipe heard through its radiation, the burble, the exhaust flap, airbox honk, overrun crackle (with
+// the flames), gear whine and valvetrain ticks.
 struct soundParams {
     double pipeLowHz = 700.0, pipeResHz = 110.0, pipeResGain = 1.5, masterHz = 7000.0;
-    bool superbike = false;
+    bool detailed = false;
     // 4-2-1 exhaust as a quarter-wave pipe: valve end closed, tailpipe open, so it rings at the odd
     // multiples of c / 4L. The reflection loses highs every round trip.
     double pipeLength = 1.15;       // m, header + link pipe + silencer
@@ -236,6 +239,7 @@ struct drivetrainParams {
     // bikes
     double slipper = 1.0;           // share of the clutch capacity that passes engine braking
     double quickshiftTime = 0.0;    // s of ignition cut (up) or blip (down) per clutchless shift; 0 = none
+    bool dualClutch = false;        // cars: a dual-clutch box (drawn with two clutch packs; the RS 3's S tronic)
     // quickshift down, rev-matched: blip until the drive torque through the dogs crosses zero (or
     // quickshiftTime runs out), the old gear drops out, the ECU revs the engine to the lower gear's
     // speed, and the new gear goes in once the speeds agree (or after qsMatchTimeout)
@@ -494,7 +498,7 @@ struct drivetrain {
         dct = on;
         shiftPhase = 0;
         revMatch = toFirst = false;
-        say(on ? "MANUAL DCT: E/Q shift, no clutch needed, anti-stall" : "MANUAL NORMAL: hold C to change gear and pull away", now);
+        say(on ? "MANUAL DCT: E/Q shift, no clutch, anti-stall" : "MANUAL NORMAL: hold C to shift and pull away", now);
     }
 
     // the Z key: sport in automatic; in a car's manual, NORMAL <-> DCT
@@ -512,8 +516,8 @@ struct drivetrain {
             gear = targetGear = 0;
             clutchPedal = false;
             say(P.bike ? "MANUAL: neutral. Hold C, press Q for 1st, release C gently"
-                : dct ? "MANUAL DCT: neutral. E for 1st and press the throttle: the box works the clutch (Z: normal)"
-                      : "MANUAL: neutral. Hold C, press E for 1st, release C gently (Z: DCT)", now);
+                : dct ? "MANUAL DCT: neutral. E for 1st, then the throttle (Z: normal)"
+                      : "MANUAL: neutral. Hold C, E for 1st, release C gently (Z: DCT)", now);
         } else {
             // pick the gear that puts the engine nearest pickRpm for this road speed
             int best = pickGear();

@@ -35,6 +35,29 @@ engineParams inline4FitParams() {
     return P;
 }
 
+// --phystest targets (src/test_car.hpp): the K24Z3 it is tuned to, the Fit's gearing
+carSpec inline4FitCar() {
+    carSpec S;
+    S.name = "inline-4 (Honda Fit gearing)";
+    S.dispLo = 2300; S.dispHi = 2380;
+    S.idleLo = 750; S.idleHi = 850;
+    S.toLimiterLo = 0.5; S.toLimiterHi = 2.5;
+    S.sweepTo = 7000;
+    S.torqueWhat = "peak torque (K24Z3: 218 N m)"; S.torqueLo = 180; S.torqueHi = 230;
+    S.torqueRpmLo = 3000; S.torqueRpmHi = 5500;
+    S.powerWhat = "peak power (K24Z3: 132 kW / 177 hp)"; S.powerLo = 85; S.powerHi = 140;
+    S.powerRpmLo = 5000; S.powerRpmHi = 7000;
+    S.carWhat = "1300 kg, Honda Fit 5 speed, final drive 4.62";
+    S.zeroTo100Lo = 6.0; S.zeroTo100Hi = 12.0;
+    S.wotUpLo = 5800;
+    S.lightUpLo = 2300; S.lightUpHi = 3500;
+    S.hillPedal = 0.35; S.hillGrade = 0.12; S.flatGearLo = 3; S.flatGearHi = 5;
+    S.coastDownLo = 1050; S.coastDownHi = 1400;
+    S.dumpStalls = true;
+    S.reverseLo = -40; S.reverseHi = -5;
+    return S;
+}
+
 // Honda Fit 5MT (Honda's 2010 spec sheet): 3.308 / 1.870 / 1.303 / 0.949 / 0.727, reverse 3.308,
 // final drive 4.62, 0.305 m tyres, 1300 kg car
 drivetrainParams inline4FitDriveParams() {
@@ -153,7 +176,8 @@ const engineType &inline4FitType() {
         t.bike = false;
         t.engine = inline4FitParams;
         t.drive = inline4FitDriveParams;
-        t.physTest = physicsTestInline4;
+        t.physTest = physicsTestCar;
+        t.car = inline4FitCar;
         t.physTestTurbo = physicsTestInline4Turbo;
         t.exhaust = inline4FitExhaust;
         t.exhaustTurbo = inline4FitTurboExhaust;

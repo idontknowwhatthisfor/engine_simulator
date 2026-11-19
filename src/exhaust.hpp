@@ -323,7 +323,7 @@ struct exhaustModel {
             double tau = want > heat[c] ? 4.0 : 10.0;  // heats in seconds, cools slower
             heat[c] += (want - heat[c]) * (1.0 - std::exp(-dt / tau));
         }
-        // the flap servo, as in engineSound (superbike voice)
+        // the flap servo, as in engineSound (the detailed voice)
         const soundParams &sp = sim.P.sound;
         double rpm = std::fabs(sim.rpm()), demand = std::max(sim.pedal, sim.blip);
         double want = std::clamp((rpm - sp.flapOpenRpm) / sp.flapSpan + 0.5, 0.0, 1.0);

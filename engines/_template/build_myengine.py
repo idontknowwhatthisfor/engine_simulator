@@ -10,8 +10,8 @@ Standard library only. Usage:
     (defaults: engines/inline4_fit/engine.mesh -> myengine.mesh next to this file)
 
 tools/meshlib.py's inline_engine() does the work: it scales the inline-4's piston and rod to the bore,
-stroke and rod length, builds a flat crank with one throw per cylinder (pins placed for the even
-firing order), a see-through crankcase, block and head and a cam cover, and writes the ENGMSHv3 mesh
+stroke and rod length, builds a crank with one throw per cylinder (pins placed for the even
+firing order: 720/n deg apart in firing order), a see-through crankcase, block and head and a cam cover, and writes the ENGMSHv3 mesh
 with the firing lags and the metadata the simulator reads (zPrimary for the bike gearbox).
 Another layout (a V, a boxer, extra parts like the H2's supercharger) builds its parts with meshlib's
 Donor, build_crank, build_block and write_engine directly: see engines/ducati_v4/build_v4.py and

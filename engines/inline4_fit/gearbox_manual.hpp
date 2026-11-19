@@ -1,5 +1,7 @@
-// the car's manual gearbox, drawn behind the flywheel: one gear pair per gear (the Honda Fit's five)
-// and a reverse idler
+// the car's gearbox, drawn behind the flywheel: one gear pair per gear (the Honda Fit's five, the RS 3's
+// seven) and a reverse idler, behind a single dry clutch or, for a dual-clutch box
+// (drivetrainParams::dualClutch), two wet clutch packs nested one inside the other on two coaxial input
+// shafts
 #pragma once
 #include "../../src/render.hpp"
 #include "../../src/physics.hpp"
@@ -22,6 +24,22 @@ struct gearboxModel {
     std::vector<int> nOut, nCnt;   // per gear, index 1..gears
     std::vector<float> zGear;
     meshBuf inGear, headGear, clutchDisc, pressurePlate, inShaft, outShaft, cntShaft, flange, collar, housing;
+    // dual clutch: the outer pack (K1: odd gears) and the inner one (K2: even gears and reverse), each
+    // a stack of friction plates with an apply plate, in a drum the crank turns; the hollow outer input
+    // shaft (K2's) round the solid inner one (K1's)
+    bool dual = false;
+    meshBuf k1Plate, k2Plate, k1Apply, k2Apply, drum, outerInShaft;
+    // how far the whole box moves back (mesh +z) so it clears a crank or crankcase that reaches past the
+    // inline-4's (0 for the inline-4 and the RS 3)
+    float zShift = 0.f;
+    static constexpr float FRONT_Z = 256.f;  // the housing's front face, unshifted
+    static float shiftFor(const engineModel &e) {
+        float hi = -1e9f;
+        for (const group &g : e.groups)
+            if (g.kind == CRANK || g.kind == BLOCK)
+                for (std::size_t v = 0; v < g.verts.size(); v += 6) hi = std::max(hi, g.verts[v + 2]);
+        return std::max(0.f, hi + 5.f - FRONT_Z);
+    }
     std::vector<meshBuf> outGear, cntGear;
     // reverse: countershaft gear -> idler (on its own short shaft, off to the side) -> output gear,
     // one pair-spacing past the top gear (485 for five gears)
@@ -42,6 +60,8 @@ struct gearboxModel {
     void build(const engineModel &e, const drivetrainParams &dp, renderer &ren) {
         ax = e.crankAxis.x;
         ay = e.crankAxis.y;
+        zShift = shiftFor(e);
+        dual = dp.dualClutch;
         float rIn = D / (1.f + H);
         nIn = teethFor(rIn);
         nHead = teethFor(D - rIn);
@@ -83,10 +103,19 @@ struct gearboxModel {
         }
         flange = makeGear(32.f, 4, 10.f, 14.f);
         collar = makeCylinder(24.f, -5.f, 5.f, 24);
-        housing = makeBox({ax - 92.f, ay - 92.f, 256.f}, {ax + 92.f, ay + D + 84.f, rearZ(gears)});
+        housing = makeBox({ax - 92.f, ay - 92.f, FRONT_Z}, {ax + 92.f, ay + D + 84.f, rearZ(gears)});
         for (meshBuf *m : {&inGear, &headGear, &clutchDisc, &pressurePlate, &inShaft, &outShaft, &cntShaft, &flange,
                            &collar, &housing, &revCnt, &revOut, &revIdler, &idlerShaft})
             ren.upload(*m);
+        if (dual) {
+            k1Plate = makeGear(60.f, 24, 4.f, 44.f);   // rings: the outer pack between r 44 and 60
+            k2Plate = makeGear(38.f, 18, 4.f, 22.f);   // the inner pack between r 22 and 38
+            k1Apply = makeGear(60.f, 6, 5.f, 44.f);
+            k2Apply = makeGear(38.f, 6, 5.f, 22.f);
+            drum = makeGear(68.f, 8, 30.f, 63.f);      // the basket round both packs, turned by the crank
+            outerInShaft = makeCylinder(18.f, 262.f, 296.f);
+            for (meshBuf *m : {&k1Plate, &k2Plate, &k1Apply, &k2Apply, &drum, &outerInShaft}) ren.upload(*m);
+        }
         for (int g = 1; g <= gears; g++) {
             ren.upload(cntGear[g]);
             ren.upload(outGear[g]);
@@ -99,7 +128,7 @@ struct gearboxModel {
 
     void items(const engineSim &sim, float crankDelta, const mat4 &world, int ghost, std::vector<drawItem> &out) const {
         const drivetrain &d = sim.drive;
-        auto place = [&](float x, float y, float z, float angle) { return world * translate({x, y, z}) * rotateZ(angle); };
+        auto place = [&](float x, float y, float z, float angle) { return world * translate({x, y, z + zShift}) * rotateZ(angle); };
         auto add = [&](const meshBuf &m, const mat4 &model, std::array<float, 4> c, float rough, float metal) {
             out.push_back({&m, model, {c[0], c[1], c[2], c[3]}, rough, metal});
         };
@@ -113,8 +142,25 @@ struct gearboxModel {
         // clutch: the pressure plate turns with the crank, the disc with the input shaft, so you can see
         // them slip; the plate backs off a little when the clutch is released
         float lift = static_cast<float>(1.0 - d.clutch) * 5.f;
-        add(pressurePlate, place(ax, ay, 281.f + lift, crankDelta), PLATE, 0.4f, 0.6f);
-        add(clutchDisc, place(ax, ay, 266.f, inA), FRICTION, 0.8f, 0.f);
+        if (!dual) {
+            add(pressurePlate, place(ax, ay, 281.f + lift, crankDelta), PLATE, 0.4f, 0.6f);
+            add(clutchDisc, place(ax, ay, 266.f, inA), FRICTION, 0.8f, 0.f);
+        } else {
+            // the pack for the gear in carries the drive and closes with d.clutch; the other stands open.
+            // Through a shift the old one opens, the gear changes, and the new one closes: the handover
+            bool k1 = d.gear > 0 && d.gear % 2 == 1;
+            bool k2 = d.gear == -1 || (d.gear > 0 && d.gear % 2 == 0);
+            float lift1 = k1 ? lift : 5.f, lift2 = k2 ? lift : 5.f;
+            add(drum, place(ax, ay, 274.f, crankDelta), PLATE, 0.4f, 0.6f);
+            for (int k = 0; k < 3; k++) {
+                float z = 264.f + 6.f * k;
+                add(k1Plate, place(ax, ay, z, inA), FRICTION, 0.8f, 0.f);
+                add(k2Plate, place(ax, ay, z, inA), FRICTION, 0.8f, 0.f);
+            }
+            add(k1Apply, place(ax, ay, 283.f + lift1, crankDelta), k1 ? BRASS : PLATE, 0.4f, 0.6f);
+            add(k2Apply, place(ax, ay, 283.f + lift2, crankDelta), k2 ? BRASS : PLATE, 0.4f, 0.6f);
+            add(outerInShaft, place(ax, ay, 0.f, inA), SHAFT, 0.3f, 0.8f);
+        }
         add(inShaft, place(ax, ay, 0.f, inA), SHAFT, 0.3f, 0.8f);
         add(inGear, place(ax, ay, 300.f, inA), STEEL, 0.35f, 0.7f);
         add(headGear, place(ax, cy, 300.f, cntA), STEEL, 0.35f, 0.7f);
@@ -144,7 +190,7 @@ struct gearboxModel {
         float parked = gears >= 3 ? (zGear[2] + zGear[3]) / 2.f : zGear[1] + 15.f;
         float collarZ = d.gear > 0 && d.gear <= gears ? zGear[d.gear] - 15.f : d.gear < 0 ? Z_REV - 15.f : parked;
         add(collar, place(ax, ay, collarZ, outA), d.gear != 0 ? BRASS : STEEL, 0.3f, 0.8f);
-        if (ghost == 0) add(housing, world, {0.37f, 0.36f, 0.33f, 0.16f}, 0.65f, 0.f);
+        if (ghost == 0) add(housing, world * translate({0.f, 0.f, zShift}), {0.37f, 0.36f, 0.33f, 0.16f}, 0.65f, 0.f);
     }
 };
 

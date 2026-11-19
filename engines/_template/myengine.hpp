@@ -37,10 +37,10 @@ engineParams myengineParams() {
     P.rpmScale = 14000.0;           // the HUD rev counter's full scale
     P.counterweight = 0.0;          // an even-firing inline-3 has no 1st-order vertical force to balance
     P.blockMass = 50.0; P.blockRollInertia = 0.9;
-    // the voice (src/sound.hpp): the superbike stages, with the S 1000 RR's settings as a start
+    // the voice (src/sound.hpp): the detailed stages, with the S 1000 RR's settings as a start
     P.sound = soundParams();
     soundParams &S = P.sound;
-    S.superbike = true;
+    S.detailed = true;
     S.pipeLowHz = 2600.0; S.pipeResHz = 220.0; S.pipeResGain = 0.6;
     S.masterHz = 12000.0;
     S.intakeGain = 1.0;

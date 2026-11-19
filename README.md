@@ -68,7 +68,7 @@ The original model, split into moving parts from the glTF.
 | Vehicle | 1300 kg car, 0.305 m tyres, CdA 0.65 |
 | Drivetrain | Friction clutch, automatic mode (shift schedule, kickdown, downshift under load, sport mode with rev-matched downshifts) or manual in two modes (Z): NORMAL (clutch pedal for every change, stalls if you dump it at idle) and DCT (see the RS 3) |
 | Results (sim) | 0–100 km/h in 6.8 s |
-| 3D | The see-through block, and a procedural 5-speed gearbox with a reverse idler behind the flywheel |
+| 3D | The see-through block, and a procedural 5-speed gearbox with a reverse idler behind the flywheel (the car gearbox drawing moves back, `gearboxModel::shiftFor`, for an engine whose crank or crankcase reaches past the inline-4's) |
 | Exhaust (3D) | Tubular 4-2-1 manifold (1+4, 2+3) on a cast flange, close-coupled catalyst, mid pipe, silencer and tailpipe running back beside the gearbox |
 
 ### `rs3`: Audi RS 3 (8Y, 2021-), 2.5 TFSI turbocharged inline-5
@@ -79,8 +79,9 @@ The original model, split into moving parts from the glTF.
 
 The five-cylinder, built like the superbikes from the inline-4's piston and rod (scaled to the 82.5 mm
 bore and the 144 mm rod) on a procedural crank with its pins 72° apart, with a red RS cam cover. It is
-the only engine that is always turbocharged (`engineType::turbocharged`): the turbo is on without
-`--turbo yes` and is drawn with the inline-4's turbo model.
+the only engine that is always turbocharged (`engineType::boost = builtInBoost::turbo`; the H2 is
+`supercharger`): the turbo is on without `--turbo yes` and is drawn with the inline-4's turbo model,
+or a procedural one when that is not there (below).
 
 | | |
 |---|---|
@@ -89,14 +90,17 @@ the only engine that is always turbocharged (`engineType::turbocharged`): the tu
 | Turbo | One turbo: a small turbine nozzle so it spools from ~2000 rpm, a big wastegate, a high-pressure-ratio compressor with a wide map (its surge line well left of the engine's flow at 2000 rpm, no choke at 7000; the test checks it never surges at full throttle). Blow-off valve, front-mounted intercooler |
 | ECU boost | Up to 1.5 bar, but a charge (torque) limit holds the 500 N·m plateau with ~1.2–1.4 bar, and the target falls from 5500 rpm to ~1.1 bar at 7000 for the flat top-end power (`turboParams::chargeMax`, `boostFallRpm`…) |
 | Output (sim) | 492 N·m at 2000, 500–507 N·m at 2500–4500, 485 at 5500; 299–300 kW (~402 hp) at 6000–6500 and 289 kW at 7000 rpm (Audi: 500 N·m at 2250–5600, 294 kW / 400 PS at 5600–7000), idle 770 rpm, limiter 7100 rpm, peak cylinder pressure 150 bar |
-| Gearbox | 7-speed S tronic (DQ500 dual clutch): 3.563 / 2.526 / 1.679 / 1.022 / 0.788 / 0.761 / 0.635, reverse 2.789, final drives 4.059 (1st, 4th, 5th, R) and 3.450 (2nd, 3rd, 6th, 7th): Audi's 8V figures, the same box. The sim has one final drive (3.450), so 1st, 4th, 5th and reverse carry the 4.059 / 3.450 step in their ratio. Shifts take 0.03 s out and 0.08 s in. Shifts the same in manual's DCT mode (any car: T for manual, then Z) |
+| Gearbox | 7-speed S tronic (DQ500 dual clutch): 3.563 / 2.526 / 1.679 / 1.022 / 0.788 / 0.761 / 0.635, reverse 2.789, final drives 4.059 (1st, 4th, 5th, R) and 3.450 (2nd, 3rd, 6th, 7th): Audi's 8V figures, the same box. The sim has one final drive (3.450), so 1st, 4th, 5th and reverse carry the 4.059 / 3.450 step in their ratio. Shifts take 0.03 s out and 0.08 s in. Shifts the same in manual's DCT mode (any car: T for manual, then Z). Drawn as a dual-clutch box (`drivetrainParams::dualClutch`): two wet clutch packs nested in a crank-driven drum, the outer one for the odd gears, the inner one for the even gears and reverse, on two coaxial input shafts; the pack carrying the drive closes (its apply plate brass), and a shift hands over from one to the other |
 | Vehicle | 1570 kg + 75 kg driver, 265/30 R19 (0.325 m), CdA 0.72, quattro (the car model has no tyre grip limit, so all-wheel drive needs nothing extra) |
 | Exhaust (3D) | Five cast runners into a manifold over the turbine, the downpipe back under the car, catalyst, mid pipe with the sport exhaust's flap, rear silencer and two big tailpipes. Intake: airbox behind the turbo, charge pipe to a front-mounted intercooler, back up the other side to the throttle and a plenum along the head |
 | Results (sim) | Launch at ~4500 rpm, 0–100 km/h 4.3 s (Audi: 3.8 s), 0–200 km/h 14.0 s, full-throttle upshifts at ~7000 rpm |
-| Sound | The superbike voice stages on a car: a long pipe for the deep five-cylinder note and its idle burble, the sport exhaust's flaps opening from ~3500 rpm, overrun crackle (with flames), the turbo's whistle and the blow-off valve |
+| Sound | The detailed voice (`soundParams::detailed`, the bikes' stages) on a car: a long pipe for the deep five-cylinder note and its idle burble, the sport exhaust's flaps opening from ~3500 rpm, overrun crackle (with flames), the turbo's whistle and the blow-off valve |
 
-`--turbo yes` is refused (it already has one). Without the turbo model's mesh (it needs the optional
-`Assets-2` download) the RS 3 still runs with its turbo, just without drawing it.
+`--turbo yes` is refused (it already has one). Without the downloaded turbo model (the optional
+`Assets-2` download) the RS 3 draws a procedural turbo instead (`build_rs3_turbo.py` ->
+`rs3_turbo.mesh`, `engineType::turboFallbackMeshFile`): turbine and compressor wheels on their shaft,
+the centre housing, and see-through scrolls with their four ports where the downloaded model has them,
+so the same exhaust and intake pipes fit either.
 
 ### `v4`: Ducati Desmosedici Stradale (Panigale V4)
 
@@ -493,7 +497,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--wav out.wav` | Render a scripted run to a WAV file. The bikes play a ride: start, blips, limiter, launch through the gears, braking with rev-matched downshifts. The inline-4 plays a start / rev / lift-off script; the RS 3 (and the inline-4 with `--turbo yes`) two full-throttle pulls in the car with lift-offs. |
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
-| `--grade pct --reverse --sport --dct --no-wheelie` | Starting conditions (`--dct`: a car's manual mode starts in DCT) |
+| `--grade pct --reverse --sport --manual --dct --no-wheelie` | Starting conditions (`--manual`: start in manual, in neutral; `--dct`: a car's manual mode is DCT) |
 | `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below; the RS 3 always has its own). With `--phystest`, runs the turbo checks; with `--wav`, plays the turbo drive |
 | `--bov yes\|no` | With the turbo: fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
 | `--variant name` | Another version of the engine (`v4`, `s1000rr`, `h2`, `zx10r` and `mxking` have one: `tuned`) |
@@ -515,7 +519,7 @@ src/
   turbo.hpp                 the turbocharger (--turbo yes): see-through housings, spinning rotor, spool
   physics.hpp               engine model, ECU, drivetrain, vehicle (parameter structs + engineSim)
   presets.hpp               starting points for a class of engine (the superbike engine and drivetrain)
-  engine_type.hpp           engineType: what an engine provides; bikeSpec (test targets); REGISTER_ENGINE
+  engine_type.hpp           engineType: what an engine provides; bikeSpec / carSpec (test targets); REGISTER_ENGINE
   engines.hpp               the registered engines for --engine-type, setupSim()
   calibration.hpp           VE_*, FMEP_*, IDLE_*, SND_*... overrides for calibrating (every --phystest, --wav)
   hud.hpp                   the HUD and help line, built from what the engine has
@@ -523,17 +527,18 @@ src/
   dyno.hpp                  the WOT dyno curve (D), measured in the background
   bike_gearbox.hpp          the bikes' sequential gearbox (3D)
   test_bike.hpp             --phystest for the bikes, checked against each engine's bikeSpec
+  test_car.hpp              --phystest for the cars, checked against each car's carSpec
   test_synth.hpp            --synthtest N
   dump_params.hpp           --dump-params
 engines/
   all.hpp                   generated by the Makefile: includes every engine's header (not in git)
   <type>/engine.mk          each engine's part of the Makefile: its header, meshes and mesh rule
-  inline4_fit/              inline4_fit.hpp (engine + Honda Fit gearing + type), gearbox_manual.hpp (3D car
-                            gearbox), test_inline4.hpp, extract_parts.py, scene.gltf/.bin, license.txt,
+  inline4_fit/              inline4_fit.hpp (engine + Honda Fit gearing + car spec + type), gearbox_manual.hpp
+                            (3D car gearbox, single or dual clutch), test_inline4.hpp (--turbo yes test), extract_parts.py, scene.gltf/.bin, license.txt,
                             engine.mesh, tests/ (pixel baselines), build_turbo.py, turbocharger/
                             (turbo model), turbo.mesh
-  audi_rs3/                 audi_rs3.hpp (engine, turbo, sound, S tronic gearing, exhaust, type),
-                            test_rs3.hpp, build_rs3.py, rs3.mesh
+  audi_rs3/                 audi_rs3.hpp (engine, turbo, sound, S tronic gearing, exhaust, car spec, type),
+                            build_rs3.py, rs3.mesh, build_rs3_turbo.py, rs3_turbo.mesh (procedural turbo)
   ducati_v4/                ducati_v4.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_v4.py, v4.mesh
   bmw_s1000rr/              bmw_s1000rr.hpp (engine, sound, gearing, test targets, demo ride, type),
@@ -596,12 +601,14 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    - `engineParams`: bore (as in the builder), compression, cam timing, VE curve, limiter, inertia,
      idle, and `sound` for the voice. A bike starts from `superbikeBaseParams()` (`src/presets.hpp`);
    - `drivetrainParams`: gearing (any number of gears, from the tooth counts) and vehicle;
-   - `bikeSpec`: the `--phystest` targets (bikes; a car writes its own test, like
-     `engines/inline4_fit/test_inline4.hpp`). Besides the published figures, every check's window has a
+   - `bikeSpec` (bikes, `physicsTestBike`) or `carSpec` (cars, `physicsTestCar` in `src/test_car.hpp`):
+     the `--phystest` targets. A car's test checks the balance and the firing order against the
+     engine's own geometry (no targets needed), runs the turbo checks when the engine is boosted, and
+     drives automatic, manual NORMAL and DCT and reverse. Besides the published figures, every check's window has a
      field with a superbike default (idle, cranking, flare, coast-down, balance and firing-test speeds,
      0-100 / 0-200, the manual tests' shift rpm, `stallsOnClutchDump`, `liftsFront`, `shakeMax1st`,
      `downshiftMaxMs`...; see `src/engine_type.hpp`). Set the ones where the engine differs; the shift
-     targets must be below the rev limiter;
+     targets must be below the rev limiter (`carSpec` likewise: `src/engine_type.hpp`);
    - `exhaustLayout`: the pipes (control points in mesh space, radii, which cylinder or upstream pipes
      feed each one), optional flange boxes, the tailpipe outlets (for the crackle flames) and an exhaust
      valve. `cylPoint` and `cylDir` place the ports on the head in the cylinder's own frame. The
@@ -613,7 +620,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    header and the mesh rule. Nothing outside the folder needs an edit: the Makefile includes every
    `engine.mk` and generates `engines/all.hpp`, `make test` picks the engine up, and the help line
    and HUD follow from what it has (bike or car, boost, wheelie control).
-5. **Calibrate.** Put the published figures in `bikeSpec` and run
+5. **Calibrate.** Put the published figures in `bikeSpec` or `carSpec` and run
    `./engine_sim --engine-type <name> --phystest` until it passes. Environment variables override
    parameters while you try values, for every engine: `VE_BASE VE_PEAK VE_RPM VE_WIDTH` (and `VEL_*`
    for a low-cam lobe), `FMEP_A FMEP_B FMEP_C`, `RESID ETA INERTIA STARTER`,
@@ -631,7 +638,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
   even firing, no mesh) and checks that it starts, idles, burns once per cylinder every 720° at
   720/N intervals, revs to the limiter, and never produces NaN or inf.
 - `scripts/regress.sh baseline` then, after a change, `scripts/regress.sh check` proves a refactor
-  changed nothing: for every engine and version it compares `--dump-params`, the full `--selftest`
+  changed nothing: for every engine and version (from `--engine-type list --ids`) it compares `--dump-params`, the full `--selftest`
   and `--phystest` output, the `--wav` render (sha256), screenshots (engine, scene, HUD, running, on a
   stand, with options) pixel by pixel, the meshes' sha256 and the engine list. Output goes to
   `regress/` (not in git).

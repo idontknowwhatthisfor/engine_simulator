@@ -31,15 +31,18 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 BIN=./engine_sim
 
-# name|arguments
-VARIANTS=(
-    "inline4|--engine-type inline4"
-    "inline4-turbo|--engine-type inline4 --turbo yes"
-    "v4|--engine-type v4"
-    "s1000rr|--engine-type s1000rr"
-    "h2|--engine-type h2"
-    "h2-tuned|--engine-type h2 --tuned yes"
-)
+# name|arguments: every engine and version of one, from `--engine-type list --ids` ("h2 --variant tuned"
+# -> "h2-tuned|--engine-type h2 --variant tuned", "inline4 --turbo yes" -> "inline4-turbo|...")
+[[ -x $BIN ]] || make engine_sim >/dev/null || exit 2
+VARIANTS=()
+while read -r id extra; do
+    name=$id
+    case "$extra" in
+        "--turbo yes") name=$id-turbo ;;
+        --variant\ *) name=$id-${extra#--variant } ;;
+    esac
+    VARIANTS+=("$name|--engine-type $id${extra:+ $extra}")
+done < <($BIN --engine-type list --ids)
 # name|arguments for the screenshots. A shot that is not paused steps the physics in real time for
 # its few frames (frame timing varies), so the scene shots pause at once with --stopat
 SHOTS=(

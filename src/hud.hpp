@@ -27,7 +27,7 @@ std::string helpText(const engineSim &sim) {
     s += "  I: ignition\n";
     if (drive) {
         // Z: sport in automatic; in a car's manual, the NORMAL / DCT clutch mode
-        s += std::string("T: auto/manual  ") + (!sim.drive.automatic && !D.bike ? "Z: normal/DCT  " : "Z: sport  ") + w.shift;
+        s += std::string("T: auto/manual  ") + (!sim.drive.automatic && !D.bike ? "Z: DCT  " : "Z: sport  ") + w.shift;
         if (D.bike) s += "  N: neutral";                    // the bikes' neutral finder
         s += "  C: clutch";
         if (D.wheelieAccel > 0.0) s += "  V: wheelie ctrl";

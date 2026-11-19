@@ -3,7 +3,6 @@
 // type. Mesh: build_rs3.py -> rs3.mesh (built from the inline-4 model's parts).
 #pragma once
 #include "../../src/engine_type.hpp"
-#include "test_rs3.hpp"
 
 // Audi 2.5 TFSI (RS 3 8Y): 2480 cc, 82.5 x 92.8 mm, 10.0:1, 294 kW (400 PS) at 5600-7000 rpm and
 // 500 N m at 2250-5600 rpm, firing 1-2-4-5-3 every 144 deg. Aluminium block, forged steel crank,
@@ -68,10 +67,10 @@ engineParams audiRs3Params() {
 
     // the five-cylinder's voice: the odd 2.5-order warble, a deep burble at idle, the RS sport exhaust's
     // flaps opening with the revs, crackle on the overrun, the turbo's whistle and the blow-off valve.
-    // The superbike stages (src/sound.hpp) give the flap, the radiated howl and the crackle
+    // The detailed voice's stages (src/sound.hpp) give the flap, the radiated howl and the crackle
     P.sound = soundParams();
     soundParams &S = P.sound;
-    S.superbike = true;
+    S.detailed = true;
     S.pipeLength = 2.6;             // manifold, turbo, cat, mid pipe and the rear silencer
     S.pipeLowHz = 1800.0; S.pipeResHz = 125.0; S.pipeResGain = 0.8;
     S.pipeReflect = 0.5;
@@ -114,6 +113,7 @@ drivetrainParams audiRs3DriveParams() {
     P.brakeDecel = 10.0;
     // dual clutch: the next gear is preselected, one clutch hands over to the other in a few hundredths
     P.shiftOpen = 0.03; P.shiftClose = 0.08;
+    P.dualClutch = true;            // drawn with its two wet clutch packs
     P.normalDown = 1300.0;
     P.sportUp = 6900.0; P.sportDown = 4500.0;
     P.matchHold = 0.3;
@@ -124,6 +124,42 @@ drivetrainParams audiRs3DriveParams() {
     P.downMax = 6500.0; P.kickRpm = 5000.0; P.kickMax = 6400.0; P.loadDownMax = 5200.0;
     P.pickRpm = 2500.0; P.pickMax = 6500.0;
     return P;
+}
+
+// --phystest targets (src/test_car.hpp): Audi's figures, with tolerance
+carSpec audiRs3Car() {
+    carSpec S;
+    S.name = "Audi RS 3 2.5 TFSI";
+    S.dispLo = 2470; S.dispHi = 2490;
+    S.flareLo = 850; S.flareHi = 2200;
+    S.idleLo = 700; S.idleHi = 820;
+    S.idleMapLo = 20; S.idleMapHi = 55;
+    S.toLimiterLo = 0.4; S.toLimiterHi = 3.0;
+    S.liftLo = 650; S.liftHi = 1000;
+    S.sweepTo = 7000;
+    S.torqueWhat = "peak torque (Audi: 500 N m)"; S.torqueLo = 475; S.torqueHi = 530;
+    S.torqueRpmLo = 2000; S.torqueRpmHi = 5600;
+    S.powerWhat = "peak power (Audi: 294 kW / 400 PS)"; S.powerLo = 280; S.powerHi = 310;
+    S.powerRpmLo = 5500; S.powerRpmHi = 7000;
+    // Audi: 500 N m from 2250 to 5600 rpm, 294 kW from 5600 to 7000
+    S.torqueAt = {{2000, 460, 530}, {2500, 480, 525}, {5500, 465, 525}};
+    S.powerAt = {{6000, 280, 310}, {6500, 280, 310}, {7000, 280, 310}};
+    S.plateauFrom = 2500; S.plateauTo = 5000; S.plateauMax = 30;
+    S.cylMaxLo = 90; S.cylMaxHi = 150;
+    S.turboMaxLo = 80; S.turboMaxHi = 180;
+    S.spoolRpm = 2500; S.spoolLo = 0.3; S.spoolHi = 2.5;
+    S.carWhat = "1645 kg with driver, 7-speed S tronic, quattro";
+    S.zeroTo100What = "0-100 km/h (Audi: 3.8 s)"; S.zeroTo100Lo = 3.4; S.zeroTo100Hi = 4.4;
+    S.zeroTo200What = "0-200 km/h (tests: ~12-13 s)"; S.zeroTo200Lo = 10.5; S.zeroTo200Hi = 14.5;
+    S.launchLo = 2500; S.launchHi = 5000;
+    S.wotUpLo = 6400;
+    S.lightUpLo = 2000; S.lightUpHi = 3500;
+    // the RS 3 holds its speed up 15% in 4th at 35% pedal: a 25% hill makes it change down
+    S.hillPedal = 0.35; S.hillGrade = 0.25; S.flatGearLo = 4; S.flatGearHi = 7;
+    S.coastDownLo = 1150; S.coastDownHi = 1500;
+    S.dumpStalls = true;
+    S.reverseLo = -45; S.reverseHi = -5;
+    return S;
 }
 
 // exhaust and intake, mesh space (mm, "up" is -y, the front of the car at -z, the gearbox at +z).
@@ -239,13 +275,16 @@ const engineType &audiRs3Type() {
         t.meshFile = "engines/audi_rs3/rs3.mesh";
         t.buildHint = "python3 -I engines/audi_rs3/build_rs3.py";
         t.bike = false;
-        t.turbocharged = true;     // a factory turbo: always on, drawn from the inline-4's turbo model
+        t.boost = builtInBoost::turbo;  // a factory turbo: always on
         t.engine = audiRs3Params;
         t.drive = audiRs3DriveParams;
-        t.physTest = physicsTestRs3;
+        t.physTest = physicsTestCar;
+        t.car = audiRs3Car;
         t.exhaust = audiRs3Exhaust;
         t.turboMeshFile = "engines/inline4_fit/turbo.mesh";
         t.turboBuildHint = "python3 -I engines/inline4_fit/build_turbo.py (needs make assets)";
+        // without that optional download: a procedural turbo with its ports in the same places
+        t.turboFallbackMeshFile = "engines/audi_rs3/rs3_turbo.mesh";
         t.turboCredit = "turbo: \"Car Turbocharger\" by ml-design, CC-BY-4.0";
         t.hudFiringLine = true;
         return t;

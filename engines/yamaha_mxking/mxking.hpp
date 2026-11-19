@@ -41,7 +41,7 @@ engineParams mxkingParams() {
     // the voice: one thump every other turn through a long header and a small silencer
     P.sound = soundParams();
     soundParams &S = P.sound;
-    S.superbike = true;
+    S.detailed = true;
     S.pipeLength = 1.45;            // header, under the engine, into the silencer
     S.pipeLowHz = 1500.0; S.pipeResHz = 140.0; S.pipeResGain = 0.9;
     S.flapOpenRpm = 1e9;            // no exhaust valve: the silencer always sounds the same

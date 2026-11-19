@@ -38,7 +38,7 @@ engineParams bmwS1000rrParams() {
     // airbox honk at full throttle, crackle on the overrun, straight-cut gearbox whine
     P.sound = soundParams();        // its own voice, from the defaults
     soundParams &S = P.sound;
-    S.superbike = true;
+    S.detailed = true;
     S.pipeLowHz = 2600.0; S.pipeResHz = 220.0; S.pipeResGain = 0.6;
     S.masterHz = 12000.0;
     S.intakeGain = 1.0;

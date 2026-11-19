@@ -34,7 +34,7 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "tools"))
-from meshlib import Mesh, box, norm, inline_engine  # noqa: E402
+from meshlib import Mesh, box, inline_engine, tube, solid  # noqa: E402
 
 # ---- Kawasaki Ninja H2 numbers -------------------------------------------------------------------
 BORE = 76.0
@@ -71,64 +71,6 @@ def to_sc(p):
     """mesh space -> supercharger frame."""
     r = (p[0] - SC_AT[0], p[1] - SC_AT[1], p[2] - SC_AT[2])
     return (-r[2], r[1], r[0])
-
-
-def sub(a, b):
-    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
-
-
-def cross(a, b):
-    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
-
-
-def tube(path, radii, seg=28, caps=False):
-    """circle swept along a polyline (parallel-transport frames), outward normals."""
-    m = Mesh()
-    n = len(path)
-    tans = []
-    for k in range(n):
-        a, b = path[max(k - 1, 0)], path[min(k + 1, n - 1)]
-        tans.append(norm(sub(b, a)))
-    t0 = tans[0]
-    ref = (0.0, 1.0, 0.0) if abs(t0[1]) < 0.9 else (1.0, 0.0, 0.0)
-    u = norm(cross(t0, ref))
-    rings = []
-    for k in range(n):
-        t = tans[k]
-        u = norm(sub(u, tuple(t[j] * sum(u[i] * t[i] for i in range(3)) for j in range(3))))
-        v = cross(t, u)
-        ring = []
-        for j in range(seg):
-            a = 2 * math.pi * j / seg
-            d = tuple(math.cos(a) * u[i] + math.sin(a) * v[i] for i in range(3))
-            ring.append(m.vert(tuple(path[k][i] + radii[k] * d[i] for i in range(3)), d))
-        rings.append(ring)
-    for k in range(n - 1):
-        for j in range(seg):
-            a, b = rings[k][j], rings[k][(j + 1) % seg]
-            c, d = rings[k + 1][(j + 1) % seg], rings[k + 1][j]
-            m.tri(a, c, b)
-            m.tri(a, d, c)
-    if caps:
-        for k, sgn in ((0, -1.0), (n - 1, 1.0)):
-            t = tuple(sgn * c for c in tans[k])
-            ctr = m.vert(path[k], t)
-            ring = [m.vert(tuple(m.v[6 * i:6 * i + 3]), t) for i in rings[k]]
-            for j in range(seg):
-                if sgn > 0:
-                    m.tri(ctr, ring[j], ring[(j + 1) % seg])
-                else:
-                    m.tri(ctr, ring[(j + 1) % seg], ring[j])
-    return m
-
-
-def solid(faces):
-    """flat-shaded triangles from (a, b, c) point triples."""
-    m = Mesh()
-    for a, b, c in faces:
-        nrm = norm(cross(sub(b, a), sub(c, a)))
-        m.tri(m.vert(a, nrm), m.vert(b, nrm), m.vert(c, nrm))
-    return m
 
 
 def blade(theta0, x_hi=26.0, steps=10, thick=0.9):
