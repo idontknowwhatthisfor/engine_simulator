@@ -384,7 +384,7 @@ int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
                 "     rpm   torque Nm   power kW   boost bar   turbo krpm   wastegate   back kPa   peak cyl bar"
                 "   charge kPa   comp kg/s   charge C\n");
     double peakT = 0.0, peakTRpm = 0.0, peakP = 0.0, peakPRpm = 0.0, boostAt[15] = {};
-    double maxCyl = 0.0, maxTurbo = 0.0;
+    double maxCyl = 0.0, maxTurbo = 0.0, maxSurge = 0.0;
     for (int k = 0; k <= 12; k++) {
         double rr = 1000.0 + 500.0 * k;
         sim.reset(0.0);
@@ -392,7 +392,8 @@ int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
         sim.lockSpeed = true;
         sim.pedal = sim.pedalTarget = 1.0;
         sim.omega = rr / 60.0 * TWO_PI;
-        run(3.0, none);
+        run(2.0, none);
+        run(1.0, [&] { maxSurge = std::max(maxSurge, sim.surge); });  // settled: the compressor must not surge
         double cycleTime = 2.0 * TWO_PI / sim.omega, sum = 0.0, pk = 0.0;
         int n = 0;
         run(4.0 * cycleTime, [&] {
@@ -419,6 +420,7 @@ int physicsTestInline4Turbo(const engineModel &e, const engineType &type) {
     check("boost at 4000 rpm (held by the wastegate)", boostAt[6], TARGET - 0.08, TARGET + 0.05, "bar");
     check("boost at 6500 rpm", boostAt[11], TARGET - 0.08, TARGET + 0.05, "bar");
     check("highest turbo shaft speed", maxTurbo / 1000.0, 80, 170, "krpm");
+    check("full throttle: no compressor surge (dyno)", maxSurge, 0.0, 0.05, "");
     check("highest cylinder pressure", maxCyl / 1e5, 80, 140, "bar");
 
     // 3. spool-up: cruising at 3000 rpm, light pedal, then floor it

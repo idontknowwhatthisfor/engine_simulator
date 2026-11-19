@@ -31,8 +31,8 @@ struct paramDumper {
 
 // a field added to a parameter struct must be added to its dump below; these trip when one is not
 static_assert(sizeof(soundParams) == 240, "soundParams changed: update dumpSound()");
-static_assert(sizeof(turboParams) == 296, "turboParams changed: update dumpTurbo()");
-static_assert(sizeof(engineParams) == 1040, "engineParams changed: update dumpEngine()");
+static_assert(sizeof(turboParams) == 328, "turboParams changed: update dumpTurbo()");
+static_assert(sizeof(engineParams) == 1072, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 440, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
 
@@ -55,7 +55,7 @@ void dumpTurbo(const paramDumper &d, const turboParams &T) {
     DUMP(d, T, vCharge); DUMP(d, T, icDrop); DUMP(d, T, icEffStill); DUMP(d, T, icEffMoving);
     DUMP(d, T, icTau); DUMP(d, T, bovArea); DUMP(d, T, bovCrack); DUMP(d, T, bovSpan); DUMP(d, T, etaC);
     DUMP(d, T, etaT); DUMP(d, T, turbineArea); DUMP(d, T, wastegateArea); DUMP(d, T, vExhaust);
-    DUMP(d, T, bearingLoss); DUMP(d, T, boostMap); DUMP(d, T, wgKp); DUMP(d, T, wgKi);
+    DUMP(d, T, bearingLoss); DUMP(d, T, boostMap); DUMP(d, T, boostFallRpm); DUMP(d, T, boostTopRpm); DUMP(d, T, boostTop); DUMP(d, T, chargeMax); DUMP(d, T, wgKp); DUMP(d, T, wgKi);
     DUMP(d, T, knockRetard); DUMP(d, T, knockRetardHot); DUMP(d, T, tExhLight); DUMP(d, T, tExhFull);
 }
 
@@ -189,7 +189,7 @@ void dumpMesh(const paramDumper &d, const engineModel &e) {
 void dumpType(const paramDumper &d, const engineType &t, const engineModel &e) {
     DUMP(d, t, id); DUMP(d, t, aliases); DUMP(d, t, name); DUMP(d, t, summary); DUMP(d, t, label);
     d.put("firing", hudFiring(t, e)); DUMP(d, t, windowTitle); DUMP(d, t, hudTag); DUMP(d, t, credit); DUMP(d, t, meshFile);
-    DUMP(d, t, buildHint); DUMP(d, t, bike); DUMP(d, t, supercharged);
+    DUMP(d, t, buildHint); DUMP(d, t, bike); DUMP(d, t, supercharged); DUMP(d, t, turbocharged);
     d.set("engine", t.engine); d.set("drive", t.drive); d.set("physTest", t.physTest);
     d.set("physTestTurbo", t.physTestTurbo); d.set("spec", t.spec); d.set("exhaust", t.exhaust);
     d.set("exhaustTurbo", t.exhaustTurbo);

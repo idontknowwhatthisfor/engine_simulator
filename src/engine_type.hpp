@@ -97,6 +97,9 @@ struct engineType {
     bool bike = false;                     // bike drivetrain, bike gearbox, superbike tests
     bool supercharged = false;             // always boosted (engine().turbo.supercharger): its exhaust() places
                                            // turboMeshFile, drawn and spun like --turbo yes
+    bool turbocharged = false;             // always has its exhaust turbo (a factory turbo engine, the Audi
+                                           // RS 3): the turbo is on without --turbo yes, and exhaust() places
+                                           // turboMeshFile. A missing turbo mesh only leaves the turbo undrawn
     engineParams (*engine)() = nullptr;    // engine physics and sound
     drivetrainParams (*drive)() = nullptr; // clutch, gearbox and vehicle
     int (*physTest)(const engineModel &, const engineType &) = nullptr;  // --phystest

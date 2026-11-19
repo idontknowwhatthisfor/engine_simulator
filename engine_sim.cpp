@@ -42,6 +42,7 @@ struct options {
     float grade = 0.f;       // road grade in percent
     bool reverse = false;    // start in reverse (automatic)
     bool sport = false;      // automatic sport mode
+    bool dct = false;        // a car's manual mode starts in DCT (Z switches)
     bool turbo = false;      // --turbo yes: a turbocharger in the exhaust (inline-4)
     bool bov = true;         // --bov no: the turbo without its blow-off valve (it surges on lift-off)
     std::string variant;     // --variant name: another version of the engine (--tuned yes = --variant tuned)
@@ -83,6 +84,7 @@ options parseArgs(int argc, char **argv) {
         else if (a == "--grade") o.grade = std::stof(next());
         else if (a == "--reverse") o.reverse = true;
         else if (a == "--sport") o.sport = true;
+        else if (a == "--dct") o.dct = true;
         else if (a == "--turbo" || a.rfind("--turbo=", 0) == 0) {
             std::string v = a == "--turbo" ? next() : a.substr(8);
             if (v == "yes") o.turbo = true;
@@ -152,7 +154,7 @@ int main(int argc, char **argv) {
         for (const engineType *t : engineTypes()) ids += std::string(ids.empty() ? "" : "|") + t->id;
         std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type %s] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
-                             "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--no-wheelie]\n"
+                             "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--dct] [--no-wheelie]\n"
                              "                  [--turbo yes|no] [--bov yes|no] [--tuned yes|no] [--variant name]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
@@ -198,6 +200,7 @@ int main(int argc, char **argv) {
     }
     if (opt.turbo && !type.exhaustTurbo) {
         if (type.supercharged) std::fprintf(stderr, "--turbo yes: the %s is already supercharged\n", type.name);
+        else if (type.turbocharged) std::fprintf(stderr, "--turbo yes: the %s is already turbocharged\n", type.name);
         else {
             std::string have;  // the engines that do have a turbo layout
             for (const engineType *t : engineTypes())
@@ -238,6 +241,7 @@ int main(int argc, char **argv) {
     sim.drive.grade = opt.grade / 100.0;
     if (opt.reverse) sim.drive.gear = sim.drive.targetGear = -1;
     sim.drive.sport = opt.sport;
+    sim.drive.dct = opt.dct;
     if (opt.simTime > 0.f) {
         sim.pedalTarget = latchedThrottle;
         for (double t = 0.0; t < opt.simTime; t += PHYS_DT) {
@@ -293,7 +297,8 @@ int main(int argc, char **argv) {
     exhaustModel exhaust;
     turboModel turbo;
     bool showExhaust = !opt.engineOnly && type.exhaust;
-    bool showTurbo = showExhaust && (opt.turbo || type.supercharged);  // the turbo, or the supercharger
+    // the turbo, the supercharger, or a factory turbo
+    bool showTurbo = showExhaust && (opt.turbo || type.supercharged || type.turbocharged);
     if (showExhaust) {
         exhaustLayout layout;
         try {
@@ -307,11 +312,14 @@ int main(int argc, char **argv) {
         if (showTurbo) {
             try {
                 turbo.load(type.turboMeshFile, layout.turbo);
+                turbo.growBounds(eng);
             } catch (const std::exception &ex) {
                 std::fprintf(stderr, "%s (run: %s, or make)\n", ex.what(), type.turboBuildHint);
-                return 1;
+                // a factory turbo engine still runs with its turbo, just without drawing it (the turbo
+                // mesh needs the optional Assets-2 download)
+                if (!type.turbocharged) return 1;
+                showTurbo = false;
             }
-            turbo.growBounds(eng);
         }
     }
     renderer ren;
@@ -384,7 +392,7 @@ int main(int argc, char **argv) {
     sf::Text text(font, "", 16);
     sf::Text help(font, helpText(sim), 14);
     help.setFillColor(sf::Color(150, 150, 160));
-    sf::Text credit(font, std::string(type.credit) + (showTurbo && opt.turbo && *type.turboCredit ? std::string("\n") + type.turboCredit : ""), 12);
+    sf::Text credit(font, std::string(type.credit) + (showTurbo && (opt.turbo || type.turbocharged) && *type.turboCredit ? std::string("\n") + type.turboCredit : ""), 12);
     credit.setFillColor(sf::Color(110, 110, 120));
 
     std::vector<mat4> modelOf;
@@ -464,7 +472,7 @@ int main(int argc, char **argv) {
                     // no gearbox on the V4 stand: the drivetrain keys do nothing
                 } else {
                 if (e->code == K::T) sim.drive.setAutomatic(!sim.drive.automatic, sim.rpm(), sim.time);
-                if (e->code == K::Z) sim.drive.setSport(!sim.drive.sport, sim.time);
+                if (e->code == K::Z) sim.drive.toggleMode(sim.time);  // sport in automatic, NORMAL / DCT in a car's manual
                 if (e->code == K::E) sim.drive.requestShift(+1, sim.time);
                 if (e->code == K::Q) sim.drive.requestShift(-1, sim.time);
                 if (e->code == K::H) sim.drive.grade = std::min(sim.drive.grade + 0.02, 0.20);

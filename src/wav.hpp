@@ -64,12 +64,12 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
                 surgePeak = std::max(surgePeak, sim.surge);
                 boostPeak = std::max(boostPeak, sim.boostBar());
             }
-            if (turbo)
+            if (turbo || type.turbocharged)
                 std::printf("           at %4.1f s: %5.0f rpm  gear %d  %3.0f km/h  peak boost %+.2f bar  BOV %.3f kg/s  surge %.2f\n",
                             sim.time, sim.rpm(), sim.drive.gear, sim.drive.v * 3.6, boostPeak, bovPeak, surgePeak);
             from = sg.until;
         };
-        if (turbo) for (const segment &sg : TURBO_SCRIPT) play(sg);
+        if (turbo || type.turbocharged) for (const segment &sg : TURBO_SCRIPT) play(sg);
         else for (const segment &sg : SCRIPT) play(sg);
     }
     // resample 40 kHz -> 44.1 kHz, linear

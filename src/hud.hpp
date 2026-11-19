@@ -26,7 +26,8 @@ std::string helpText(const engineSim &sim) {
     if (drive) s += "  S: brake";
     s += "  I: ignition\n";
     if (drive) {
-        s += std::string("T: auto/manual  Z: sport  ") + w.shift;
+        // Z: sport in automatic; in a car's manual, the NORMAL / DCT clutch mode
+        s += std::string("T: auto/manual  ") + (!sim.drive.automatic && !D.bike ? "Z: normal/DCT  " : "Z: sport  ") + w.shift;
         if (D.bike) s += "  N: neutral";                    // the bikes' neutral finder
         s += "  C: clutch";
         if (D.wheelieAccel > 0.0) s += "  V: wheelie ctrl";
@@ -86,7 +87,7 @@ std::string hudText(const engineSim &sim, const engineType &type, const engineMo
     if (stand) s += "\n RPM " + f0(sim.rpm()) + "   " + type.label + ", on a stand" + camStr;
     else
         s += "\n RPM " + f0(sim.rpm()) + (*type.hudTag ? std::string("  ") + type.hudTag : std::string()) + "   gear " + gearName +
-             (dv.automatic ? (dv.sport ? " SPORT" : " AUTO") : " MANUAL") + "   " + f0(dv.v * 3.6) + " km/h" + camStr;
+             (dv.automatic ? (dv.sport ? " SPORT" : " AUTO") : dv.dctOn() ? " MANUAL DCT" : " MANUAL") + "   " + f0(dv.v * 3.6) + " km/h" + camStr;
     s += std::string("\n ") + w.throttle + " " + f0(sim.pedal * 100.0) + "%  throttle " + f0(sim.throttleOpen * 100.0) +
          "%  manifold " + f0(sim.pMan / 1000.0) + " kPa";
     if (sim.P.turbo.on && !stand) {

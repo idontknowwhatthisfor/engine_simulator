@@ -105,6 +105,14 @@ struct turboParams {
     double vExhaust = 2.0e-3;       // m^3, exhaust manifold + turbine housing
     double bearingLoss = 1.4e-6;    // W per (rad/s)^2: ~150 W at 100k rpm
     double boostMap = 160e3;        // Pa, manifold pressure at full pedal (~0.6 bar boost)
+    // the ECU's boost target over rpm (engineSim::boostTarget): boostMap up to boostFallRpm, then
+    // straight down to boostTop at boostTopRpm and held there (a real map lowers the boost at the top
+    // end, for the turbine's back pressure, the exhaust heat and knock). boostFallRpm 0: flat
+    double boostFallRpm = 0.0, boostTopRpm = 0.0, boostTop = 0.0;
+    // torque limit (engineSim::boostTarget): the ECU caps the air per cycle, VE x manifold pressure /
+    // charge temperature, at chargeMax times an atmospheric charge at tIntake (VE 1). Where the turbo
+    // could give more, the boost is turned down and the torque plateaus. 0: none
+    double chargeMax = 0.0;
     double wgKp = 2.0, wgKi = 10.0;  // wastegate PI: travel per bar over the target, per bar second
     double knockRetard = 8.0;       // deg of spark taken out per bar over atmospheric
     double knockRetardHot = 0.1;    // deg more per K of charge over 320 K
@@ -274,6 +282,13 @@ struct drivetrain {
     drivetrainParams P;
     bool automatic = true;
     bool sport = false;            // automatic sub-mode: hold low gears, rev-matched downshifts
+    // manual sub-mode (cars, Z in manual): false = NORMAL, a clutch pedal for every change and for pulling
+    // away; true = DCT, the driver picks the gears (E/Q) and the box works the clutch like a dual-clutch
+    // gearbox in its manual mode: take-off, each change (blipping to the lower gear's speed on a
+    // downshift), and anti-stall (the clutch opens near idle and it drops to 1st as the car stops)
+    bool dct = false;
+    bool dctOn() const { return dct && !automatic && !P.bike; }
+    bool boxWorksClutch() const { return automatic || dctOn(); }
     int gear = 1, targetGear = 1;  // -1 = reverse, 0 = neutral, 1..gears
     int qsPhase = 0;               // quickshift under way: 1 up (ignition cut), -1 down (blip)
     bool dogsFree = false;         // quickshift down: the old gear is out, engine and wheels are apart
@@ -415,8 +430,46 @@ struct drivetrain {
             }
             return;
         }
+        if (shiftPhase != 0) return;  // a DCT change is still going in
         int g = std::clamp(gear + dir, -1, P.gears);
         if (g == gear) return;
+        if (dctOn() && g == -1 && !stopped) {
+            say("stop the car before selecting reverse", now);
+            return;
+        }
+        if (dctOn() && gear >= 1 && g >= 1 && clutch > 0.3) {
+            // DCT, in gear with the clutch closed: the box opens it, swaps gears and closes it again
+            double landing = outputOmega() * P.primary * P.ratios[g] * 60.0 / (2.0 * 3.14159265358979323846);
+            if (g < gear && landing > P.qsMaxRpm) {  // over-rev protection
+                say("downshift refused: " + std::to_string(g) + " would be " +
+                        std::to_string(static_cast<int>(std::lround(landing / 100.0) * 100)) + " rpm", now);
+                return;
+            }
+            targetGear = g;
+            shiftPhase = 1;
+            lastShift = now;
+            revMatch = g < gear;
+            matchRpm = landing;
+            say(std::to_string(gear) + " -> " + std::to_string(g) +
+                    (revMatch ? " (rev match " + std::to_string(static_cast<int>(std::lround(matchRpm / 100.0) * 100)) + " rpm)" : ""),
+                now);
+            return;
+        }
+        if (dctOn()) {
+            // DCT, out of or into N or R: with the clutch open the gear just goes in; with it closed (as
+            // it sits in N) the box opens it first. Either way the take-off logic then bites on the throttle
+            say(g == 0 ? "N" : g == -1 ? "R" : std::to_string(g), now);
+            revMatch = false;
+            if (clutch < 0.05) {
+                gear = targetGear = g;
+            } else {
+                targetGear = g;
+                toFirst = true;  // after the swap: back to the take-off clutch, not a full engagement
+                shiftPhase = 1;
+                lastShift = now;
+            }
+            return;
+        }
         if (g != 0 && clutch > 0.3) {
             say("hold C (clutch) to change gear", now);
             return;
@@ -435,6 +488,21 @@ struct drivetrain {
         else say(on ? "SPORT (active in automatic, press T)" : "NORMAL", now);
     }
 
+    // manual NORMAL <-> DCT (cars). The clutch carries on from where it is: a held pedal still opens
+    // it in NORMAL, and DCT takes over from the current engagement
+    void setDct(bool on, double now) {
+        dct = on;
+        shiftPhase = 0;
+        revMatch = toFirst = false;
+        say(on ? "MANUAL DCT: E/Q shift, no clutch needed, anti-stall" : "MANUAL NORMAL: hold C to change gear and pull away", now);
+    }
+
+    // the Z key: sport in automatic; in a car's manual, NORMAL <-> DCT
+    void toggleMode(double now) {
+        if (!automatic && !P.bike) setDct(!dct, now);
+        else setSport(!sport, now);
+    }
+
     void setAutomatic(bool a, double rpmNow, double now) {
         automatic = a;
         shiftPhase = 0;
@@ -444,7 +512,8 @@ struct drivetrain {
             gear = targetGear = 0;
             clutchPedal = false;
             say(P.bike ? "MANUAL: neutral. Hold C, press Q for 1st, release C gently"
-                       : "MANUAL: neutral. Hold C, press E for 1st, release C gently", now);
+                : dct ? "MANUAL DCT: neutral. E for 1st and press the throttle: the box works the clutch (Z: normal)"
+                      : "MANUAL: neutral. Hold C, press E for 1st, release C gently (Z: DCT)", now);
         } else {
             // pick the gear that puts the engine nearest pickRpm for this road speed
             int best = pickGear();
@@ -480,10 +549,11 @@ struct drivetrain {
                 }
             }
         }
-        if (!automatic) {
+        if (!boxWorksClutch() && shiftPhase == 0) {
             clutch = std::clamp(clutch + (clutchPedal ? -P.clutchPressRate : P.clutchReleaseRate) * dt, 0.0, 1.0);
             return;
         }
+        // a shift the box is working the clutch for: automatic, or manual DCT
         if (shiftPhase != 0 && revMatch) matchRpm = outputOmega() * P.primary * P.ratios[targetGear] * 60.0 / (2.0 * 3.14159265358979323846);
         if (shiftPhase == 1) {  // clutch out, then swap gears
             clutch -= dt / P.shiftOpen;
@@ -541,6 +611,7 @@ struct drivetrain {
             }
             return;
         }
+        if (!automatic) return;  // manual DCT: the driver picks the gears
 
         // shift schedule
         if (gear < 1 || now - lastShift < 1.0 || v < 2.0 || clutch < 0.99) return;  // no shifting in R
@@ -788,6 +859,17 @@ struct engineSim {
     bool onLowCam(double r) const { return P.lowCam && volEffLow(r) > volEffHigh(r); }
     double volEff(double r) const { return onLowCam(r) ? volEffLow(r) : volEffHigh(r); }
 
+    // manifold pressure the ECU aims for at full pedal with the turbo: boostMap, lowered at the top end
+    // (boostFallRpm .. boostTopRpm) and capped by the charge (torque) limit, never below atmospheric
+    double boostTarget(double r) const {
+        const turboParams &T = P.turbo;
+        double p = T.boostMap;
+        if (T.boostFallRpm > 0.0 && T.boostTopRpm > T.boostFallRpm)
+            p += (T.boostTop - T.boostMap) * std::clamp((std::fabs(r) - T.boostFallRpm) / (T.boostTopRpm - T.boostFallRpm), 0.0, 1.0);
+        if (T.chargeMax > 0.0) p = std::min(p, T.chargeMax * P.pAtm * tCharge / (P.tIntake * std::max(volEff(std::fabs(r)), 0.1)));
+        return std::max(p, P.pAtm);
+    }
+
     double trappedAir(const cylinderState &s, double r) const {
         return volEff(r) * pMan * s.vDisp / (P.rGas * tCharge);
     }
@@ -926,7 +1008,7 @@ struct engineSim {
         fuelCut = !standalone && drive.coupled() && drive.clutch > 0.9 && demand < 0.02 && rpmFilt > P.fuelCutRpm;
         qsCut = !standalone && drive.qsPhase > 0;
         // launch control holds the revs while the clutch slips (and the plain bite logic when not)
-        if (!standalone && drive.automatic && drive.P.launchPedal > 0.0 && drive.launching(r) && r > drive.launchRpm(demand) + 300.0)
+        if (!standalone && drive.boxWorksClutch() && drive.P.launchPedal > 0.0 && drive.launching(r) && r > drive.launchRpm(demand) + 300.0)
             qsCut = true;
         // wheelie control: trim the fuel while the drive force would lift the front wheel
         // (the smoothed drive force is also what the HUD shows)
@@ -1028,7 +1110,7 @@ struct engineSim {
         // inverting the flow model below. Full pedal is always wide open.
         // with the turbo, full pedal asks for the boost target and the throttle is fed from the compressor
         double pUp = P.turbo.on ? pBoost : P.pAtm;
-        double pWant = P.mapMin + demand * ((P.turbo.on ? P.turbo.boostMap : P.pAtm) - P.mapMin);
+        double pWant = P.mapMin + demand * ((P.turbo.on ? boostTarget(r) : P.pAtm) - P.mapMin);
         double flowWant = volEff(r) * pWant * vDispTotal * std::fabs(omega) / (4.0 * 3.14159265358979323846) / (P.rGas * tCharge);
         double flux = P.throttleCd * pUp / std::sqrt(P.rGas * tCharge) * flowFunction(std::min(pWant / pUp, 0.995));
         double etc = demand > 0.001 ? std::min(P.throttleArea, flowWant / flux) : 0.0;

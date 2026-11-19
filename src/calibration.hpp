@@ -20,6 +20,12 @@ void applyCalibrationEnv(engineParams &P) {
     // supercharger / turbo compressor map and relief valve
     env("SC_PR", P.turbo.prRef); env("SC_FLOW", P.turbo.flowPeakRef); env("SC_CHOKE", P.turbo.chokeFall);
     env("SC_RELIEF", P.turbo.reliefP);
+    // exhaust turbo: turbine nozzle, wastegate, boost target (Pa absolute), shaft inertia
+    env("TURBO_AREA", P.turbo.turbineArea); env("TURBO_WG", P.turbo.wastegateArea); env("TURBO_BOOST", P.turbo.boostMap);
+    env("TURBO_INERTIA", P.turbo.inertia); env("TURBO_KNOCK", P.turbo.knockRetard);
+    // the ECU's boost target over rpm and the charge (torque) limit
+    env("TURBO_FALL", P.turbo.boostFallRpm); env("TURBO_TOPRPM", P.turbo.boostTopRpm); env("TURBO_TOP", P.turbo.boostTop);
+    env("TURBO_CHARGE", P.turbo.chargeMax);
     // sound (heard in --wav)
     soundParams &S = P.sound;
     env("SND_LOW", S.pipeLowHz); env("SND_OPEN", S.flapOpenHz); env("SND_DRIVE", S.drive);

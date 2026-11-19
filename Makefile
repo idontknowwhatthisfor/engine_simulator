@@ -52,7 +52,7 @@ run-%: all
 # engine itself gets --selftest and --phystest, its versions --phystest), plus synthetic inline engines
 # of these cylinder counts built in memory (--synthtest N). Every check runs; make fails if any of
 # them did (each run's exit status, not just its last line, which is all that is printed)
-SYNTH_CYLINDERS = 1 2 3 4 6 8
+SYNTH_CYLINDERS = 1 2 3 4 5 6 8
 test: all
 	@ids=$$(./engine_sim --engine-type list --ids) || exit 1; \
 	printf '%s\n' "$$ids" | { \
