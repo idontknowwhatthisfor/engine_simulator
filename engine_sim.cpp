@@ -701,7 +701,8 @@ int main(int argc, char **argv) {
             window.draw(msg);
         }
 
-        // full-throttle dyno chart: torque and power against rpm, with where the engine is right now
+        // full-throttle dyno chart: torque (lb-ft) and power (hp) against rpm on one shared scale, so the
+        // curves cross at 5252 rpm as on a real dyno sheet; with where the engine is right now
         if (showDyno) {
             const float PW = 330.f, PH = 230.f;
             const float px = float(winSize.x) - PW - 12.f, py = float(winSize.y) - PH - 78.f;
@@ -716,7 +717,8 @@ int main(int argc, char **argv) {
                 LABEL(150, 150, 160);
             const int n = dyno.done.load(std::memory_order_acquire);
             const float rMin = dyno.rpm.front(), rMax = dyno.rpm.back();
-            float tMax = 10.f, kMax = 10.f, peakT = 0.f, peakTRpm = 0.f, peakK = 0.f, peakKRpm = 0.f;
+            const float LBFT = 0.737562f, HP = 1.341022f;  // N m -> lb-ft, kW -> mechanical hp
+            float vMax = 10.f, peakT = 0.f, peakTRpm = 0.f, peakK = 0.f, peakKRpm = 0.f;
             for (int k = 0; k < n; k++) {
                 if (dyno.torque[k] > peakT) { peakT = dyno.torque[k]; peakTRpm = dyno.rpm[k]; }
                 if (dyno.kw[k] > peakK) { peakK = dyno.kw[k]; peakKRpm = dyno.rpm[k]; }
@@ -728,12 +730,11 @@ int main(int argc, char **argv) {
                     if (f * m >= v) return f * m;
                 return 10.f * m;
             };
-            tMax = nice(std::max(tMax, peakT * 1.1f));
-            kMax = nice(std::max(kMax, peakK * 1.1f));
+            vMax = nice(std::max({vMax, peakT * LBFT * 1.1f, peakK * HP * 1.1f}));
 
             const float L = px + 40.f, R = px + PW - 40.f, T = py + 40.f, B = py + PH - 26.f;
             auto xOf = [&](float r) { return L + (r - rMin) / (rMax - rMin) * (R - L); };
-            auto yOf = [&](float v, float vMax) { return B - std::clamp(v / vMax, -0.05f, 1.02f) * (B - T); };
+            auto yOf = [&](float v) { return B - std::clamp(v / vMax, -0.05f, 1.02f) * (B - T); };
             auto label = [&](const std::string &s, float x, float y, sf::Color c, bool right = false) {
                 sf::Text t(font, s, 11);
                 t.setFillColor(c);
@@ -755,19 +756,30 @@ int main(int argc, char **argv) {
                 grid.append({{R, y}, GRID});
             }
             window.draw(grid);
+            // 5252 rpm, where lb-ft and hp are equal (hp = lb-ft x rpm / 5252)
+            if (5252.f > rMin && 5252.f < rMax) {
+                const sf::Color MARK(200, 200, 210, 60);
+                sf::VertexArray mark(sf::PrimitiveType::Lines);
+                for (float y = T; y < B; y += 6.f) {
+                    mark.append({{xOf(5252.f), y}, MARK});
+                    mark.append({{xOf(5252.f), std::min(y + 3.f, B)}, MARK});
+                }
+                window.draw(mark);
+                label("5252", xOf(5252.f) + 3.f, T + 1.f, LABEL);
+            }
             sf::Vertex axes[] = {{{L, T}, AXIS}, {{L, B}, AXIS}, {{L, B}, AXIS}, {{R, B}, AXIS}, {{R, B}, AXIS}, {{R, T}, AXIS}};
             window.draw(axes, 6, sf::PrimitiveType::Lines);
-            label(numToStr(tMax, 0), L - 4.f, T - 7.f, TQ_COL, true);
-            label("N m", L - 4.f, B - 14.f, TQ_COL, true);
-            label(numToStr(kMax, 0), R + 4.f, T - 7.f, KW_COL);
-            label("kW", R + 4.f, B - 14.f, KW_COL);
+            label(numToStr(vMax, 0), L - 4.f, T - 7.f, TQ_COL, true);
+            label("lb-ft", L - 4.f, B - 14.f, TQ_COL, true);
+            label(numToStr(vMax, 0), R + 4.f, T - 7.f, KW_COL);
+            label("hp", R + 4.f, B - 14.f, KW_COL);
 
             // the curves (thickened by drawing each twice, a pixel apart)
             for (float off : {0.f, 1.f}) {
                 sf::VertexArray tq(sf::PrimitiveType::LineStrip), pw(sf::PrimitiveType::LineStrip);
                 for (int k = 0; k < n; k++) {
-                    tq.append({{xOf(dyno.rpm[k]), yOf(dyno.torque[k], tMax) + off}, TQ_COL});
-                    pw.append({{xOf(dyno.rpm[k]), yOf(dyno.kw[k], kMax) + off}, KW_COL});
+                    tq.append({{xOf(dyno.rpm[k]), yOf(dyno.torque[k] * LBFT) + off}, TQ_COL});
+                    pw.append({{xOf(dyno.rpm[k]), yOf(dyno.kw[k] * HP) + off}, KW_COL});
                 }
                 window.draw(tq);
                 window.draw(pw);
@@ -780,10 +792,10 @@ int main(int argc, char **argv) {
                 sf::Vertex cursor[] = {{{x, T}, sf::Color(200, 200, 210, 90)}, {{x, B}, sf::Color(200, 200, 210, 90)}};
                 window.draw(cursor, 2, sf::PrimitiveType::Lines);
                 float tNow = static_cast<float>(sim.brakeAvg), kNow = static_cast<float>(sim.brakeAvg * sim.omega / 1000.0);
-                for (auto [v, vMax, col] : {std::tuple{tNow, tMax, TQ_COL}, std::tuple{kNow, kMax, KW_COL}}) {
+                for (auto [v, col] : {std::pair{tNow * LBFT, TQ_COL}, std::pair{kNow * HP, KW_COL}}) {
                     sf::CircleShape dot(4.f);
                     dot.setOrigin({4.f, 4.f});
-                    dot.setPosition({x, yOf(v, vMax)});
+                    dot.setPosition({x, yOf(v)});
                     dot.setFillColor(col);
                     dot.setOutlineColor(sf::Color::White);
                     dot.setOutlineThickness(1.f);
@@ -798,8 +810,9 @@ int main(int argc, char **argv) {
             if (n < static_cast<int>(dyno.rpm.size()))
                 label("measuring " + numToStr(dyno.rpm[n], 0) + " rpm...", px + PW - 10.f, py + 8.f, LABEL, true);
             else {
-                label(numToStr(peakT, 0) + " N m @ " + numToStr(peakTRpm, 0), px + PW - 10.f, py + 2.f, TQ_COL, true);
-                label(numToStr(peakK, 0) + " kW (" + numToStr(peakK * 1.341f, 0) + " hp) @ " + numToStr(peakKRpm, 0),
+                label(numToStr(peakT * LBFT, 0) + " lb-ft (" + numToStr(peakT, 0) + " N m) @ " + numToStr(peakTRpm, 0),
+                      px + PW - 10.f, py + 2.f, TQ_COL, true);
+                label(numToStr(peakK * HP, 0) + " hp (" + numToStr(peakK, 0) + " kW) @ " + numToStr(peakKRpm, 0),
                       px + PW - 10.f, py + 15.f, KW_COL, true);
             }
         }
