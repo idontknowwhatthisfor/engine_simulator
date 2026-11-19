@@ -159,6 +159,8 @@ exhaustLayout mxkingExhaust(const engineModel &e) {
     return L;
 }
 
+const engineType &mxkingTunedType();  // --tuned yes, below
+
 // ---- the engine type -------------------------------------------------------------------------------
 const engineType &mxkingType() {
     static const engineType T = [] {
@@ -181,6 +183,154 @@ const engineType &mxkingType() {
         t.exhaust = mxkingExhaust;
         t.gearboxSide = -1.f;
         t.primaryModule = 1.8f * 84.f / (24.f + 73.f);  // smaller gears than the superbikes'
+        t.variants = {{"tuned", mxkingTunedType}};
+        return t;
+    }();
+    return T;
+}
+
+// ---- --tuned yes: a road-race MX King ------------------------------------------------------------
+// What the Indonesian underbone road-race builds do to the T150 engine (a typical build, not one
+// team's or a published kit; every number is an estimate):
+//   - bore-up: a 62 mm forged piston in a replated barrel on the stock crank, 177 cc
+//     (mxking_race.mesh, written by build_mxking.py with the stock engine)
+//   - 13.2:1, a race cam with more lift and overlap, stiffer valve springs: breathes best near
+//     10,500 rpm, limiter at 13,000
+//   - a 32 mm throttle body and an open race filter, an ECU remapped for race fuel
+//   - a lighter magneto rotor: revs quicker, idles higher (1800 rpm) and rougher
+//   - an open race pipe: a fatter header with an expansion chamber under the engine and a short can
+//   - a stripped bike (~100 kg) with a 60 kg rider tucked in, a race clutch, the stock gearbox and
+//     sprockets
+engineParams mxkingTunedParams() {
+    engineParams P = mxkingParams();
+    P.bore = 0.062;                 // must match RACE_BORE in build_mxking.py
+    P.compression = 13.2;
+    P.ivc = 250.0 * DEGR;           // intake shuts ~70 deg after BDC
+    P.evo = 475.0 * DEGR;           // exhaust opens ~65 deg before BDC
+    P.burn = 46.0 * DEGR;           // faster burn: more squish, more advance
+    P.residualMin = 0.55;           // big overlap: a lumpy idle
+    P.mRecip = 0.21;                // forged slipper piston: a bigger bore for little more mass
+    P.inertia = 0.011;              // lighter magneto rotor (0.012 stock)
+    P.vManifold = 0.20e-3;          // short race manifold
+    P.throttleArea = 8.04e-4;       // one 32 mm throttle body
+    P.idleBase = 3.6e-6; P.idleMin = 2.2e-6; P.idleMax = 2.4e-5;
+    P.idleRpm = 1800.0;
+    P.starterTorque = 45.0;         // 13.2:1 is harder to crank over
+    P.revLimit = 13000.0; P.revResume = 12700.0;
+    P.pedalRate = 10.0;
+    // calibrated with --engine-type mxking --tuned yes --phystest: 18.8 N m at 11000 and 22.0 kW
+    // (29.5 hp) at 11500 rpm, against stock's 13.9 N m at 7000 and 11.2 kW at 8000; peaky below 8000
+    P.veBase = 0.55; P.vePeak = 0.74; P.veRpm = 11300.0; P.veWidth = 3400.0;
+    P.sparkFrom = 1800.0; P.sparkSpan = 6000.0;
+    P.rpmScale = 14000.0;
+    P.fuelCutRpm = 2800.0;
+    soundParams &S = P.sound;       // open race pipe
+    S.pipeLength = 1.2;             // expansion chamber and a short can
+    S.pipeLowHz = 2200.0; S.pipeResHz = 180.0; S.pipeResGain = 1.1;
+    S.flapShutHz = 4000.0; S.flapShutGain = 1.0;
+    S.intakeGain = 0.9;             // open filter: the intake honk comes through
+    S.popChance = 0.4;
+    S.drive = 0.5;
+    S.radiateHz = 300.0;
+    S.burble = 4.0;
+    S.tick = 0.25;
+    return P;
+}
+
+drivetrainParams mxkingTunedDriveParams() {
+    drivetrainParams P = mxkingDriveParams();
+    P.carMass = 160.0;              // ~100 kg stripped and a 60 kg rider
+    P.cdA = 0.33;                   // tucked in behind a small screen
+    P.wheelInertia = 0.4;           // lighter rims
+    P.clutchCapacity = 50.0;        // race clutch springs
+    P.clutchReleaseRate = 1.2;
+    P.openRpm = 2200.0; P.idleOpenRpm = 2400.0; P.biteSpan = 2000.0;
+    P.launchPedal = 4500.0;
+    P.upBase = 3000.0; P.upPedal = 9300.0;  // full throttle: change up at ~12,300
+    P.normalDown = 3500.0;
+    P.sportUp = 12500.0; P.sportDown = 9000.0;
+    P.downMax = 12000.0; P.kickRpm = 9000.0; P.kickMax = 12000.0; P.loadDownMax = 10000.0;
+    P.pickRpm = 7000.0; P.pickMax = 12000.0;
+    P.qsMaxRpm = 12700.0;
+    return P;
+}
+
+bikeSpec mxkingTunedSpec() {
+    bikeSpec S = mxkingSpec();
+    S.name = "Yamaha MX King race (177 cc)";
+    S.dispLo = 175; S.dispHi = 179;
+    S.limLo = 13000; S.limHi = 13500;
+    S.torqueWhat = "peak torque (race build, ~18-20 N m)"; S.torqueLo = 17.5; S.torqueHi = 20.5;
+    S.torqueRpmWhat = "peak torque rpm (race: high up)"; S.torqueRpmLo = 9500; S.torqueRpmHi = 11500;
+    S.powerWhat = "peak power (race build, ~20-22 kW)"; S.powerLo = 19.5; S.powerHi = 22.5;
+    S.powerRpmWhat = "peak power rpm (race: near the limiter)"; S.powerRpmLo = 11000; S.powerRpmHi = 12500;
+    S.sweepTo = 13000;
+    S.bikeWhat = "MX King gearing, 160 kg with rider (race)";
+    S.upshiftLo = 11800; S.upshiftHi = 13000;
+    S.topWhat = "top speed after 30 s (race, estimate)"; S.topLo = 145; S.topHi = 180;
+    S.flareLo = 2000; S.flareHi = 5000;
+    S.idleLo = 1650; S.idleHi = 1950;
+    S.idleGearLo = 1600; S.idleGearHi = 2100;
+    S.closedLo = 1600; S.closedHi = 2300;
+    S.neutralIdleLo = 1000; S.neutralIdleHi = 2700;
+    S.toLimiterLo = 0.2; S.toLimiterHi = 1.5;
+    S.shakeRpm = 10000;
+    S.shakeMax1st = 4000;                       // N: the bigger piston at 10,000 rpm
+    S.zeroTo100What = "0-100 km/h (race, estimate)"; S.zeroTo100Lo = 5.5; S.zeroTo100Hi = 10.0;
+    S.launchAccelLo = 0.4; S.launchAccelHi = 0.8;  // the light bike pulls harder off the line
+    S.shiftRpm = 11500; S.shiftRpmGentle = 10000;
+    S.neutralRevMin = 8000;
+    S.rejoinHi = 13500;
+    return S;
+}
+
+// the race pipe: a fatter, heat-blued header swelling into an expansion chamber under the crankcase,
+// then a short brushed-steel can with a carbon end cap, high and tucked in
+exhaustLayout mxkingTunedExhaust(const engineModel &e) {
+    exhaustLayout L;
+    const std::array<float, 4> BLUED{0.45f, 0.42f, 0.55f, 1.f}, STEEL{0.70f, 0.69f, 0.67f, 1.f},
+        CARBON{0.10f, 0.10f, 0.11f, 1.f};
+    auto pipe = [&](std::vector<vec3> pts, float r0, float r1, int cyl, std::vector<int> from, std::array<float, 4> rgba,
+                    float rough, float metal, bool capStart, bool capEnd) {
+        pipeSpec p;
+        p.pts = pts; p.r0 = r0; p.r1 = r1; p.cyl = cyl; p.from = from; p.rgba = rgba;
+        p.rough = rough; p.metal = metal;
+        p.capStart = capStart; p.capEnd = capEnd;
+        L.pipes.push_back(p);
+        return static_cast<int>(L.pipes.size()) - 1;
+    };
+    const cylinderGeom &g = e.cyls[0];
+    vec3 port = cylPoint(e, 0, 0.5f * g.bore + 12.f, g.deckY - 28.f);
+    vec3 out = port + cylDir(e, 0, 1.f, 0.f) * 30.f;
+    int header = pipe({port, out, {out.x - 10.f, 120.f, 10.f}, {60.f, 128.f, 30.f}}, 16.f, 18.f, 0, {}, BLUED, 0.25f, 0.95f,
+                      false, false);
+    // the expansion chamber: swells out under the crankcase and back in
+    int body = pipe({{60.f, 128.f, 30.f}, {0.f, 132.f, 55.f}, {-70.f, 126.f, 80.f}}, 18.f, 34.f, -1, {header}, BLUED,
+                    0.25f, 0.95f, false, false);
+    int cone = pipe({{-70.f, 126.f, 80.f}, {-140.f, 105.f, 105.f}, {-175.f, 85.f, 115.f}}, 34.f, 14.f, -1, {body}, BLUED,
+                    0.25f, 0.95f, false, false);
+    int can = pipe({{-175.f, 85.f, 115.f}, {-330.f, 20.f, 125.f}}, 30.f, 28.f, -1, {cone}, STEEL, 0.35f, 0.9f, true, true);
+    int cap = pipe({{-325.f, 22.f, 125.f}, {-348.f, 12.f, 126.f}}, 28.f, 18.f, -1, {can}, CARBON, 0.5f, 0.2f, true, false);
+    pipe({{-346.f, 13.f, 126.f}, {-358.f, 8.f, 126.f}}, 14.f, 14.f, -1, {cap}, STEEL, 0.3f, 0.9f, true, false);
+    L.outlets.push_back({{-358.f, 8.f, 126.f}, {-12.f, -5.f, 0.f}, 14.f});
+    return L;
+}
+
+const engineType &mxkingTunedType() {
+    static const engineType T = [] {
+        engineType t = mxkingType();
+        t.id = "mxking-tuned";
+        t.name = "Yamaha MX King race (177 cc)";
+        t.summary = "Yamaha MX King road-race build: 62 mm bore-up to 177 cc, race cam, 32 mm throttle, open pipe";
+        t.label = "Yamaha MX King race single, 177 cc, TUNED";
+        t.windowTitle = "Yamaha MX King (race)";
+        t.hudTag = "RACE";
+        t.meshFile = "engines/yamaha_mxking/mxking_race.mesh";
+        t.engine = mxkingTunedParams;
+        t.drive = mxkingTunedDriveParams;
+        t.spec = mxkingTunedSpec;
+        t.exhaust = mxkingTunedExhaust;
+        t.variants.clear();  // a variant has no variants of its own
         return t;
     }();
     return T;

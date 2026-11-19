@@ -240,6 +240,42 @@ for the rev-matched 2 → 1 downshift. `--phystest` checks the 1st-order shake a
 adds to rather than cancels. It never reaches 200 km/h, so it sets `zeroTo200What = nullptr` to skip
 that check. The superbike-sized gearbox drawing looks large next to this engine.
 
+#### Tuned (`--tuned yes`): race build
+
+```bash
+./engine_sim --engine-type mxking --tuned yes
+```
+
+A typical Indonesian underbone road-race build of the T150 engine. It is no one team's engine, and
+every number is an estimate. The changes:
+
+- a bore-up to 177 cc: a 62 mm forged piston in a replated barrel on the stock crank and rod. It has
+  its own mesh (`mxking_race.mesh`, written by `build_mxking.py` with the stock one), so the bigger
+  piston shows. The cam cover is red;
+- 13.2:1, a race cam with more lift and overlap (intake closes ~70° after BDC, exhaust opens ~65°
+  before BDC), stiffer valve springs and a 13000 rpm limiter;
+- a 32 mm throttle body, an open race filter and a race-fuel map;
+- a lighter magneto rotor. It idles higher (1800 rpm) and lumpier, and needs a stronger starter for
+  the compression;
+- an open race pipe: a fatter, heat-blued header that swells into an expansion chamber under the
+  crankcase, then a short steel can with a carbon end cap. It's louder, with more crackle and intake
+  honk;
+- a stripped bike (~100 kg) and a 60 kg rider tucked in, with race clutch springs. The gearbox and
+  sprockets are stock.
+
+| | Stock | Race (sim) |
+|---|---|---|
+| Engine | 57.0 × 58.7 mm, 149.7 cc, 10.4:1 | 62.0 × 58.7 mm, 177 cc, 13.2:1 |
+| Peak torque | 13.9 N·m at 7000 rpm | 18.8 N·m at 11000 rpm |
+| Peak power | 11.2 kW (15 hp) at 8000 rpm | 22.0 kW (29.5 hp) at 11500 rpm |
+| Limiter | ~10300 rpm | 13000 rpm |
+| Idle | 1400 rpm | 1800 rpm |
+| 0–100 km/h | 13.6 s | 7.3 s |
+| After 30 s in 5th | ~117 km/h | ~163 km/h |
+
+It is peaky: below ~8000 rpm it makes less torque than the stock engine. The HUD shows RACE after
+the rpm.
+
 ### Exhaust
 
 Each engine draws its exhaust beside the block (not with `--engine-only`). The pipes are swept tubes
@@ -358,7 +394,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--grade pct --reverse --sport --no-wheelie` | Starting conditions |
 | `--turbo yes\|no` (or `--turbo=yes`) | Fit the turbocharger to the inline-4 (default `no`; see below). With `--phystest`, runs the turbo checks; with `--wav`, plays the turbo drive |
 | `--bov yes\|no` | With the turbo: fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
-| `--variant name` | Another version of the engine (`v4`, `s1000rr` and `h2` have one: `tuned`) |
+| `--variant name` | Another version of the engine (`v4`, `s1000rr`, `h2` and `mxking` have one: `tuned`) |
 | `--tuned yes\|no` | Same as `--variant tuned` (default `no`) |
 | `--compare a.png b.png` | Pixel diff of two screenshots |
 | `--synthtest N` | Hidden: test an N-cylinder inline engine built in memory (see [Testing](#testing)) |
@@ -400,8 +436,8 @@ engines/
                             build_s1000rr.py, s1000rr.mesh
   kawasaki_h2/              kawasaki_h2.hpp (engine, supercharger, sound, gearing, test targets, demo ride,
                             type), build_h2.py, h2.mesh, h2_supercharger.mesh
-  yamaha_mxking/            mxking.hpp (engine, sound, gearing, test targets, type), build_mxking.py,
-                            mxking.mesh
+  yamaha_mxking/            mxking.hpp (engine, sound, gearing, test targets, type, race version),
+                            build_mxking.py, mxking.mesh, mxking_race.mesh
   _template/                a new engine to copy (not built): myengine.hpp, build_myengine.py, engine.mk
 tools/meshlib.py            the mesh builders' shared steps and the ENGMSHv3 writer
 scripts/

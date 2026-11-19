@@ -5,7 +5,8 @@ well forward as in an underbone frame.
 
 Standard library only. Usage:
     python3 -I engines/yamaha_mxking/build_mxking.py [i4_mesh] [out_file]
-    (defaults: engines/inline4_fit/engine.mesh -> mxking.mesh next to this file)
+    (defaults: engines/inline4_fit/engine.mesh -> mxking.mesh next to this file; the race engine,
+    mxking_race.mesh, goes next to it)
 
 tools/meshlib.py's inline_engine() does the work: it scales the inline-4's piston and rod to the bore,
 stroke and rod length, builds a flat crank with one throw per cylinder (pins placed for the even
@@ -37,6 +38,11 @@ FIRING = (1,)           # a single: fires once every 720 deg
 # cam cover material: r, g, b, a, metallic, roughness, blend (1: see-through like the block)
 COVER = (0.10, 0.18, 0.55, 0.30, 0.0, 0.5, 1)  # Yamaha racing blue
 
+# the race engine (--tuned yes, mxking_race.mesh): the usual road-race bore-up, a 62 mm forged piston
+# in a replated barrel on the stock crank (62 x 58.7: 177 cc); the rod and the head stay
+RACE_BORE = 62.0
+RACE_COVER = (0.60, 0.08, 0.06, 0.30, 0.0, 0.5, 1)  # a red race cam cover
+
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
@@ -44,6 +50,10 @@ def main():
     out_file = sys.argv[2] if len(sys.argv) > 2 else os.path.join(here, "mxking.mesh")
     inline_engine(src, out_file, "Yamaha MX King 150 single", BORE, STROKE, ROD_L, PITCH, INCLINE,
                   FIRING, COVER)
+    # the race engine, next to the stock one
+    race_file = os.path.join(os.path.dirname(out_file), "mxking_race.mesh")
+    inline_engine(src, race_file, "Yamaha MX King race single (bore-up)", RACE_BORE, STROKE, ROD_L, PITCH,
+                  INCLINE, FIRING, RACE_COVER)
 
 
 if __name__ == "__main__":
