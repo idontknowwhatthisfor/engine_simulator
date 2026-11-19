@@ -188,8 +188,8 @@ const engineType &kawasakiH2Type() {
 // ---- --tuned yes: a top-end tune ------------------------------------------------------------------
 // What a race-kit H2 does to move the power peak up toward the 14000 rpm redline (estimates, not a
 // published kit):
-//   - higher-lift cams: the engine breathes best near 12000 rpm instead of 9000; the bottom end
-//     stays stock (the pull-away is no weaker), the 8000-10000 mid range gives a little
+//   - higher-lift cams: the engine breathes best near 12000 rpm instead of 9000. It trades mid range
+//     for top end: stock up to ~3000 rpm, 16-18% less torque at 6000-8000, stronger above ~10700
 //   - a stiffer spring in the plenum relief valve: the boost keeps climbing with the revs (rpm^2)
 //     instead of being held from ~10500
 //   - race fuel and a remapped ECU: less spark taken out for boost and the hot charge

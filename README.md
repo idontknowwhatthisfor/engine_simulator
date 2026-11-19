@@ -93,11 +93,16 @@ Built from the inline-4's piston and rod, scaled, on a new procedural crank and 
 ```
 
 Ducati's own accessory route to more power: the full titanium racing exhaust (made by Akrapovič) and
-the ECU map that comes with it, quoted at about 226 hp (166 kW) against the stock 214. The engine,
-limiter, gearbox and gearing stay stock. The changes:
+the ECU map that comes with it, quoted at about 226 hp (166 kW) against the stock 214. On top of that,
+for top speed, a higher limiter and taller gearing (estimates, not Ducati's kit). The engine and the
+gearbox stay stock. The changes:
 
-- the freer system and the map: the engine breathes better from ~7000 rpm up, most of all at the top,
-  and the map adds a little spark advance;
+- the freer system and the map: more torque everywhere, from ~+1% at 4000–6000 rpm growing to ~+7% at
+  the top, and the map adds a little spark advance;
+- the map's limiter is 500 rpm up, at 14500 rpm, and the full-throttle upshift moves to ~14100 rpm;
+- a 38-tooth rear sprocket in place of the 41 (16/38): every gear ~8% taller, so 6th now runs out where
+  the power and the drag balance instead of on the stock limiter. The taller 1st makes a gentle 25%
+  take-off bog to ~780 rpm (`takeoffMinRpm = 700`);
 - the exhaust: heat-blued titanium headers a size up on the stock route, a titanium collector under the
   engine in place of the black pre-silencer, and two short titanium cans stacked on the right with
   carbon end caps. No exhaust valve;
@@ -107,8 +112,12 @@ limiter, gearbox and gearing stay stock. The changes:
 |---|---|---|
 | Peak torque | 124 N·m at 10500 rpm | 130 N·m at 11000 rpm |
 | Peak power | 155 kW (208 hp) at 13000 rpm | 164.5 kW (221 hp) at 13000 rpm |
-| 0–200 km/h | 6.8 s | 6.8 s |
-| After 30 s in 6th | ~290 km/h | ~292 km/h (6th tops out at the 14000 limiter) |
+| Limiter | 14000 rpm | 14500 rpm |
+| Chain | 16/41 | 16/38 |
+| Top of 1st / 2nd / 3rd (from the gearing) | ~136 / 174 / 212 km/h | ~152 / 194 / 237 km/h |
+| 0–100 km/h | 3.3 s | 3.3 s |
+| 0–200 km/h | 6.8 s | 6.7 s |
+| After 30 s in 6th | ~290 km/h (on the 14000 limiter) | ~326 km/h |
 
 The HUD shows TUNED after the rpm.
 
@@ -197,8 +206,9 @@ The 3D supercharger (`h2_supercharger.mesh`, written by `build_h2.py` with the e
 A top-end tune that moves the peak up toward the 14000 rpm redline. The block, supercharger,
 gearing and limiter stay stock; the changes are estimates of a race kit, not a published one:
 
-- higher-lift cams: the engine breathes best near 12000 rpm instead of 9000. The bottom end stays
-  stock (the pull-away is no weaker); the 8000–10000 rpm mid range gives a little;
+- higher-lift cams: the engine breathes best near 12000 rpm instead of 9000. It trades mid range for
+  top end: stock up to ~3000 rpm, then weaker up to ~10700 rpm (16–18% less torque at 6000–8000 rpm),
+  and stronger above it (+20–30% from 12000 rpm). It feels flat out of slow corners until ~11000 rpm;
 - the exhaust opens 10° earlier, so it blows down in time at 14000 rpm;
 - a stiffer spring in the plenum relief valve: about +1.2 bar at the top instead of +1.0;
 - race fuel: less spark taken out for boost and for the hot charge;
@@ -210,6 +220,7 @@ gearing and limiter stay stock; the changes are estimates of a race kit, not a p
 | | Stock | Tuned (sim) |
 |---|---|---|
 | Peak torque | 133 N·m at 10500 rpm | 142 N·m at 12000 rpm |
+| Torque at 6000 / 8000 rpm | 96 / 117 N·m | 80 / 96 N·m |
 | Peak power | 147.5 kW (198 hp) at 11000 rpm | 186 kW (250 hp) at 13500 rpm |
 | 0–200 km/h | 7.0 s | 6.8 s |
 | After 30 s in 6th | ~312 km/h | ~340 km/h |

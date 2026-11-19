@@ -223,17 +223,22 @@ const engineType &ducatiV4Type() {
     return T;
 }
 
-// ---- --tuned yes: the race exhaust and its map ------------------------------------------------------
+// ---- --tuned yes: the race exhaust and its map, a higher limiter and taller gearing -------------------
 // Ducati's accessory route to more power for the Desmosedici Stradale: a full titanium racing exhaust
 // (Akrapovic-made) with the ECU map that comes with it, quoted at about 226 hp (166 kW) against the
-// stock 214. The engine itself is stock: the gains are at the top, where the freer system lets the
-// cylinders empty and fill better (the bigger, unrestricted collector and short cans), and the map
-// adds a little spark and fuel. The limiter, gearbox and gearing are stock.
+// stock 214. The engine itself is stock: the freer system lets the cylinders empty and fill better
+// (the bigger, unrestricted collector and short cans), and the map adds a little spark and fuel. The
+// gain starts low (~+1% at 4000-6000 rpm) and grows to ~+7% at the top.
+// For top speed (estimates, not Ducati's kit): the map's limiter is 500 rpm up at 14500, and a 38-tooth
+// rear sprocket in place of the 41 gears every ratio ~8% taller, so 6th runs out near the power peak
+// instead of on the stock limiter. The gearbox itself is stock.
 engineParams ducatiV4TunedParams() {
     engineParams P = ducatiV4Params();
     // calibrated with --engine-type v4 --tuned yes --phystest: 130 N m at 11000 and 164.5 kW at
-    // 13000 rpm, against stock's 124 N m at 10500 and 155 kW; a little more everywhere above 7000
+    // 13000 rpm, against stock's 124 N m at 10500 and 155 kW; more everywhere, ~+1% at 4000-6000 rpm
+    // growing to ~+7% at the top
     P.veBase = 0.60; P.vePeak = 0.60; P.veRpm = 11400.0; P.veWidth = 6000.0;
+    P.revLimit = 14500.0; P.revResume = 14100.0;  // the race map's limiter
     P.sparkHigh = 37.0;             // race map
     soundParams &S = P.sound;       // open race system, no exhaust valve
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
@@ -284,6 +289,16 @@ exhaustLayout ducatiV4TunedExhaust(const engineModel &e) {
     return L;
 }
 
+// taller gearing: a 38-tooth rear sprocket (16/38, 2.375) in place of the stock 41 (2.563), and the
+// full-throttle upshift moved up with the limiter
+drivetrainParams ducatiV4TunedDriveParams() {
+    drivetrainParams P = ducatiDriveParams();
+    P.finalDrive = 38.0 / 16.0;
+    P.upPedal = 9800.0;             // full throttle: change up just under the 14500 limiter
+    P.sportUp = 14000.0; P.sportDown = 9800.0;
+    return P;
+}
+
 bikeSpec ducatiV4TunedSpec() {
     bikeSpec S = ducatiSpec();
     S.name = "Ducati V4 (tuned)";
@@ -293,9 +308,13 @@ bikeSpec ducatiV4TunedSpec() {
     S.powerRpmWhat = "peak power rpm (tuned)";
     S.torqueLo = 118; S.torqueHi = 140; S.torqueRpmLo = 9500; S.torqueRpmHi = 12000;
     S.powerLo = 158; S.powerHi = 178; S.powerRpmLo = 12500; S.powerRpmHi = 14000;
-    S.bikeWhat = "Panigale V4 gearing, 278 kg with rider (tuned)";
-    S.topWhat = "top speed after 30 s, 6th gear (tuned)";
-    S.topLo = 275; S.topHi = 315;
+    S.limLo = 14500; S.limHi = 15100;
+    S.sweepTo = 14500;
+    S.bikeWhat = "Panigale V4, 16/38 chain, 278 kg with rider (tuned)";
+    S.upshiftLo = 13000; S.upshiftHi = 14600;
+    S.topWhat = "top speed after 30 s, 6th gear (tuned, taller gearing)";
+    S.topLo = 295; S.topHi = 335;
+    S.takeoffMinRpm = 700;          // the taller 1st: a 25% take-off bogs deeper (~780 rpm)
     return S;
 }
 
@@ -304,11 +323,12 @@ const engineType &ducatiV4TunedType() {
         engineType t = ducatiV4Type();
         t.id = "v4-tuned";
         t.name = "Ducati V4 (tuned)";
-        t.summary = "Ducati Desmosedici Stradale V4, tuned: titanium race exhaust and its map, no exhaust valve";
+        t.summary = "Ducati Desmosedici Stradale V4, tuned: titanium race exhaust and its map, 14500 limiter, 16/38 gearing";
         t.label = "Ducati-style 90 deg V4, 1103 cc, TUNED";
         t.windowTitle = "V4 engine (tuned)";
         t.hudTag = "TUNED";
         t.engine = ducatiV4TunedParams;
+        t.drive = ducatiV4TunedDriveParams;
         t.spec = ducatiV4TunedSpec;
         t.exhaust = ducatiV4TunedExhaust;
         t.variants.clear();  // a variant has no variants of its own
