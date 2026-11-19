@@ -149,7 +149,8 @@ carSpec audiRs3Car() {
     S.turboMaxLo = 80; S.turboMaxHi = 180;
     S.spoolRpm = 2500; S.spoolLo = 0.3; S.spoolHi = 2.5;
     S.carWhat = "1645 kg with driver, 7-speed S tronic, quattro";
-    S.zeroTo100What = "0-100 km/h (Audi: 3.8 s)"; S.zeroTo100Lo = 3.4; S.zeroTo100Hi = 4.4;
+    S.zeroTo100What = "0-100 km/h, no launch control"; S.zeroTo100Lo = 3.6; S.zeroTo100Hi = 4.6;
+    S.launchTo100What = "0-100 km/h, launch control (Audi: 3.8 s)"; S.launchTo100Lo = 3.5; S.launchTo100Hi = 4.1;
     S.zeroTo200What = "0-200 km/h (tests: ~12-13 s)"; S.zeroTo200Lo = 10.5; S.zeroTo200Hi = 14.5;
     S.launchLo = 2500; S.launchHi = 5000;
     S.wotUpLo = 6400;

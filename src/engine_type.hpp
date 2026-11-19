@@ -100,6 +100,10 @@ struct carSpec {
     const char *zeroTo200What = nullptr;         // nullptr: no 0-200 check
     double zeroTo200Lo = 0.0, zeroTo200Hi = 0.0;
     double launchLo = 0.0, launchHi = 0.0;       // peak rpm in the first 0.6 s of a WOT launch (0: no check)
+    // launch control: brake and full throttle held 2 s at a standstill (the car must stay put, the revs
+    // held), then the brake released: 0-100 km/h from the release. nullptr: no check
+    const char *launchTo100What = nullptr;
+    double launchTo100Lo = 0.0, launchTo100Hi = 0.0;  // s
     double wotUpLo = 0.0;                        // lowest WOT upshift rpm (at most the limiter + 100)
     double lightUpLo = 2000.0, lightUpHi = 3500.0;  // first upshift at 20% pedal, rpm
     double hillPedal = 0.35, hillGrade = 0.12;   // cruise at this pedal 15 s, then this grade...

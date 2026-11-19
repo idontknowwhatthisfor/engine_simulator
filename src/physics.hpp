@@ -598,6 +598,13 @@ struct drivetrain {
         }
         else if (std::fabs(v) < 3.0 && gear <= 2) target = std::clamp((rpmFilt - P.openRpm - P.launchPedal * pedal) / P.biteSpan, 0.0, 1.0);
         else target = 1.0;
+        // brakes on at a standstill (launch control: brake and throttle together): the box lets the clutch
+        // carry only what the brakes can hold, so the car stays put while the engine works against them,
+        // held at the launch rpm, and the turbo builds boost. Let go of the brake and it launches on boost
+        if (brake && std::fabs(v) < 0.5 && gear != 0) {
+            double kRatio = std::fabs(ratio()) * P.finalDrive / P.wheelRadius;
+            target = std::min(target, 0.8 * mass() * P.brakeDecel / (P.clutchCapacity * kRatio * P.efficiency));
+        }
         double rate = target > clutch || launch ? 2.5 : 8.0;  // launch: ease both ways so it doesn't hunt
         clutch += std::clamp(target - clutch, -rate * dt, rate * dt);
 
@@ -674,8 +681,9 @@ struct drivetrain {
                         0.5 * P.airDensity * P.cdA * v * std::fabs(v) + m * g * std::sin(th);
         double mEff = m + P.wheelInertia / (P.wheelRadius * P.wheelRadius) +
                       (coupled() ? P.inputInertia * kRatio * kRatio : 0.0);
-        // brake, plus hill-hold in automatic when stopped with the throttle closed
-        bool hold = brake || (automatic && pedal < 0.03 && std::fabs(v) < 0.5);
+        // brake, plus hill-hold when the box works the clutch (automatic, manual DCT): stopped with the
+        // throttle closed, the brakes stay on until the throttle opens
+        bool hold = brake || (boxWorksClutch() && pedal < 0.03 && std::fabs(v) < 0.5);
         double brakeMax = hold ? m * P.brakeDecel : 0.0;
         double fNet = wheelForce - resist;
         double a;

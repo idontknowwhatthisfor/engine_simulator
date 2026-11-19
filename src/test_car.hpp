@@ -463,6 +463,33 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
         check(sp ? "sport: pulls away after the stop" : "normal: pulls away after the stop", sim.drive.v * 3.6, 5, 80, "km/h");
         sim.drive.sport = false;
     }
+    if (S.launchTo100What) {
+        // launch control: brake and full throttle together. The box only lets the clutch carry what the
+        // brakes hold, the engine works against them at the launch rpm and a turbo builds boost; let go
+        // of the brake and it launches
+        startCar(true);
+        sim.drive.brake = true;
+        sim.pedalTarget = 1.0;
+        double creep = 0.0, rpmSum = 0.0;
+        int n = 0;
+        run(1.0, none);
+        run(1.0, [&] { creep = std::max(creep, std::fabs(sim.drive.v)); rpmSum += sim.rpm(); n++; });
+        double boost = sim.boostBar();
+        std::printf("  launch control: held at %.0f rpm, boost %+.2f bar (target %+.2f), clutch %.2f\n", rpmSum / n, boost,
+                    target(sim.rpm()), sim.drive.clutch);
+        check("launch control: car held still by the brakes", creep * 3.6, 0.0, 0.5, "km/h");
+        double lr = sim.drive.launchRpm(1.0);
+        check("launch control: revs held near the launch rpm", rpmSum / n, lr - 800.0, lr + 800.0, "rpm");
+        if (boosted) check("launch control: boost built against the brakes", boost / target(sim.rpm()), 0.7, 1.2, "x tgt");
+        sim.drive.brake = false;
+        t0 = sim.time;
+        double t100 = -1.0;
+        while (t100 < 0.0 && sim.time - t0 < 20.0) {
+            run(0.001, none);
+            if (sim.drive.v * 3.6 >= 100.0) t100 = sim.time - t0;
+        }
+        check(S.launchTo100What, t100, S.launchTo100Lo, S.launchTo100Hi, "s");
+    }
     {
         // reverse at a standstill, and drive refused while rolling backwards
         startCar(true);
@@ -594,6 +621,32 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
         check("manual DCT: anti-stall braking to the stop", lowest, 500, REV_LIMIT, "rpm");
         check("manual DCT: in 1st once stopped", stoppedGear, 1, 1, "");
         check("manual DCT: pulls away after the stop", sim.drive.v * 3.6, 5, 70, "km/h");
+        // hill-hold: stopped on a 15% hill in 1st with the brake released and the throttle shut, it stays
+        // put; then the throttle pulls it up the hill
+        sim.pedalTarget = 0.0;
+        sim.drive.brake = true;
+        while (sim.drive.v > 0.01 && sim.time < 500.0) run(0.001, none);
+        sim.drive.grade = 0.15;
+        run(1.0, none);
+        sim.drive.brake = false;
+        double rolled = 0.0;
+        run(2.0, [&] { rolled = std::min(rolled, sim.drive.v); });
+        check("manual DCT: hill-hold on 15% (most roll back)", -rolled * 3.6, 0.0, 0.5, "km/h");
+        sim.pedalTarget = 0.4;
+        run(3.0, none);
+        check("manual DCT: pulls away up the hill", sim.drive.v * 3.6, 5, 70, "km/h");
+        sim.drive.grade = 0.0;
+    }
+    {
+        // manual NORMAL has no hill-hold: on the same hill in neutral with the brake released, it rolls back
+        startCar(false);
+        sim.drive.grade = 0.15;
+        sim.drive.brake = true;
+        run(0.5, none);
+        sim.drive.brake = false;
+        run(1.0, none);
+        check("manual normal: no hill-hold, rolls back on 15%", sim.drive.v * 3.6, -40, -1, "km/h");
+        sim.drive.grade = 0.0;
     }
 
     std::printf("%s\n", ok ? "PASS" : "FAIL");
