@@ -217,7 +217,7 @@ engineParams kawasakiH2TunedParams() {
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
     S.flapShutGain = 1.0;
     S.popChance = 0.5;
-    S.drive = 0.097;
+    S.drive = 0.1039;
     S.pipeLength = 1.1;             // the short race can (kawasakiH2TunedExhaust): a shorter pipe, a higher note
     S.pipeResHz = 230.0;
     return P;

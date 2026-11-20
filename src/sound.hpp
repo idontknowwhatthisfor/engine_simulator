@@ -526,6 +526,7 @@ struct engineSound {
     // turbo: compressor whistle, intake whoosh, blow-off valve, surge flutter
     biquad whoosh, bovBand, bovHigh, flutterBand, flutterThump;
     double whistlePhase = 0.0, splitterPhase = 0.0;
+    double ventAvg = 0.0;             // the supercharger bypass's flow averaged over ~0.15 s (its chirp)
 
     // for this simulation's engine (its sound parameters, idle speed and cylinder count) and, when
     // given, its drawn exhaust: the detailed voice's pipes then follow the layout (unless
@@ -792,7 +793,8 @@ private:
     //   - whistle: the compressor's blade pass (6 full blades, 6 splitters) at the shaft speed,
     //     louder with the air it moves
     //   - whoosh: broadband rush of the intake air through the compressor
-    //   - blow-off valve: the vented charge hisses out ("pssh"), following the flow through it
+    //   - blow-off valve: the vented charge hisses out ("pssh"), following the flow through it; a
+    //     supercharger's bypass valve, which recirculates inside the intake, only chirps as it opens
     //   - surge flutter: each backflow burst through the stalled compressor chuffs ("stu-tu-tu")
     double turboVoice(const engineSim &sim) {
         if (!sim.P.turbo.on) return 0.0;
@@ -809,6 +811,13 @@ private:
         double pr = std::max(0.0, sim.pCharge / sim.P.pAtm - 1.0);
         double rush = 0.35 * whoosh.run(noise() * flow * (0.3 + pr));
         double vent = std::pow(std::clamp(sim.bovFlow / 0.05, 0.0, 1.5), 1.5);  // a trickle at idle vacuum is near silent
+        if (sim.P.turbo.supercharger) {
+            // a supercharger's bypass valve recirculates the air back to the inlet inside the intake
+            // instead of venting it: it chirps as it snaps open (the part of the flow that is new,
+            // over its ~0.15 s average) and the steady recirculation is only a faint rush
+            ventAvg += (vent - ventAvg) * (1.0 - std::exp(-1.0 / (0.15 * fs)));
+            vent = std::max(0.0, vent - ventAvg) + 0.12 * vent;
+        }
         double pssh = 0.9 * bovHigh.run(bovBand.run(noise() * vent));
         double back = std::clamp(-sim.compFlow / 0.03, 0.0, 1.5);
         double flutter = sim.surge * (0.8 * flutterBand.run(noise() * back) + 2.0 * flutterThump.run(back));
