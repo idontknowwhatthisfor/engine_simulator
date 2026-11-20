@@ -251,10 +251,13 @@ engineParams ducatiV4TunedParams() {
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
     S.flapShutGain = 1.0;
     S.popChance = 0.6;
-    S.drive = 0.1436;
+    S.drive = 0.1523;
     S.pipeLength = 1.3;             // the same headers into short cans: a little shorter, a higher note
     S.pipeResHz = 170.0;
     S.burble = 3.5;                 // a harder lope at idle with the valve gone
+    // with no silencer the turbulent rasp came within 3-5 dB of the note (a roar more than an
+    // engine): turned down, the note stands 8-10 dB over the noise under load, as on the stock bike
+    S.raspGain = 0.4;
     return P;
 }
 
