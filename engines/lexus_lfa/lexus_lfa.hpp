@@ -67,9 +67,11 @@ engineParams lexusLfaParams() {
     S.burbleFadeFrom = 3500.0; S.burbleFadeSpan = 3000.0; S.burbleHigh = 0.4;
     S.tick = 0.12;
     // ten cylinders' exhaust strokes overlap (about three at once), so the summed outflow hardly drops
-    // between pulses and the turbulent rasp, which follows it squared, would drown the firing note:
-    // an eighth of it leaves the note ~9-11 dB above the roar on throttle
-    S.raspGain = 1.0 / 8.0;
+    // between pulses and the turbulent rasp, which follows it squared, is strong. 0.4, as on the
+    // tuned V4: the straight-pipe car keeps a rasp like the other straight pipes; this car's catalysts
+    // and silencer take most of it (src/sound.hpp raspThrough). It was an eighth when the rasp skipped
+    // the silencers
+    S.raspGain = 0.4;
     return P;
 }
 
@@ -310,7 +312,7 @@ engineParams lexusLfaTunedParams() {
     P.vePeak = 0.37;
     P.sparkHigh = 33.0;
     // straight pipe: no silencer and no valve, so it is always "open", rings harder, louder, more
-    // crackle. The rasp stays at the stock car's eighth (a full-strength rasp drowns the V10's note)
+    // crackle. The rasp stays at the stock car's 0.4 (a full-strength rasp drowns the V10's note)
     soundParams &S = P.sound;
     S.flapOpenRpm = -1e6; S.flapShutGain = 1.0;  // nothing to shut
     S.pipeLength = 2.4;             // valve to the tips, no silencer volume in between
