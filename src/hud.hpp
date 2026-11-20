@@ -35,7 +35,7 @@ std::string helpText(const engineSim &sim) {
         if (sim.P.turbo.on) s += sim.P.turbo.supercharger ? "  F: bypass" : "  F: BOV";  // the boost valve
         s += "\n";
     }
-    s += "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: sound  D: dyno  X: shake  P: pause  R: reset";
+    s += "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: sound  K: leveller  D: dyno  X: shake  P: pause  R: reset";
     return s;
 }
 
@@ -45,6 +45,8 @@ struct hudView {
     double timeScale = 1.0;
     bool paused = false;
     const char *sound = "off";    // "stereo", "mono", "muted" or "off"
+    bool leveller = false;        // the playback leveller (K) is on
+    double levelGainDb = 0.0;     // its boost now
     float shakeView = 1.f;
     bool ghost = true, blur = true;
     const exhaustModel *exhaust = nullptr;  // drawn exhaust (nullptr: none)
@@ -130,7 +132,7 @@ std::string hudText(const engineSim &sim, const engineType &type, const engineMo
     // FUEL CUT, REV CUT... come and go
     s += "\n" + flags + "\n shake 1st " + p2(sim.shake1() / 1000.0, 5) +
          " kN  2nd " + p2(sim.shake2() / 1000.0, 5) + " kN  roll +-" + p0(sim.rollAmp(), 4) + " N m" +
-         "\n sound " + v.sound + "  shake view x" + f0(v.shakeView) + "  block " + (v.ghost ? "ghost" : "hidden") + "  blur " +
+         "\n sound " + v.sound + (v.leveller ? " lvl +" + f0(v.levelGainDb) + " dB" : " lvl off") + "  shake view x" + f0(v.shakeView) + "  block " + (v.ghost ? "ghost" : "hidden") + "  blur " +
          (v.blur ? "on" : "off");
     if (type.hudFiringLine) s += "\n firing (" + hudFiring(type, eng) + "):";
     return s + strokes;

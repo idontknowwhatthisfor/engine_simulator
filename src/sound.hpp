@@ -2,6 +2,7 @@
 #pragma once
 #include "physics.hpp"
 #include "exhaust.hpp"
+#include "leveller.hpp"
 
 // ---------------------------------------------------------------------------------------------
 // engine sound: synthesised from the simulation at the physics rate
@@ -1069,6 +1070,8 @@ public:
     audioRing ring;
     std::atomic<double> simPerOut{40000.0 / RATE};  // simulation samples per output sample
     std::atomic<bool> muted{false};
+    std::atomic<bool> levelling{true};  // the playback leveller (src/leveller.hpp), K in the window
+    std::atomic<float> levelGain{1.f};  // its current gain, for the HUD
 
     engineAudio() { initialize(2, RATE, {sf::SoundChannel::FrontLeft, sf::SoundChannel::FrontRight}); }
     ~engineAudio() override { stop(); }
@@ -1079,6 +1082,7 @@ private:
     audioFrame last;
     float vol = 1.f;
     sincResampler rsL, rsR;
+    playbackLeveller leveller{RATE};
 
     bool onGetData(Chunk &data) override {
         double base = simPerOut.load();
@@ -1098,9 +1102,15 @@ private:
                 rsR.push(last.r);
             }
             vol += ((muted.load() ? 0.f : 1.f) - vol) * 0.002f;
-            out[k] = static_cast<std::int16_t>(std::clamp(rsL.at(frac) * vol, -1.f, 1.f) * 30000.f);
-            out[k + 1] = static_cast<std::int16_t>(std::clamp(rsR.at(frac) * vol, -1.f, 1.f) * 30000.f);
+            float l = rsL.at(frac), r = rsR.at(frac);
+            leveller.process(l, r);
+            l = engineSound::limit(l);  // what the lookahead did not catch
+            r = engineSound::limit(r);
+            out[k] = static_cast<std::int16_t>(std::clamp(l * vol, -1.f, 1.f) * 30000.f);
+            out[k + 1] = static_cast<std::int16_t>(std::clamp(r * vol, -1.f, 1.f) * 30000.f);
         }
+        leveller.on = levelling.load();
+        levelGain = static_cast<float>(leveller.gain());
         data.samples = out.data();
         data.sampleCount = out.size();
         return true;

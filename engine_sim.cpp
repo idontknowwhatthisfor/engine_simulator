@@ -474,6 +474,7 @@ int main(int argc, char **argv) {
                     soundOut = soundOut == soundMode::mono ? soundMode::stereo : soundOut == soundMode::stereo ? soundMode::muted : soundMode::mono;
                     audio->muted = soundOut == soundMode::muted;
                 }
+                if (e->code == K::K && audio) audio->levelling = !audio->levelling;  // playback leveller
                 if (e->code == K::D) showDyno = !showDyno;
                 if (e->code == K::X) shakeIdx = (shakeIdx + 1) % 3;
                 if (e->code == K::P) paused = !paused;
@@ -563,6 +564,8 @@ int main(int argc, char **argv) {
             hv.timeScale = TIME_SCALES[scaleIdx];
             hv.paused = paused;
             hv.sound = !audio ? "off" : soundOut == soundMode::stereo ? "stereo" : soundOut == soundMode::mono ? "mono" : "muted";
+            hv.leveller = audio && audio->levelling;
+            hv.levelGainDb = audio ? 20.0 * std::log10(std::max(1.0f, audio->levelGain.load())) : 0.0;
             hv.shakeView = SHAKE_VIEWS[shakeIdx];
             hv.ghost = ghost == 0;
             hv.blur = blur;

@@ -18,6 +18,13 @@ the sound card's 44.1 kHz through a windowed-sinc filter. Each engine's level (`
 is linear and set so its loudest moments stay under full scale; a limiter near full scale is only a
 safety net, so the waveform is not flattened.
 
+In the window only, a playback leveller (`src/leveller.hpp`, K toggles it, on by default) rides the
+gain of what goes to the sound card: quiet stretches (idle, cruising, a single's gaps between firings)
+come up toward -18 dBFS RMS, by up to +15 dB, while full throttle stays about where it is and peaks
+stay near 0.70. One gliding gain for both channels with a 6 ms lookahead, so it adds no harmonics.
+It runs on the audio thread after resampling; `--wav`, `--stats` and the tests are upstream of it and
+unchanged. The HUD's sound line shows its boost (`lvl +N dB`).
+
 Each cylinder's exhaust pulse is its gas escaping through the exhaust valves as they lift: compressible
 flow through the valves' open area (choked at high pressure ratios), the cylinder emptying from the
 pressure the combustion left, or, on the overrun, drawing the pipe's hot gas back in; the piston's push
@@ -657,6 +664,7 @@ calibrated so that the published torque and power come out of the physics.
 | `[` / `]` | Slow motion / back toward real time (×1 … ×0.01) |
 | `,` / `.` | When paused: step the crank by 1° |
 | G / B / M / D / X | See-through block / motion blur / sound: mono → stereo → muted / full-throttle dyno chart / shake view (×1, ×20, ×100) |
+| K | Playback leveller on / off (lifts the quiet stretches in the window; `--wav` is never levelled) |
 | P / R / Esc | Pause / reset / quit |
 
 ## Command-line options
@@ -697,6 +705,7 @@ src/
   calibration.hpp           VE_*, RAM_*, SCAV_*, FMEP_*, IDLE_*, SND_*... overrides for calibrating (every --phystest, --wav)
   hud.hpp                   the HUD and help line, built from what the engine has
   sound.hpp, wav.hpp        sound synthesis + audio stream, --wav rendering
+  leveller.hpp              playback leveller (the window's stream only)
   dyno.hpp                  the WOT dyno curve (D), measured in the background (and --dyno)
   bike_gearbox.hpp          the bikes' sequential gearbox (3D)
   test_bike.hpp             --phystest for the bikes, checked against each engine's bikeSpec
