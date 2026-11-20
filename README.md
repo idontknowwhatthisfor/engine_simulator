@@ -178,7 +178,7 @@ A typical big-turbo build (estimates, not one tuner's car) on the stock 82.5 × 
 | Gearbox | Stock ratios; a gearbox tune: more clutch clamping (950 N·m), full-throttle upshifts at ~7300 rpm, launch control a little higher (~4900 rpm on 1.5 bar) |
 | Results (sim) | 0–100 km/h 3.0 s with launch control (3.6 s floored from idle), 0–200 km/h 10.8 s |
 | 3D | Straight pipe: the downpipe and the mid pipe a size up, straight pipes where the catalyst and the rear silencer were, no flap, bigger blued titanium tips. The physics is unchanged by it (the header's waves reflect at the manifold's merge over the turbine, upstream) |
-| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~10 dB at idle, 1–2 dB on lift-off and at full throttle, which stays the loudest; ~8 dB with the ignition off), more crackle, more turbo |
+| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~9 dB at idle, ~4 dB at full throttle, which stays the loudest, 1–3 dB on lift-off, ~7 dB with the ignition off), more crackle, more turbo |
 
 
 ### `lfa`: Lexus LFA (2010-2012), 1LR-GUE 72° V10
