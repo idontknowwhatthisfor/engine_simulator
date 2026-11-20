@@ -238,9 +238,37 @@ public:
         catalystA = std::exp(-2.0 * 3.14159265358979323846 * 4000.0 / fs);
         turbineA = std::exp(-2.0 * 3.14159265358979323846 * 1500.0 / fs);
         ok = !outlets.empty();
+        // the way out for the rasp: from cylinder 1's port downstream to a tailpipe (the first branch
+        // at each split), noting the silencers, catalysts and the turbine it passes
+        std::vector<std::vector<int>> down(pipes.size());
+        for (std::size_t k = 0; k < n; k++)
+            if (idx[k] >= 0)
+                for (int f : L.pipes[k].from)
+                    if (f >= 0 && f < static_cast<int>(k) && idx[f] >= 0) down[idx[f]].push_back(idx[k]);
+        pathSilencers = pathCatalysts = 0;
+        pathTurbine = false;
+        for (int k = port.empty() ? -1 : port[0], guard = 0; k >= 0 && guard < static_cast<int>(pipes.size()); guard++) {
+            pathSilencers += pipes[k].kind == pipeAcoustic::silencer;
+            pathCatalysts += pipes[k].kind == pipeAcoustic::catalyst;
+            for (const junction &j : junctions)
+                if (j.turbine && std::find(j.terms.begin(), j.terms.end(), 2 * k + 1) != j.terms.end()) pathTurbine = true;
+            k = down[k].empty() ? -1 : down[k][0];
+        }
+        // the packing takes the high-frequency flow noise whatever the valve does (the valve sets the
+        // back pressure and lets the low note through; the gas still crosses the packing): a one-pole
+        // low-pass's gain at the rasp's 1.2 kHz, at the shut setting
+        double w = 2.0 * 3.14159265358979323846 * 1200.0 / fs;
+        auto at = [&](double a) { return (1.0 - a) / std::sqrt(1.0 - 2.0 * a * std::cos(w) + a * a); };
+        raspPass = std::pow(sp.chamberLoss * at(chamberA), pathSilencers) * std::pow(0.92 * at(catalystA), pathCatalysts) *
+                   (pathTurbine ? 0.45 * at(turbineA) : 1.0);
         setValve(0.0);
         return ok;
     }
+
+    // what reaches the tailpipe of the turbulent rasp (soundParams::raspGain, around 1.2 kHz), one pass
+    // down the drawn path: each silencer's packing, each catalyst and the turbine take what they take
+    // off the exhaust note at that frequency. 1 for a straight pipe
+    double raspThrough() const { return raspPass; }
 
     // the delays from the gas temperature (or soundParams::gasSpeed when it is set)
     void setTemperature(const exhaustGasTemp &gt) {
@@ -330,6 +358,9 @@ private:
     struct outlet { int pipe; double lp = 0.0; };
     double fs = 40000.0, aRef = 1.0, openA = 0.0, chamberA = 0.0, catalystA = 0.0, turbineA = 0.0;
     double valve = -1.0, silA = 0.0, silG = 0.8;  // the silencers' packing as the exhaust valve has it
+    int pathSilencers = 0, pathCatalysts = 0;     // on the way out (build), for raspThrough()
+    bool pathTurbine = false;
+    double raspPass = 1.0;
     soundParams sp;
     std::vector<pipeAc> pipes;
     std::vector<int> port;           // per cylinder: its header
@@ -636,6 +667,9 @@ struct engineSound {
         // follows the outflow squared: a full charge at high revs roars, the thin overrun flow barely hisses
         double outflow = std::max(0.0, exhaust);
         double rasp = 0.5 * sp.raspGain * turbulence.run(noise() * outflow * std::min(outflow, 3.0) / 1.5);
+        // made at the valves and along the pipes, it goes out through the drawn silencers, catalysts
+        // and turbine like the note does (their packing is what silences it)
+        if (net.ok) rasp *= net.raspThrough();
         double raw = body + rasp;
         // silencer: shut flap = dull and quieter, open = bright and loud (crossfade, both always running)
         double shut = sp.flapShutGain * flapShut.run(raw), open = flapOpen.run(raw);

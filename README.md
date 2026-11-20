@@ -30,7 +30,9 @@ pipe stage): each drawn pipe the gas reaches is a pair of delay lines as long as
 it, joined where the drawing joins them. So each cylinder's pulse reaches the merges after its own
 runner, every section rings at its own length, area changes reflect part of each wave, a silencer
 (a section that widens abruptly, or one tagged `pipeAcoustic::silencer`) damps and dulls what passes,
-a catalyst (tagged) takes a little off the top, the turbine passes a dulled share, and the drawn
+a catalyst (tagged) takes a little off the top, the turbine passes a dulled share (the turbulent rasp of
+the gas flow goes out through the same silencers, catalysts and turbine, so straight pipes keep it and
+silenced or turbo exhausts lose most of it), and the drawn
 exhaust valve both opens a way past the silencer and switches the voice's valve stage (no valve drawn:
 always open). The speed of sound follows the gas temperature: hot gas from combustion, cooled by the
 blowdown and settling to the pipe walls' temperature, so a cold start rings lower and the pipe modes
