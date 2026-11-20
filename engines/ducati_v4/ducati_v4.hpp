@@ -65,7 +65,7 @@ engineParams ducatiV4Params() {
     S.whineGain = 0.012;
     S.tick = 0.7; S.tickHz = 2400.0;  // Desmo rocker clatter
     S.masterHz = 10000.0;
-    S.drive = 0.0875;
+    S.drive = 0.0764;
     return P;
 }
 
@@ -251,7 +251,7 @@ engineParams ducatiV4TunedParams() {
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
     S.flapShutGain = 1.0;
     S.popChance = 0.6;
-    S.drive = 0.1637;
+    S.drive = 0.1436;
     S.pipeLength = 1.3;             // the same headers into short cans: a little shorter, a higher note
     S.pipeResHz = 170.0;
     S.burble = 3.5;                 // a harder lope at idle with the valve gone

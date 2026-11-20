@@ -52,7 +52,7 @@ engineParams kawasakiZx10rParams() {
     S.intakeGain = 1.2;
     S.popChance = 0.3;
     S.whineGain = 0.022;
-    S.drive = 0.0958;
+    S.drive = 0.0603;
     S.radiateHz = 300.0;
     S.burble = 3.0;
     S.tick = 0.45;
@@ -173,7 +173,7 @@ engineParams kawasakiZx10rTunedParams() {
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
     S.flapShutGain = 1.0;
     S.popChance = 0.55;
-    S.drive = 0.1421;
+    S.drive = 0.1032;
     S.pipeLength = 1.05;            // the short race can: a shorter pipe, a higher note
     S.pipeResHz = 240.0;
     S.intakeGain = 1.4;             // open kit airbox

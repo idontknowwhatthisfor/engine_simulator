@@ -18,6 +18,13 @@ the sound card's 44.1 kHz through a windowed-sinc filter. Each engine's level (`
 is linear and set so its loudest moments stay under full scale; a limiter near full scale is only a
 safety net, so the waveform is not flattened.
 
+Each cylinder's exhaust pulse is its gas escaping through the exhaust valves as they lift: compressible
+flow through the valves' open area (choked at high pressure ratios), the cylinder emptying from the
+pressure the combustion left, or, on the overrun, drawing the pipe's hot gas back in; the piston's push
+on the exhaust stroke rides on top. How fast the valve opens against the pressure ratio sets how sharp
+or deep each engine sounds. The intake roar follows the air's speed through the intake valves, peaking
+as each opens and closes. (The inline-4's simpler voice keeps the original pulses.)
+
 The exhaust you see is the exhaust you hear (every engine but the inline-4, whose simpler voice has no
 pipe stage): each drawn pipe the gas reaches is a pair of delay lines as long as sound takes to cross
 it, joined where the drawing joins them. So each cylinder's pulse reaches the merges after its own

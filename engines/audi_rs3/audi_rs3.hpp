@@ -87,7 +87,7 @@ engineParams audiRs3Params() {
     S.airboxHz = 160.0; S.intakeHowlHz = 650.0; S.intakeGain = 0.5;
     S.popRpm = 2500.0; S.popChance = 0.45;
     S.whineGain = 0.0;              // helical gears
-    S.drive = 0.1091;
+    S.drive = 0.1143;
     S.radiateHz = 260.0;
     S.burble = 3.5;
     S.burbleFadeFrom = 4000.0; S.burbleFadeSpan = 2500.0; S.burbleHigh = 0.5;
@@ -343,7 +343,7 @@ engineParams audiRs3TunedParams() {
     S.pipeReflect = 0.65;
     S.pipeLowHz = 2300.0;
     S.popChance = 0.75;
-    S.drive = 0.0907;
+    S.drive = 0.081;
     S.pipeLength = 2.3;
     S.intakeGain = 0.8;
     S.turboGain = 1.2;

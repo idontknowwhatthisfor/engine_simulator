@@ -485,6 +485,12 @@ struct engineSound {
     double sinceLift = 1e9;           // s since the throttle was snapped shut
     double unburnt = 0.0;             // unburnt fuel in the header, full charges' worth (afterfire)
     cylArray<int> openedCyl;          // the cylinders whose exhaust valve opened this sample
+    // per cylinder, from its exhaust valve's opening (valveFlow): the gas's mass (kg), internal energy
+    // (J) and the cylinder's volume at the opening (m^3)
+    cylArray<double> bdM, bdU, bdV;
+    // the valve-flow blowdown's weight against the piston's push: 0.3 keeps the two in the balance
+    // the earlier sqrt(pressure) pulses had (median full-throttle level over the engines within 2 dB)
+    static constexpr double blowScale = 0.3;
     double primaryPhase = 0.0, gearMeshPhase = 0.0;
     // turbo: compressor whistle, intake whoosh, blow-off valve, surge flutter
     biquad whoosh, bovBand, bovHigh, flutterBand, flutterThump;
@@ -518,6 +524,7 @@ struct engineSound {
             cylSrc.assign(sim.cylCount(), 0.0);
             cylOpen.assign(sim.cylCount(), 0);
             openedCyl.assign(sim.cylCount(), 0);
+            bdM.assign(sim.cylCount(), 0.0); bdU.assign(sim.cylCount(), 0.0); bdV.assign(sim.cylCount(), 0.0);
             pipeDampA = std::exp(-2.0 * 3.14159265358979323846 * sp.pipeDampHz / fs);
             flapShut = biquad::make(biquad::LOWPASS, fs, sp.flapShutHz, 0.707);
             flapOpen = biquad::make(biquad::LOWPASS, fs, sp.flapOpenHz, 0.707);
@@ -560,7 +567,7 @@ struct engineSound {
     // one output sample for the current simulation state; call once per physics step
     float sample(const engineSim &sim) {
         const double TWO_PI = 2.0 * 3.14159265358979323846;
-        double exhaust = 0.0, intakeFlow = 0.0, heat = 0.0;
+        double exhaust = 0.0, intakeFlow = 0.0, heat = 0.0, intakeJet = 0.0;
         int opened = 0;  // exhaust valves that opened this sample
         if (sp.detailed && lastRegion.size() != sim.cyl.size()) lastRegion.assign(sim.cyl.size(), -1);
         for (int c = 0; c < sim.cylCount(); c++) {
@@ -568,32 +575,33 @@ struct engineSound {
             double x, dx, d2x;
             engineSim::geom(sim.phase(c), s.r, s.L, x, dx, d2x);
             double pistonSpeed = dx * sim.omega / 15.0;  // relative to a brisk 15 m/s
-            if (s.region == 2) {
-                // blowdown (signed: an over-expanded cylinder at light load sucks back a weaker pulse)
-                // plus the gas the piston pushes out on the exhaust stroke
+            bool justOpened = sp.detailed && s.region == 2 && lastRegion[c] != 2 && lastRegion[c] >= 0;
+            if (s.region == 2 && sp.detailed) {
+                // the blowdown through the valve, plus the gas the piston pushes out on the exhaust
+                // stroke, scaled by how full the cylinder was (tiny charge on overrun)
+                double fullCharge = sim.P.pAtm * s.vDisp / (sim.P.rGas * sim.P.tIntake);
+                double charge = std::sqrt(std::clamp(s.mAir / fullCharge, 0.0, 1.0));
+                double pulse = blowScale * valveFlow(sim, c, justOpened) + 1.2 * charge * std::max(0.0, -pistonSpeed);
+                exhaust += pulse;
+                cylSrc[c] = pulse;
+            } else if (s.region == 2) {
+                // the simple voice: blowdown (signed: an over-expanded cylinder at light load sucks back a
+                // weaker pulse) plus the gas the piston pushes out, scaled by how full the cylinder was
                 double dp = (s.p - sim.pExh) / 1e5;
-                // the displaced gas is scaled by how full the cylinder was (tiny charge on overrun)
                 double fullCharge = sim.P.pAtm * s.vDisp / (sim.P.rGas * sim.P.tIntake);
                 double charge = std::sqrt(std::clamp(s.mAir / fullCharge, 0.0, 1.0));
                 double blow = (dp >= 0.0 ? 1.0 : -0.5) * std::sqrt(std::fabs(dp));
-                if (sp.detailed) {
-                    // the valve takes ~30 deg to lift: the blowdown swells in instead of stepping
-                    // (a step would radiate as a click on every opening)
-                    double since = std::fmod(sim.phase(c) - sim.P.evo + 4.0 * CYCLE, CYCLE) / DEGR;
-                    double u = std::clamp(since / 30.0, 0.0, 1.0);
-                    blow *= u * u * (3.0 - 2.0 * u);
-                }
-                double pulse = blow + 1.2 * charge * std::max(0.0, -pistonSpeed);
-                exhaust += pulse;
-                if (sp.detailed) cylSrc[c] = pulse;
+                exhaust += blow + 1.2 * charge * std::max(0.0, -pistonSpeed);
             } else if (sp.detailed) {
                 cylSrc[c] = 0.0;
+                bdM[c] = 0.0;
             }
             if (sp.detailed) cylOpen[c] = s.region == 2;
+            if (s.region == 0 && sp.detailed) intakeJet += intakeVelocity(sim, c, pistonSpeed);
             if (s.region == 0) intakeFlow += std::max(0.0, pistonSpeed) * sim.pMan / sim.P.pAtm;
             heat += s.heatRate;
             if (sp.detailed) {
-                if (s.region == 2 && lastRegion[c] != 2 && lastRegion[c] >= 0) openedCyl[opened++] = c;
+                if (justOpened) openedCyl[opened++] = c;
                 lastRegion[c] = s.region;
             }
         }
@@ -637,7 +645,9 @@ struct engineSound {
         // speaks with the throttle open
         double open3 = sim.throttleOpen * std::sqrt(sim.throttleOpen);
         double ipulse = intakeFlow * (0.15 + open3);
-        double induction = sp.intakeGain * (0.9 * airbox.run(ipulse) + 0.5 * howl.run(ipulse + 0.6 * open3 * noise())) +
+        // the bellmouths' roar: noise riding on the air's speed through the intake valves (intakeVelocity)
+        double roar = std::min(intakeJet, 3.0);
+        double induction = sp.intakeGain * (0.9 * airbox.run(ipulse) + 0.5 * howl.run(ipulse + 0.6 * open3 * roar * noise())) +
                            intake.run(1.5 * sim.throttleFlow * noise());
 
         // crackle: unburnt fuel lit in the header (afterfire)
@@ -775,6 +785,74 @@ private:
         if (sp.burbleFadeSpan <= 0.0) return sp.burble;
         double u = std::clamp((rpm - sp.burbleFadeFrom) / sp.burbleFadeSpan, 0.0, 1.0);
         return sp.burble * (1.0 + (sp.burbleHigh - 1.0) * u);
+    }
+
+    // the exhaust valve's blowdown (detailed voice): from the opening, the cylinder's gas escapes
+    // through the valves' open area as they lift, by compressible flow through a nozzle (choked while
+    // the cylinder is above ~1.9 x the pipe's pressure), as a filling-and-emptying volume: from the
+    // physics' pressure at opening, the gas's mass and energy change with the enthalpy carried out
+    // until it is down to the pipe's pressure. A light-load charge that has over-expanded below the
+    // pipe's pressure instead draws the pipe's hot gas back in (reverse flow: the valve flows worse
+    // backwards, discharge coefficient 0.45 against 0.65) until it is filled. The pulse's rise and
+    // length come from the valve's lift and the pressure ratio: how sharp or deep each engine sounds.
+    // The piston's push on the exhaust stroke is added separately (sample()). Returned: the volume
+    // flow at the pipe's pressure (hot gas takes more room), relative to the piston sweeping its
+    // bore at 15 m/s.
+    //   valves: 2 per cylinder, 0.3 x bore across, lifting to 0.28 x their diameter (the curtain,
+    //   capped by the port); open from EVO to 20 deg after TDC on a smooth (1 - cos) lift curve
+    double valveFlow(const engineSim &sim, int c, bool justOpened) {
+        const cylinderState &s = sim.cyl[c];
+        const double R = sim.P.rGas, G = 1.35, PI_ = 3.14159265358979323846;
+        const double CV = R / (G - 1.0), CP = G * CV;
+        double phi = sim.phase(c);
+        if (justOpened) {
+            double burnedMass = s.mAir * (1.0 + (s.qTot > 0.0 ? 1.0 / sim.P.afr : 0.0));
+            bdV[c] = sim.volume(s, phi);
+            bdM[c] = burnedMass;
+            bdU[c] = s.p * bdV[c] / (G - 1.0);  // internal energy m cv T = p V / (gamma - 1)
+        }
+        double m = bdM[c], V = bdV[c];
+        if (m <= 0.0) return 0.0;  // not seen open yet (the first cycle), or nothing in it
+        double p = (G - 1.0) * bdU[c] / V, T = std::max(200.0, p * V / (m * R));
+        double since = std::fmod(phi - sim.P.evo + 4.0 * CYCLE, CYCLE);
+        double u = std::clamp(since / (CYCLE + 20.0 * DEGR - sim.P.evo), 0.0, 1.0);
+        double dv = 0.3 * sim.P.bore;
+        double curtain = PI_ * dv * 0.28 * dv * (0.5 - 0.5 * std::cos(2.0 * PI_ * u));
+        double area = 2.0 * std::min(curtain, 0.25 * PI_ * dv * dv);
+        double pe = sim.pExh, mdot, tOut, hFlow;
+        if (p >= pe) {
+            double pr = pe / p;
+            mdot = 0.65 * area * p / std::sqrt(R * T) * engineSim::flowFunction(pr);
+            tOut = T * std::pow(pr, (G - 1.0) / G);
+            hFlow = CP * T;            // the enthalpy leaving
+        } else {                       // the pipe's gas back into the cylinder
+            double tPipe = gasTemp.at(0.1);
+            mdot = -0.45 * area * pe / std::sqrt(R * tPipe) * engineSim::flowFunction(p / pe);
+            tOut = tPipe;
+            hFlow = CP * tPipe;        // the enthalpy coming in
+        }
+        double dt = 1.0 / fs;
+        bdU[c] = std::max(bdU[c] - mdot * hFlow * dt, 1e-6);
+        bdM[c] = std::max(m - mdot * dt, 1e-6 * s.vDisp);
+        double q = mdot * R * tOut / pe;  // m^3/s at the pipe's pressure
+        return q / (s.area * 15.0);
+    }
+
+    // the air's speed through cylinder c's intake valves while they are open (from ~20 deg before
+    // TDC to IVC, same valve sizes as the exhaust's, a little bigger: 0.35 x bore), relative to
+    // 100 m/s and squared (turbulent roar grows steeply with the jet's speed), scaled by the air's
+    // density (manifold pressure). The piston sets the flow; the valve's small opening at either end
+    // of the stroke makes the jet fast: the roar peaks as each valve opens and closes.
+    double intakeVelocity(const engineSim &sim, int c, double pistonSpeed) {
+        const cylinderState &s = sim.cyl[c];
+        const double PI_ = 3.14159265358979323846;
+        double phi = sim.phase(c);
+        double u = std::clamp((phi + 20.0 * DEGR) / (sim.P.ivc + 20.0 * DEGR), 0.0, 1.0);
+        double dv = 0.35 * sim.P.bore;
+        double curtain = PI_ * dv * 0.28 * dv * (0.5 - 0.5 * std::cos(2.0 * PI_ * u));
+        double area = 0.65 * 2.0 * std::max(std::min(curtain, 0.25 * PI_ * dv * dv), 1e-6);
+        double v = std::min(std::max(0.0, pistonSpeed) * 15.0 * s.area / area, 340.0);
+        return (v / 100.0) * (v / 100.0) * sim.pMan / sim.P.pAtm;
     }
 
     // afterfire, at cylinder c's exhaust valve opening. Unburnt fuel collects in the header:
