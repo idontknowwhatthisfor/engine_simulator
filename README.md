@@ -30,15 +30,15 @@ blowdown and settling to the pipe walls' temperature, so a cold start rings lowe
 climb as the pipes heat up. `--wav` prints what it found (pipes, silencers, catalysts, open ends,
 turbine). `SND_LAYOUT=0` falls back to the single typed pipe (`soundParams::pipeLength`).
 
-The window plays it in stereo, heard from the camera (M cycles stereo, muted, mono). The sound is split
+Everything plays in mono (the window, `--wav`, the tests). In the window, M switches to stereo, heard
+from the camera (M cycles mono, stereo, muted). The sound is split
 by where it comes from: the tailpipes (at the drawn outlets), the intake (above the heads), the
 engine block (clatter, valvetrain, gear whine, starter) and the turbo or supercharger (where it is
 drawn). Each reaches each ear after its distance at the speed of sound, panned by its direction, with
 the ear facing away hearing it duller, and louder as the camera gets closer (up to +4 dB). The
 tailpipe beams backward: orbit behind a car and the exhaust comes up, in front of it the intake and
 the engine do; a bike's far side, away from its silencer, is quieter. From the starting view every
-source plays at its mono level, so the balance there is the mono one. `--wav out.wav --stereo` renders
-the same mix, heard from the starting camera (`--yaw --pitch --zoom` move it).
+source plays at its mono level, so the balance there is the mono one.
 
 It has eight engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
@@ -642,7 +642,7 @@ calibrated so that the published torque and power come out of the physics.
 | F | Blow-off valve on/off (`rs3`, the tuned `inline4`); bypass valve on/off (`h2`) |
 | `[` / `]` | Slow motion / back toward real time (×1 … ×0.01) |
 | `,` / `.` | When paused: step the crank by 1° |
-| G / B / M / D / X | See-through block / motion blur / sound: stereo → muted → mono / full-throttle dyno chart / shake view (×1, ×20, ×100) |
+| G / B / M / D / X | See-through block / motion blur / sound: mono → stereo → muted / full-throttle dyno chart / shake view (×1, ×20, ×100) |
 | P / R / Esc | Pause / reset / quit |
 
 ## Command-line options
@@ -653,7 +653,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
-| `--wav out.wav` | Render a scripted run to a WAV file. The bikes play a ride: start, blips, limiter, launch through the gears, braking with rev-matched downshifts. The inline-4 plays a start / rev / lift-off script; the RS 3 (and the tuned inline-4) two full-throttle pulls in the car with lift-offs. Mono; `--stereo` renders the window's stereo mix from the starting camera (`--yaw --pitch --zoom`). |
+| `--wav out.wav` | Render a scripted run to a WAV file. The bikes play a ride: start, blips, limiter, launch through the gears, braking with rev-matched downshifts. The inline-4 plays a start / rev / lift-off script; the RS 3 (and the tuned inline-4) two full-throttle pulls in the car with lift-offs. Mono. |
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
 | `--grade pct --reverse --sport --manual --dct --no-wheelie` | Starting conditions (`--manual`: start in manual, in neutral; `--dct`: a car's manual mode is DCT) |
