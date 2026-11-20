@@ -41,6 +41,7 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
         sim.drive.reset(true);
         sim.drive.bikeShift(0, sim.time, true);  // neutral
         for (const rideStep &sg : type.ride) {
+            int popsBefore = snd.popCount;
             std::printf("  %4.1f - %4.1f s  %s\n", from, sg.until, sg.what);
             sim.starter = sg.starter;
             sim.pedalTarget = sg.throttle;
@@ -56,7 +57,8 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
                 sim.step(PHYS_DT);
                 emit();
             }
-            std::printf("           at %4.1f s: %5.0f rpm  gear %d  %3.0f km/h\n", sim.time, sim.rpm(), sim.drive.gear, sim.drive.v * 3.6);
+            std::printf("           at %4.1f s: %5.0f rpm  gear %d  %3.0f km/h  crackle %d\n", sim.time, sim.rpm(), sim.drive.gear,
+                        sim.drive.v * 3.6, snd.popCount - popsBefore);
             from = sg.until;
         }
     } else {
@@ -66,6 +68,7 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
             sim.ignition = sg.ignition;
             sim.pedalTarget = sg.throttle;
             double bovPeak = 0.0, surgePeak = 0.0, boostPeak = -1.0;
+            int popsBefore = snd.popCount;
             while (sim.time < sg.until) {
                 sim.step(PHYS_DT);
                 emit();
@@ -76,6 +79,7 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
             if (type.boost == builtInBoost::turbo)
                 std::printf("           at %4.1f s: %5.0f rpm  gear %d  %3.0f km/h  peak boost %+.2f bar  BOV %.3f kg/s  surge %.2f\n",
                             sim.time, sim.rpm(), sim.drive.gear, sim.drive.v * 3.6, boostPeak, bovPeak, surgePeak);
+            if (snd.popCount > popsBefore) std::printf("           crackle %d\n", snd.popCount - popsBefore);
             from = sg.until;
         };
         if (type.boost == builtInBoost::turbo) for (const segment &sg : TURBO_SCRIPT) play(sg);

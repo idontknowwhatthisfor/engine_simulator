@@ -483,7 +483,8 @@ struct engineSound {
     double popLastAmp = 0.0;
     biquad tickBand;
     double sinceLift = 1e9;           // s since the throttle was snapped shut
-    bool lastQs = false;
+    double unburnt = 0.0;             // unburnt fuel in the header, full charges' worth (afterfire)
+    cylArray<int> openedCyl;          // the cylinders whose exhaust valve opened this sample
     double primaryPhase = 0.0, gearMeshPhase = 0.0;
     // turbo: compressor whistle, intake whoosh, blow-off valve, surge flutter
     biquad whoosh, bovBand, bovHigh, flutterBand, flutterThump;
@@ -516,6 +517,7 @@ struct engineSound {
             pipeLine.init(2.0 * sp.pipeLength / exhaustGasTemp::soundSpeed(280.0) * fs + 2.0);
             cylSrc.assign(sim.cylCount(), 0.0);
             cylOpen.assign(sim.cylCount(), 0);
+            openedCyl.assign(sim.cylCount(), 0);
             pipeDampA = std::exp(-2.0 * 3.14159265358979323846 * sp.pipeDampHz / fs);
             flapShut = biquad::make(biquad::LOWPASS, fs, sp.flapShutHz, 0.707);
             flapOpen = biquad::make(biquad::LOWPASS, fs, sp.flapOpenHz, 0.707);
@@ -591,7 +593,7 @@ struct engineSound {
             if (s.region == 0) intakeFlow += std::max(0.0, pistonSpeed) * sim.pMan / sim.P.pAtm;
             heat += s.heatRate;
             if (sp.detailed) {
-                if (s.region == 2 && lastRegion[c] != 2 && lastRegion[c] >= 0) opened++;
+                if (s.region == 2 && lastRegion[c] != 2 && lastRegion[c] >= 0) openedCyl[opened++] = c;
                 lastRegion[c] = s.region;
             }
         }
@@ -638,18 +640,9 @@ struct engineSound {
         double induction = sp.intakeGain * (0.9 * airbox.run(ipulse) + 0.5 * howl.run(ipulse + 0.6 * open3 * noise())) +
                            intake.run(1.5 * sim.throttleFlow * noise());
 
-        // overrun crackle: a share of the exhaust valve openings on a closed throttle light up the
-        // unburnt mixture in the hot header; the quickshifter cut ends in a bark and the limiter crackles
-        bool overrun = demand < 0.02 && rpm > sp.popRpm && sim.ignition;
+        // crackle: unburnt fuel lit in the header (afterfire)
         sinceLift = demand < 0.02 ? sinceLift + 1.0 / fs : 0.0;
-        double fade = std::exp(-sinceLift / 1.0);  // the ECU leans the overrun out after a second or so
-        bool cut = sim.revCut || sim.qsCut;
-        for (int k = 0; k < opened; k++) {
-            double chance = overrun ? sp.popChance * fade * std::clamp((rpm - sp.popRpm) / 3000.0, 0.2, 1.0) : cut ? 0.5 : 0.0;
-            if (0.5 * (noise() + 1.0) < chance) trigger(0.6 + 0.6 * std::fabs(noise()));
-        }
-        if (lastQs && !sim.qsCut) trigger(1.3);  // power comes back after the shift: bark
-        lastQs = sim.qsCut;
+        for (int k = 0; k < opened; k++) afterfire(sim, openedCyl[k], rpm, demand);
         double pn = noise() * popEnv;
         double pops = popAmp * (1.4 * popBand.run(pn) + 2.5 * popThump.run(pn));
         popEnv *= std::exp(-1.0 / (0.008 * fs));
@@ -782,6 +775,45 @@ private:
         if (sp.burbleFadeSpan <= 0.0) return sp.burble;
         double u = std::clamp((rpm - sp.burbleFadeFrom) / sp.burbleFadeSpan, 0.0, 1.0);
         return sp.burble * (1.0 + (sp.burbleHigh - 1.0) * u);
+    }
+
+    // afterfire, at cylinder c's exhaust valve opening. Unburnt fuel collects in the header:
+    //   - the overrun map: with the throttle shut above soundParams::popRpm the ECU keeps injecting for
+    //     a moment with the spark retarded, so a share of each charge's fuel (popChance, more as
+    //     the revs rise) leaves unburnt and still burning; it leans out over about a second
+    //   - an ignition cut (rev limiter, quickshifter): the spark is cut, not the fuel, so the whole
+    //     charge's fuel goes into the pipe
+    // Each exhaust stroke flushes some of it out of the tailpipe (15%), and the pulse arriving lights
+    // what is there with a chance set by how hot it is: a burning or freshly burned slug (~1000 K and
+    // up), or failing that the header walls (the gas temperature model's, ~300-1170 K), from nothing
+    // at 700 K to certain at 1100 K, and by how much fuel has gathered. A pop burns most of it, louder
+    // the more there was. So the limiter crackles once the pipes are hot, the overrun pops die away as
+    // the ECU leans out, and the first firing after a quickshift lights the fuel the cut cylinders
+    // dumped: the bark.
+    void afterfire(const engineSim &sim, int c, double rpm, double demand) {
+        const cylinderState &s = sim.cyl[c];
+        if (s.mAir <= 0.0 || sim.stalled || !sim.ignition) { unburnt *= 0.85; return; }
+        double fullCharge = sim.P.pAtm * s.vDisp / (sim.P.rGas * sim.P.tIntake);
+        double fuel = s.mAir / fullCharge;  // this charge's fuel, in full charges' worth
+        bool burned = s.qTot > 0.0, cut = sim.revCut || sim.qsCut;
+        bool overrunMap = demand < 0.02 && rpm > sp.popRpm;
+        double add = 0.0, source = 0.0;     // unburnt fuel added; the igniting gas's temperature (K)
+        if (cut && !burned) {
+            add = fuel;
+        } else if (overrunMap) {
+            double fade = std::exp(-sinceLift / 1.0);
+            add = fuel * sp.popChance * fade * std::clamp((rpm - sp.popRpm) / 3000.0, 0.2, 1.0);
+            source = 1100.0 * fade;         // the late-burning charge itself
+        }
+        if (burned) source = std::max(source, 0.7 * (800.0 + 1200.0 * s.glowEvo));
+        source = std::max(source, gasTemp.wallAt(0.3));
+        unburnt = 0.85 * unburnt + add;
+        double chance = std::clamp((source - 700.0) / 400.0, 0.0, 1.0) * std::clamp(unburnt / 0.05, 0.0, 1.0);
+        if (0.5 * (noise() + 1.0) < chance) {
+            double lit = 0.8 * unburnt;
+            unburnt -= lit;
+            trigger(std::clamp(0.45 + 2.0 * std::sqrt(lit), 0.4, 1.5));
+        }
     }
 
     void trigger(double amp) {

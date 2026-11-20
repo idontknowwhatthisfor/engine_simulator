@@ -547,8 +547,13 @@ built from the engine's layout (`src/exhaust.hpp`), and they move with the engin
   the pipes.
 - **Exhaust valve** (bikes). A lever on the pipe, driven like the sound's flap: shut at idle and light
   load, open with revs or throttle. The HUD shows how far it is open.
-- **Crackle** (bikes). Every pop the sound makes (overrun crackle, limiter, quickshifter bark) shoots a
-  short flame out of the tailpipes. Some pops, and every bark, also throw a few sparks that arc down
+- **Crackle** (bikes). The pops are afterfire: unburnt fuel lit in the hot header. The overrun map
+  leaves a share of each closed-throttle charge unburnt for about a second (`soundParams::popChance`),
+  the limiter and quickshifter cuts dump whole charges, each exhaust stroke flushes some out, and the
+  next hot pulse (a burning slug, or hot enough walls) lights what has gathered, louder the more there
+  was. So a cold pipe barely pops, the limiter crackles once the pipes are hot, and a quickshift ends in
+  a bark when the first firing lights the cut cylinders' fuel. `--wav` counts them per phase. Every pop
+  the sound makes shoots a short flame out of the tailpipes. Some pops, and every bark, also throw a few sparks that arc down
   under gravity. They run on simulated time, so slow motion slows them too. The inline-4 makes no pops, so
   it has no flames.
 

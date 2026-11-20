@@ -51,7 +51,9 @@ struct soundParams {
     double flapShutHz = 1600.0, flapOpenHz = 6500.0, flapShutGain = 0.55;
     // airbox: tonal honk from the intake pulses, loud at full throttle
     double airboxHz = 190.0, intakeHowlHz = 750.0, intakeGain = 0.0;
-    // overrun crackle (lift-off above popRpm), quickshifter bark, limiter crackle
+    // crackle (afterfire, engineSound::afterfire): the overrun map above popRpm leaves popChance of
+    // each closed-throttle charge's fuel unburnt (0: none); the limiter and quickshifter cuts dump
+    // whole charges. The hot pipe lights it: overrun pops, limiter crackle, the quickshift bark
     double popRpm = 3500.0, popChance = 0.0;
     // straight-cut gear whine: primary pair and the engaged gearbox pair
     double whineGain = 0.0;
