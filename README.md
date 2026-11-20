@@ -150,7 +150,7 @@ inline-4's turbo model, or a procedural one when that is not there (below).
 | Vehicle | 1570 kg + 75 kg driver, 265/30 R19 (0.325 m), CdA 0.72, quattro (the car model has no tyre grip limit, so all-wheel drive needs nothing extra) |
 | Exhaust (3D) | Five cast runners into a manifold over the turbine, the downpipe back under the car, catalyst, mid pipe with the sport exhaust's flap, rear silencer and two big tailpipes. Intake: airbox behind the turbo, charge pipe to a front-mounted intercooler, back up the other side to the throttle and a plenum along the head |
 | Results (sim) | 0–100 km/h 3.7 s with launch control (S and full throttle, then let go of S: held at ~4500 rpm on 1.2 bar; Audi: 3.8 s), 4.3 s floored from idle (the turbo spools on the way), 0–200 km/h 14.0 s, full-throttle upshifts at ~7000 rpm |
-| Sound | The detailed voice (`soundParams::detailed`, the bikes' stages) on a car: a long pipe for the deep five-cylinder note and its idle burble, the sport exhaust's flaps opening from ~3500 rpm, overrun crackle (with flames), the turbo's whistle and the blow-off valve |
+| Sound | The detailed voice (`soundParams::detailed`, the bikes' stages) on a car: a long pipe for the deep five-cylinder note and its idle burble, the sport exhaust's flaps opening under throttle or from ~5000 rpm (shut while coasting down), overrun crackle (with flames), the turbo's whistle and the blow-off valve |
 
 Without the downloaded turbo model (the optional `Assets-2` download) the RS 3 (and the tuned
 inline-4) draws a procedural turbo instead (`build_rs3_turbo.py` ->
@@ -176,7 +176,7 @@ A typical big-turbo build (estimates, not one tuner's car) on the stock 82.5 × 
 | Gearbox | Stock ratios; a gearbox tune: more clutch clamping (950 N·m), full-throttle upshifts at ~7300 rpm, launch control a little higher (~4900 rpm on 1.5 bar) |
 | Results (sim) | 0–100 km/h 3.0 s with launch control (3.6 s floored from idle), 0–200 km/h 10.8 s |
 | 3D | Straight pipe: the downpipe and the mid pipe a size up, straight pipes where the catalyst and the rear silencer were, no flap, bigger blued titanium tips. The physics is unchanged by it (the header's waves reflect at the manifold's merge over the turbine, upstream) |
-| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~9 dB at idle, ~1 dB on lift-off and at full throttle, which stays the loudest), more crackle, more turbo |
+| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~10 dB at idle, 1–2 dB on lift-off and at full throttle, which stays the loudest; ~8 dB with the ignition off), more crackle, more turbo |
 
 
 ### `lfa`: Lexus LFA (2010-2012), 1LR-GUE 72° V10

@@ -82,8 +82,11 @@ engineParams audiRs3Params() {
     S.pipeLowHz = 1800.0; S.pipeResHz = 125.0; S.pipeResGain = 0.8;
     S.pipeReflect = 0.5;
     S.masterHz = 8000.0;
-    S.flapOpenRpm = 3500.0; S.flapSpan = 1200.0;
-    S.flapShutGain = 0.5;
+    // the flaps open under throttle (from ~2500 rpm) or with the revs from ~5000 rpm, so they shut as a
+    // lift-off coasts down: the overrun and idle stay quieter than full throttle, and the straight-pipe
+    // car stays louder than this one on the overrun
+    S.flapOpenRpm = 5000.0; S.flapSpan = 1200.0;
+    S.flapShutGain = 0.35;
     S.airboxHz = 160.0; S.intakeHowlHz = 650.0; S.intakeGain = 0.5;
     S.popRpm = 2500.0; S.popChance = 0.45;
     S.whineGain = 0.0;              // helical gears
