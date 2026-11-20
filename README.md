@@ -20,10 +20,19 @@ safety net, so the waveform is not flattened.
 
 In the window only, a playback leveller (`src/leveller.hpp`, K toggles it, on by default) rides the
 gain of what goes to the sound card: quiet stretches (idle, cruising, a single's gaps between firings)
-come up toward -18 dBFS RMS, by up to +15 dB, while full throttle stays about where it is and peaks
-stay near 0.70. One gliding gain for both channels with a 6 ms lookahead, so it adds no harmonics.
+are compressed 2:1 upward toward -18 dBFS RMS (by up to +15 dB), while full throttle stays about
+where it is and peaks stay near 0.70. The ratio keeps the loudness order: a 20 dB idle-to-load gap
+becomes about 10 dB, never reversed. One gliding gain for both channels with a 6 ms lookahead, so it adds no harmonics.
 It runs on the audio thread after resampling; `--wav`, `--stats` and the tests are upstream of it and
 unchanged. The HUD's sound line shows its boost (`lvl +N dB`).
+
+Small speakers (laptops, phones) play almost nothing below ~150 Hz, where a single's idle lives. O
+turns on a speaker voicing (`src/speaker.hpp`, off by default, window only): a 110 Hz high-pass and a
++3 dB lift at 400 Hz, plus virtual bass: the band under 150 Hz is rectified into its 2nd, 4th...
+harmonics, band-passed to 150-600 Hz and mixed in, so the ear fills in the fundamental it cannot hear.
+With it on the leveller may boost up to +20 dB. Measured above 150 Hz (over the leveller alone): idle
++4-8 dB, load +2-5 dB. It adds harmonics the engine does not make, so leave it
+off on headphones. The HUD shows `spk` when it is on.
 
 Each cylinder's exhaust pulse is its gas escaping through the exhaust valves as they lift: compressible
 flow through the valves' open area (choked at high pressure ratios), the cylinder emptying from the
@@ -665,6 +674,7 @@ calibrated so that the published torque and power come out of the physics.
 | `,` / `.` | When paused: step the crank by 1° |
 | G / B / M / D / X | See-through block / motion blur / sound: mono → stereo → muted / full-throttle dyno chart / shake view (×1, ×20, ×100) |
 | K | Playback leveller on / off (lifts the quiet stretches in the window; `--wav` is never levelled) |
+| O | Speaker voicing on / off (virtual bass for laptop / phone speakers; window only) |
 | P / R / Esc | Pause / reset / quit |
 
 ## Command-line options
@@ -706,6 +716,7 @@ src/
   hud.hpp                   the HUD and help line, built from what the engine has
   sound.hpp, wav.hpp        sound synthesis + audio stream, --wav rendering
   leveller.hpp              playback leveller (the window's stream only)
+  speaker.hpp               small-speaker voicing: EQ + virtual bass (the window's stream only)
   dyno.hpp                  the WOT dyno curve (D), measured in the background (and --dyno)
   bike_gearbox.hpp          the bikes' sequential gearbox (3D)
   test_bike.hpp             --phystest for the bikes, checked against each engine's bikeSpec

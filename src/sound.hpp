@@ -3,6 +3,7 @@
 #include "physics.hpp"
 #include "exhaust.hpp"
 #include "leveller.hpp"
+#include "speaker.hpp"
 
 // ---------------------------------------------------------------------------------------------
 // engine sound: synthesised from the simulation at the physics rate
@@ -1072,6 +1073,7 @@ public:
     std::atomic<bool> muted{false};
     std::atomic<bool> levelling{true};  // the playback leveller (src/leveller.hpp), K in the window
     std::atomic<float> levelGain{1.f};  // its current gain, for the HUD
+    std::atomic<bool> speakerMode{false};  // small-speaker voicing (src/speaker.hpp), O in the window
 
     engineAudio() { initialize(2, RATE, {sf::SoundChannel::FrontLeft, sf::SoundChannel::FrontRight}); }
     ~engineAudio() override { stop(); }
@@ -1083,6 +1085,7 @@ private:
     float vol = 1.f;
     sincResampler rsL, rsR;
     playbackLeveller leveller{RATE};
+    speakerVoicing voicing{RATE};
 
     bool onGetData(Chunk &data) override {
         double base = simPerOut.load();
@@ -1103,6 +1106,7 @@ private:
             }
             vol += ((muted.load() ? 0.f : 1.f) - vol) * 0.002f;
             float l = rsL.at(frac), r = rsR.at(frac);
+            voicing.process(l, r);
             leveller.process(l, r);
             l = engineSound::limit(l);  // what the lookahead did not catch
             r = engineSound::limit(r);
@@ -1110,6 +1114,8 @@ private:
             out[k + 1] = static_cast<std::int16_t>(std::clamp(r * vol, -1.f, 1.f) * 30000.f);
         }
         leveller.on = levelling.load();
+        voicing.on = speakerMode.load();
+        leveller.maxGain = voicing.on ? playbackLeveller::MAX_GAIN_SPEAKER : playbackLeveller::MAX_GAIN;
         levelGain = static_cast<float>(leveller.gain());
         data.samples = out.data();
         data.sampleCount = out.size();
