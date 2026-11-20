@@ -48,6 +48,7 @@ struct options {
     bool bov = true;         // --bov no: the turbo without its blow-off valve (it surges on lift-off)
     std::string variant;     // --variant name: another version of the engine (--tuned yes = --variant tuned)
     std::string wav;         // --wav out.wav: render a scripted run to a file and quit
+    bool stereo = false;     // --stereo: --wav in stereo, heard from the starting camera (--yaw --pitch --zoom)
     bool selftest = false, phystest = false;
     bool dumpParams = false; // --dump-params (hidden): print every parameter and quit (scripts/regress.sh)
     bool dyno = false;       // --dyno (hidden): print the WOT dyno curve (calibration env applied) and quit
@@ -110,6 +111,7 @@ options parseArgs(int argc, char **argv) {
             else throw std::runtime_error("--bov takes yes or no, not \"" + v + "\"");
         }
         else if (a == "--wav") o.wav = next();
+        else if (a == "--stereo") o.stereo = true;
         else if (a == "--selftest") o.selftest = true;
         else if (a == "--phystest") o.phystest = true;
         else if (a == "--dump-params") o.dumpParams = true;
@@ -151,7 +153,7 @@ int main(int argc, char **argv) {
         for (const engineType *t : engineTypes()) ids += std::string(ids.empty() ? "" : "|") + t->id;
         std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type %s] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
-                             "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--manual] [--dct] [--no-wheelie]\n"
+                             "                  [--noblur] [--nohud] [--mute] [--stereo] [--engine-only] [--grade pct] [--reverse] [--sport] [--manual] [--dct] [--no-wheelie]\n"
                              "                  [--bov yes|no] [--tuned yes|no] [--variant name]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
@@ -216,7 +218,7 @@ int main(int argc, char **argv) {
         return selfTest(eng, type.name, pattern);
     }
     if (opt.phystest) return type.physTest(eng, type);
-    if (!opt.wav.empty()) return renderWav(eng, type, opt.wav, opt.bov);
+    if (!opt.wav.empty()) return renderWav(eng, type, opt.wav, opt.bov, opt.stereo, camera{opt.yaw, opt.pitch, opt.distScale});
 
     // engine state; theta of cylinder 1 starts at the model's rest pose unless --crank says otherwise
     const double THETA0 = opt.crankDeg < 0.f ? eng.cyls[0].theta0 : opt.crankDeg * DEGR;
@@ -371,6 +373,12 @@ int main(int argc, char **argv) {
     exhaustLayout soundLayout;
     if (type.exhaust) soundLayout = type.exhaust(eng);
     engineSound snd(1.0 / PHYS_DT, sim, type.exhaust ? &soundLayout : nullptr);
+    snd.setScene(eng, type.exhaust ? &soundLayout : nullptr);
+    // every source at its mono level from the default view (the --wav --stereo render uses the same)
+    snd.calibrateListener(listenerFromCamera({options{}.yaw, options{}.pitch, DIST0}, centre));
+    // M cycles stereo (each source placed in the scene, heard from the camera) -> muted -> mono -> stereo
+    enum class soundMode { stereo, muted, mono };
+    soundMode soundOut = soundMode::stereo;
     if (opt.sound && opt.screenshot.empty()) {
         audio = std::make_unique<engineAudio>();
         audio->play();
@@ -463,7 +471,10 @@ int main(int argc, char **argv) {
                     sim.drive.message = std::string(valve) + (sim.P.turbo.bov ? " fitted" : " removed: lift off on boost to hear it surge");
                     sim.drive.messageTime = sim.time;
                 }
-                if (e->code == K::M && audio) audio->muted = !audio->muted.load();
+                if (e->code == K::M && audio) {
+                    soundOut = soundOut == soundMode::stereo ? soundMode::muted : soundOut == soundMode::muted ? soundMode::mono : soundMode::stereo;
+                    audio->muted = soundOut == soundMode::muted;
+                }
                 if (e->code == K::D) showDyno = !showDyno;
                 if (e->code == K::X) shakeIdx = (shakeIdx + 1) % 3;
                 if (e->code == K::P) paused = !paused;
@@ -524,10 +535,16 @@ int main(int argc, char **argv) {
         // fixed-step physics, slowed down by the time scale
         if (!paused) {
             physAccum += dt * TIME_SCALES[scaleIdx];
+            if (audio) snd.setListener(listenerFromCamera(cam, centre));
             while (physAccum >= PHYS_DT) {
                 sim.step(PHYS_DT);
                 float smp = snd.sample(sim);  // always: its crackles also light the tailpipe flames
-                if (audio) audio->ring.push(smp);
+                if (audio) {
+                    // the stereo mix runs in every mode, so switching to it plays no stale sound
+                    audioFrame f;
+                    snd.stereo(f.l, f.r);
+                    audio->ring.push(soundOut == soundMode::stereo ? f : audioFrame{smp, smp});
+                }
                 physAccum -= PHYS_DT;
             }
         }
@@ -546,7 +563,7 @@ int main(int argc, char **argv) {
             hv.fps = fps;
             hv.timeScale = TIME_SCALES[scaleIdx];
             hv.paused = paused;
-            hv.sound = audio ? (audio->muted ? "muted" : "on") : "off";
+            hv.sound = !audio ? "off" : soundOut == soundMode::stereo ? "stereo" : soundOut == soundMode::mono ? "mono" : "muted";
             hv.shakeView = SHAKE_VIEWS[shakeIdx];
             hv.ghost = ghost == 0;
             hv.blur = blur;

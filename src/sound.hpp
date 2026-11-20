@@ -337,10 +337,129 @@ private:
     std::vector<outlet> outlets;
 };
 
+// where the listener is: the 3D camera, its two ears 18 cm apart along the camera's right vector
+// (world space, mm)
+struct listenerPose {
+    vec3 eye{0.f, 0.f, 1000.f}, right{1.f, 0.f, 0.f};
+};
+
+// the listener from the camera (src/common.hpp viewMatrix): the eye sits at target + dist * (row 2 of
+// the view rotation), the right vector is row 0
+listenerPose listenerFromCamera(const camera &cam, vec3 target) {
+    float cy = std::cos(cam.yaw), sy = std::sin(cam.yaw), cp = std::cos(cam.pitch), sp = std::sin(cam.pitch);
+    listenerPose l;
+    l.eye = target + vec3{-sy * cp, sp, cy * cp} * cam.dist;
+    l.right = {cy, 0.f, sy};
+    return l;
+}
+
+// stereo from the engine's separate sound sources (engineSound's groups), each placed in the scene:
+//   - the tailpipes (at the drawn outlets' centre), louder from behind the pipe than from in front of
+//     it (an open pipe end beams its higher harmonics along its axis)
+//   - the intake (airbox, bellmouths, throttle hiss) above the heads
+//   - the engine block (combustion clatter, valvetrain ticks, gear whine, the starter)
+//   - the turbo or supercharger, where it is drawn (on the heads when it is not)
+// Each reaches each ear after its distance at the speed of sound (so the far ear hears it a little
+// later), panned by its direction (a constant-power pan: ~7.5 dB between the ears at 90 deg), at a
+// level that follows its distance (1 / r) relative to the starting view, where every source plays at
+// its mono level (calibrate), and the ear facing away hears it duller (the head's shadow). Delay
+// and level glide to the camera's new place over ~50 ms, so orbiting the camera pans smoothly (with
+// the slight Doppler shift a moving listener really hears).
+class spatialMixer {
+public:
+    enum group { EXHAUST, INTAKE, BLOCK, TURBO, GROUPS };
+
+    void init(double fs_) {
+        fs = fs_;
+        shadowA = std::exp(-2.0 * 3.14159265358979323846 * 1800.0 / fs);
+        glide = 1.0 - std::exp(-1.0 / (0.05 * fs));
+    }
+    // a source of `share` of group g at pos (world mm); dir: the way a tailpipe points (0: all round)
+    void add(int g, vec3 pos, vec3 dir, double share) {
+        source s;
+        s.g = g; s.pos = pos; s.dir = dir; s.share = share;
+        s.line.init(0.04 * fs);  // up to ~13 m away
+        src.push_back(std::move(s));
+    }
+    bool empty() const { return src.empty(); }
+
+    // the reference view: from here every source plays at exactly its mono level (so the starting
+    // camera hears the mono balance, in stereo); elsewhere its level is relative to this
+    void calibrate(const listenerPose &l) {
+        for (source &s : src) s.ref = level(s, l);
+    }
+
+    void setListener(const listenerPose &l) {
+        for (source &s : src) {
+            double rel = std::min(level(s, l) / s.ref, 1.6);  // closer than the reference: at most +4 dB
+            vec3 toSrc = normalize(s.pos - l.eye);
+            double pan = dot(toSrc, normalize(l.right));       // -1 hard left .. +1 hard right
+            for (int e = 0; e < 2; e++) {
+                double side = e == 0 ? -1.0 : 1.0;
+                vec3 ear = l.eye + l.right * static_cast<float>(90.0 * side);
+                vec3 v = s.pos - ear;
+                double d = std::max(static_cast<double>(length(v)), 150.0);
+                s.wantDelay[e] = d * 1e-3 / 343.0 * fs;
+                // constant-power pan (about 7.5 dB between the ears for a source at 90 deg)
+                s.wantGain[e] = rel * s.share * std::sqrt(std::max(0.0, 1.0 + 0.7 * side * pan));
+                // full for a source ahead or on this ear's side, down to 0.4 with the head in the way
+                s.wantBright[e] = 1.0 - 0.6 * std::max(0.0, -side * pan);
+                if (!s.placed) { s.delay[e] = s.wantDelay[e]; s.gain[e] = s.wantGain[e]; s.bright[e] = s.wantBright[e]; }
+            }
+            s.placed = true;
+        }
+    }
+
+    // this sample's groups in, the two ears out
+    void mix(const double *groups, double &left, double &right) {
+        double out[2] = {0.0, 0.0};
+        for (source &s : src) {
+            s.line.write(groups[s.g]);
+            for (int e = 0; e < 2; e++) {
+                s.delay[e] += (s.wantDelay[e] - s.delay[e]) * glide;
+                s.gain[e] += (s.wantGain[e] - s.gain[e]) * glide;
+                s.bright[e] += (s.wantBright[e] - s.bright[e]) * glide;
+                double x = s.line.read(std::max(1.0, s.delay[e]));
+                s.lp[e] = (1.0 - shadowA) * x + shadowA * s.lp[e];
+                out[e] += s.gain[e] * (s.lp[e] + (x - s.lp[e]) * s.bright[e]);
+            }
+        }
+        left = out[0];
+        right = out[1];
+    }
+
+private:
+    struct source;
+    // a source's level heard from l: 1 / r from the listener's head, and a tailpipe's beam (x0.5
+    // straight in front of the pipe, x1 behind it)
+    static double level(const source &s, const listenerPose &l) {
+        double d = std::max(static_cast<double>(length(s.pos - l.eye)), 150.0);
+        double g = 1000.0 / d;
+        if (length(s.dir) > 0.f) g *= 0.75 + 0.25 * dot(normalize(s.dir), normalize(l.eye - s.pos));
+        return g;
+    }
+    struct source {
+        double ref = 1.0;  // level() from the reference view
+        int g = 0;
+        vec3 pos{}, dir{};
+        double share = 1.0;
+        fracDelay line;
+        double delay[2] = {1, 1}, gain[2] = {0, 0}, bright[2] = {1, 1}, lp[2] = {0, 0};
+        double wantDelay[2] = {1, 1}, wantGain[2] = {0, 0}, wantBright[2] = {1, 1};
+        bool placed = false;
+    };
+    std::vector<source> src;
+    double fs = 40000.0, shadowA = 0.0, glide = 0.0;
+};
+
 struct engineSound {
     double fs;
     soundParams sp;
-    biquad dcBlock, pipeLow, pipeRes, turbulence, intake, clatter, master;
+    biquad dcBlock, pipeLow, pipeRes, turbulence, intake, clatter, master, masterIntake, masterBlock;
+    // this sample's sound split by where it comes from (spatialMixer::group), each after its own copy
+    // of the master low-pass; the mono output is their sum
+    double groups[spatialMixer::GROUPS] = {0, 0, 0, 0};
+    spatialMixer space;  // stereo (setScene, setListener, stereo())
     std::uint32_t rng = 0x12345678u;
     double gearPhase = 0.0, armaturePhase = 0.0;
     // the detailed voice's stages (soundParams::detailed)
@@ -381,6 +500,8 @@ struct engineSound {
         intake = biquad::make(biquad::BANDPASS, fs, 350.0, 1.5);
         clatter = biquad::make(biquad::HIGHPASS, fs, 2500.0, 0.707);
         master = biquad::make(biquad::LOWPASS, fs, sp.masterHz, 0.707);
+        masterIntake = masterBlock = master;
+        space.init(fs);
         whoosh = biquad::make(biquad::BANDPASS, fs, 2500.0, 0.8);
         bovBand = biquad::make(biquad::BANDPASS, fs, 3200.0, 0.6);
         bovHigh = biquad::make(biquad::HIGHPASS, fs, 1200.0, 0.707);
@@ -480,8 +601,7 @@ struct engineSound {
             double rasp = 0.6 * sp.raspGain * turbulence.run(noise() * exhaust);
             double induction = intake.run(0.4 * intakeFlow + 3.0 * sim.throttleFlow * noise());
             double knock = 0.15 * clatter.run(noise() * std::min(1.0, heat / 5e6));
-            double mix = master.run(body + rasp + induction + knock + starterWhine(sim)) + turboVoice(sim);
-            return output(mix);
+            return mixGroups(body + rasp, induction, knock + starterWhine(sim), turboVoice(sim));
         }
 
         // ---- detailed voice (soundParams::detailed) ----------------------------------------------
@@ -554,8 +674,59 @@ struct engineSound {
         if (opened) tickEnv = 1.0;
         double ticks = sp.tick * tickBand.run(noise() * tickEnv);
         tickEnv *= std::exp(-1.0 / (0.0015 * fs));
-        double mix = master.run(exhaustOut + induction + pops + whine + knock + ticks + starterWhine(sim)) + turboVoice(sim);
-        return output(mix);
+        return mixGroups(exhaustOut + pops, induction, whine + knock + ticks + starterWhine(sim), turboVoice(sim));
+    }
+
+    // the groups through their master low-pass (the turbo's after it, to stay bright); the mono sum out
+    float mixGroups(double exhaustPart, double intakePart, double blockPart, double turboPart) {
+        groups[spatialMixer::EXHAUST] = master.run(exhaustPart);
+        groups[spatialMixer::INTAKE] = masterIntake.run(intakePart);
+        groups[spatialMixer::BLOCK] = masterBlock.run(blockPart);
+        groups[spatialMixer::TURBO] = turboPart;
+        return output(groups[0] + groups[1] + groups[2] + groups[3]);
+    }
+
+    // place the sources in the scene (world space, mm): root is the engine's mesh -> world matrix.
+    // The tailpipes at the layout's outlets (without any: under the engine), the intake above the
+    // heads, the block between the deck and the crank, the turbo where the layout puts it
+    void setScene(const engineModel &e, const exhaustLayout *layout) {
+        space = spatialMixer();
+        space.init(fs);
+        auto world = [&](vec3 p) { return transformPoint(e.root, p); };
+        auto worldDir = [&](vec3 d) { return transformPoint(e.root, d) - transformPoint(e.root, {0.f, 0.f, 0.f}); };
+        vec3 top{}, mid{};
+        int n = static_cast<int>(e.cyls.size());
+        for (int c = 0; c < n; c++) {
+            top = top + world(cylPoint(e, c, 0.f, e.cyls[c].deckY - 80.f)) * (1.f / n);
+            mid = mid + world(cylPoint(e, c, 0.f, 0.5f * e.cyls[c].deckY)) * (1.f / n);
+        }
+        if (layout && !layout->outlets.empty()) {
+            // one source at the tailpipes' centre, pointing their mean way: tips a few cm apart give no
+            // width heard from metres away, and separate copies would comb against each other
+            vec3 at{}, dir{};
+            for (const outletSpec &o : layout->outlets) {
+                at = at + world(o.at) * (1.f / layout->outlets.size());
+                dir = dir + normalize(worldDir(o.dir));
+            }
+            space.add(spatialMixer::EXHAUST, at, normalize(dir), 1.0);
+        } else {
+            space.add(spatialMixer::EXHAUST, mid - vec3{0.f, 300.f, 0.f}, {}, 1.0);
+        }
+        space.add(spatialMixer::INTAKE, top, {}, 1.0);
+        space.add(spatialMixer::BLOCK, mid, {}, 1.0);
+        space.add(spatialMixer::TURBO, layout && layout->turbo.on ? world(layout->turbo.at) : top, {}, 1.0);
+    }
+    // reference: the starting view (each source at its mono level there); l: where the camera is now
+    void calibrateListener(const listenerPose &reference) { space.calibrate(reference); }
+    void setListener(const listenerPose &l) { space.setListener(l); }
+
+    // the last sample in stereo (call after sample()): each source from where it sits, heard from the
+    // listener; the same level and limiter as the mono output
+    void stereo(float &left, float &right) {
+        double l, r;
+        space.mix(groups, l, r);
+        left = limit(sp.drive * l);
+        right = limit(sp.drive * r);
     }
 
     // the output level: linear (sp.drive is the gain, set per engine so its loudest moments stay
@@ -569,8 +740,12 @@ struct engineSound {
     float output(double mix) {
         double y = sp.drive * mix, a = std::fabs(y);
         peakOut = std::max(peakOut, a);
+        if (a > LIMIT_KNEE) limitedSamples++;
+        return limit(y);
+    }
+    static float limit(double y) {
+        double a = std::fabs(y);
         if (a <= LIMIT_KNEE) return static_cast<float>(y);
-        limitedSamples++;
         double room = 1.0 - LIMIT_KNEE;
         return static_cast<float>(std::copysign(LIMIT_KNEE + room * std::tanh((a - LIMIT_KNEE) / room), y));
     }
@@ -626,17 +801,20 @@ private:
     }
 };
 
-// single-producer single-consumer ring of samples: main thread writes, audio thread reads
+// one stereo sample
+struct audioFrame { float l = 0.f, r = 0.f; };
+
+// single-producer single-consumer ring of stereo frames: main thread writes, audio thread reads
 class audioRing {
 public:
-    bool push(float v) {
+    bool push(audioFrame v) {
         std::size_t w = wr.load(std::memory_order_relaxed), next = (w + 1) & MASK;
         if (next == rd.load(std::memory_order_acquire)) return false;  // full: drop
         buf[w] = v;
         wr.store(next, std::memory_order_release);
         return true;
     }
-    bool pop(float &v) {
+    bool pop(audioFrame &v) {
         std::size_t r = rd.load(std::memory_order_relaxed);
         if (r == wr.load(std::memory_order_acquire)) return false;
         v = buf[r];
@@ -649,7 +827,7 @@ public:
 
 private:
     static constexpr std::size_t N = 1u << 16, MASK = N - 1;
-    std::array<float, N> buf{};
+    std::array<audioFrame, N> buf{};
     std::atomic<std::size_t> wr{0}, rd{0};
 };
 
@@ -730,7 +908,8 @@ private:
 
 // streams the synthesised samples to the sound card, resampling from the physics rate. In slow
 // motion fewer samples arrive per second and they are stretched, so the pitch drops like a slowed
-// recording. The read rate is nudged to keep about 50 ms queued, which absorbs frame jitter.
+// recording. The read rate is nudged to keep about 50 ms queued, which absorbs frame jitter. Always
+// a stereo stream: the mono sound arrives as the same sample on both sides.
 class engineAudio : public sf::SoundStream {
 public:
     static constexpr unsigned RATE = 44100;
@@ -738,33 +917,36 @@ public:
     std::atomic<double> simPerOut{40000.0 / RATE};  // simulation samples per output sample
     std::atomic<bool> muted{false};
 
-    engineAudio() { initialize(1, RATE, {sf::SoundChannel::Mono}); }
+    engineAudio() { initialize(2, RATE, {sf::SoundChannel::FrontLeft, sf::SoundChannel::FrontRight}); }
     ~engineAudio() override { stop(); }
 
 private:
-    std::vector<std::int16_t> out = std::vector<std::int16_t>(512);
+    std::vector<std::int16_t> out = std::vector<std::int16_t>(1024);  // 512 frames, interleaved
     double frac = 0.0;
-    float last = 0.f, vol = 1.f;
-    sincResampler rs;
+    audioFrame last;
+    float vol = 1.f;
+    sincResampler rsL, rsR;
 
     bool onGetData(Chunk &data) override {
         double base = simPerOut.load();
         double target = std::max(64.0, 0.05 * RATE * base);
         double fill = static_cast<double>(ring.size());
         double step = base * std::clamp(1.0 + 0.05 * (fill - target) / target, 0.9, 1.1);
-        rs.setStep(step);
-        for (auto &o : out) {
+        rsL.setStep(step);
+        rsR.setStep(step);
+        for (std::size_t k = 0; k < out.size(); k += 2) {
             frac += step;
             while (frac >= 1.0) {
                 frac -= 1.0;
-                float v;
+                audioFrame v;
                 if (ring.pop(v)) last = v;
-                else last *= 0.995f;  // starved (paused): fade out instead of clicking
-                rs.push(last);
+                else { last.l *= 0.995f; last.r *= 0.995f; }  // starved (paused): fade out instead of clicking
+                rsL.push(last.l);
+                rsR.push(last.r);
             }
-            float x = rs.at(frac);
             vol += ((muted.load() ? 0.f : 1.f) - vol) * 0.002f;
-            o = static_cast<std::int16_t>(std::clamp(x * vol, -1.f, 1.f) * 30000.f);
+            out[k] = static_cast<std::int16_t>(std::clamp(rsL.at(frac) * vol, -1.f, 1.f) * 30000.f);
+            out[k + 1] = static_cast<std::int16_t>(std::clamp(rsR.at(frac) * vol, -1.f, 1.f) * 30000.f);
         }
         data.samples = out.data();
         data.sampleCount = out.size();

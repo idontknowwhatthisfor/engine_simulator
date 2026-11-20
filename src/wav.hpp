@@ -4,7 +4,10 @@
 #include "sound.hpp"
 
 // headless: run a start / idle / rev / lift-off / ignition-off sequence and write it as a WAV (--wav)
-int renderWav(const engineModel &e, const engineType &type, const std::string &path, bool bov = true) {
+// stereo: heard from the starting camera, view.yaw / pitch as given and view.dist the zoom factor on
+// the default distance (the window frames the engine and its exhaust; the gearbox is left out here)
+int renderWav(const engineModel &e, const engineType &type, const std::string &path, bool bov = true, bool stereo = false,
+              camera view = {0.6f, 0.45f, 1.f}) {
     engineSim sim;
     setupSim(sim, e, type, e.cyls[0].theta0, type.bike);  // a bike engine revs on its stand
     sim.P.turbo.bov = bov;
@@ -18,7 +21,28 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
                     snd.net.hasTurbine() ? ", turbine" : "");
     else if (sim.P.sound.detailed)
         std::printf("exhaust sound: one %.2f m pipe (soundParams::pipeLength)\n", sim.P.sound.pipeLength);
-    std::vector<float> raw;
+    std::vector<float> raw, rawR;  // rawR: the right channel in stereo (raw is then the left)
+    if (stereo) {
+        snd.setScene(e, type.exhaust ? &layout : nullptr);
+        engineModel framed = e;
+        if (type.exhaust) {
+            exhaustModel ex;
+            ex.build(layout, static_cast<int>(e.cyls.size()));
+            ex.growBounds(framed);
+        }
+        vec3 centre = (framed.lo + framed.hi) * 0.5f, ext = (framed.hi - framed.lo) * 0.5f;
+        double dist0 = std::max({ext.x, ext.y, ext.z}) * 1100.0 / 300.0;
+        snd.calibrateListener(listenerFromCamera({0.6f, 0.45f, static_cast<float>(dist0)}, centre));  // the window's starting view
+        snd.setListener(listenerFromCamera({view.yaw, view.pitch, static_cast<float>(dist0 * view.dist)}, centre));
+    }
+    auto emit = [&] {
+        float m = snd.sample(sim);
+        if (!stereo) { raw.push_back(m); return; }
+        float l, r;
+        snd.stereo(l, r);
+        raw.push_back(l);
+        rawR.push_back(r);
+    };
     struct segment { double until; bool starter, ignition; double throttle; const char *what; };
     const segment SCRIPT[] = {
         {1.2, true, true, 0.0, "starter"},   {4.0, false, true, 0.0, "idle"},
@@ -53,7 +77,7 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
             }
             while (sim.time < sg.until) {
                 sim.step(PHYS_DT);
-                raw.push_back(snd.sample(sim));
+                emit();
             }
             std::printf("           at %4.1f s: %5.0f rpm  gear %d  %3.0f km/h\n", sim.time, sim.rpm(), sim.drive.gear, sim.drive.v * 3.6);
             from = sg.until;
@@ -67,7 +91,7 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
             double bovPeak = 0.0, surgePeak = 0.0, boostPeak = -1.0;
             while (sim.time < sg.until) {
                 sim.step(PHYS_DT);
-                raw.push_back(snd.sample(sim));
+                emit();
                 bovPeak = std::max(bovPeak, sim.bovFlow);
                 surgePeak = std::max(surgePeak, sim.surge);
                 boostPeak = std::max(boostPeak, sim.boostBar());
@@ -85,14 +109,19 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
     const unsigned RATE = engineAudio::RATE;
     std::vector<std::int16_t> pcm;
     double ratio = (1.0 / PHYS_DT) / RATE;
-    sincResampler rs;
+    const unsigned CH = stereo ? 2 : 1;
+    sincResampler rs, rsR;
     rs.setStep(ratio);
+    rsR.setStep(ratio);
     std::size_t fed = 0;
     for (double t = 0.0; t + 1.0 < raw.size(); t += ratio) {
         std::size_t i = static_cast<std::size_t>(t);
-        while (fed <= i + sincResampler::HALF) rs.push(fed < raw.size() ? raw[fed++] : (fed++, 0.f));
-        double v = rs.at(t - i);
-        pcm.push_back(static_cast<std::int16_t>(std::clamp(v, -1.0, 1.0) * 30000.0));
+        for (; fed <= i + sincResampler::HALF; fed++) {
+            rs.push(fed < raw.size() ? raw[fed] : 0.f);
+            if (stereo) rsR.push(fed < rawR.size() ? rawR[fed] : 0.f);
+        }
+        pcm.push_back(static_cast<std::int16_t>(std::clamp(static_cast<double>(rs.at(t - i)), -1.0, 1.0) * 30000.0));
+        if (stereo) pcm.push_back(static_cast<std::int16_t>(std::clamp(static_cast<double>(rsR.at(t - i)), -1.0, 1.0) * 30000.0));
     }
     std::ofstream f(path, std::ios::binary);
     if (!f) return 1;
@@ -100,10 +129,10 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
     auto u16 = [&](std::uint16_t v) { f.write(reinterpret_cast<const char *>(&v), 2); };
     std::uint32_t bytes = static_cast<std::uint32_t>(pcm.size() * 2);
     f.write("RIFF", 4); u32(36 + bytes); f.write("WAVEfmt ", 8);
-    u32(16); u16(1); u16(1); u32(RATE); u32(RATE * 2); u16(2); u16(16);
+    u32(16); u16(1); u16(CH); u32(RATE); u32(RATE * 2 * CH); u16(2 * CH); u16(16);
     f.write("data", 4); u32(bytes);
     f.write(reinterpret_cast<const char *>(pcm.data()), bytes);
-    std::printf("wrote %s (%.1f s, %u Hz mono)\n", path.c_str(), pcm.size() / double(RATE), RATE);
+    std::printf("wrote %s (%.1f s, %u Hz %s)\n", path.c_str(), pcm.size() / double(RATE * CH), RATE, stereo ? "stereo" : "mono");
     std::printf("level: peak %.3f of full scale before the limiter (%.1f dBFS), limiter on %ld samples%s\n",
                 snd.peakOut, 20.0 * std::log10(std::max(snd.peakOut, 1e-9)), snd.limitedSamples,
                 snd.limitedSamples ? ": lower soundParams::drive" : "");

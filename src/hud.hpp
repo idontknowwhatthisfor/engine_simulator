@@ -35,7 +35,7 @@ std::string helpText(const engineSim &sim) {
         if (sim.P.turbo.on) s += sim.P.turbo.supercharger ? "  F: bypass" : "  F: BOV";  // the boost valve
         s += "\n";
     }
-    s += "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: mute  D: dyno  X: shake  P: pause  R: reset";
+    s += "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: sound  D: dyno  X: shake  P: pause  R: reset";
     return s;
 }
 
@@ -44,7 +44,7 @@ struct hudView {
     float fps = 0.f;              // 0: not measured yet
     double timeScale = 1.0;
     bool paused = false;
-    const char *sound = "off";    // "on", "muted" or "off"
+    const char *sound = "off";    // "stereo", "mono", "muted" or "off"
     float shakeView = 1.f;
     bool ghost = true, blur = true;
     const exhaustModel *exhaust = nullptr;  // drawn exhaust (nullptr: none)
