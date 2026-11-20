@@ -43,7 +43,10 @@ struct soundParams {
     double popRpm = 3500.0, popChance = 0.0;
     // straight-cut gear whine: primary pair and the engaged gearbox pair
     double whineGain = 0.0;
-    double drive = 0.6;             // soft-clip drive into the output
+    // output gain (linear; a limiter near full scale is only a safety net, src/sound.hpp output()).
+    // Set per engine from the --wav "level:" line: the loudest moment of the script well under full
+    // scale (peak ~0.7) and the full-throttle loudness like the other engines' (tuned ones ~2 dB up)
+    double drive = 0.178;
     // what leaves the tailpipe is heard as the rate of change of the gas flow (an open pipe end
     // radiates like a monopole): +6 dB per octave, so the voice brightens and swells with the revs.
     // radiateHz is the frequency where the derivative has unity gain
@@ -145,6 +148,13 @@ struct engineParams {
     double etaHeat = 0.85;          // fuel energy that ends up as gas pressure (combustion + wall losses)
     double burn = 50.0 * DEGR;      // Wiebe burn duration
     double wiebeA = 5.0, wiebeM = 2.0;
+    // cycle-to-cycle variation: no two combustions are alike (mixture, turbulence and residual gas
+    // differ from cycle to cycle), which is what makes an idle lope instead of humming. Each firing
+    // draws its heat release and its burn duration at random around the mean. The coefficient of
+    // variation of the heat goes from cycleCovIdle at idle-like manifold vacuum to cycleCovFull at
+    // full load (real engines: IMEP CoV a few percent at idle, 1-2% at wide-open throttle); the burn
+    // duration varies 1.5 times as much. 0 turns it off. Seeded: every run is the same.
+    double cycleCovIdle = 0.03, cycleCovFull = 0.012;
     double leakTau = 1.0;           // s, ring blow-by time constant: ~1.5% of the charge at 3000 rpm, ~18% when cranking
     double mRecip = 0.6;            // kg per cylinder: piston + pin + 1/3 rod
     double inertia = 0.13;          // kg m^2: crank + flywheel + 2/3 rods
@@ -206,6 +216,7 @@ struct cylinderState {
     double qTot = 0.0;      // heat to release this cycle, J
     double xbDone = 0.0;    // Wiebe fraction already released
     double phiSpark = 0.0;
+    double burn = 0.0;      // this cycle's burn duration, rad (engineParams::burn with its variation)
     double heatRate = 0.0;  // J/s
     double glowEvo = 0.0;   // glow when the exhaust valve opened, fades through blowdown
     bool sparked = false;
@@ -747,6 +758,7 @@ struct engineSim {
     double rpmFilt = 0.0;     // rpm averaged over ~a firing interval, what the ECU controls on
     bool lockSpeed = false;  // dyno sweep: hold omega fixed
     double vDispTotal = 0.0;
+    std::uint32_t cycleRng = 0x9e3779b9u;  // cycle-to-cycle variation (engineParams::cycleCovIdle), seeded
     // outputs
     double gasTorque = 0.0, frictionTorque = 0.0, starterTorque = 0.0, loadTorque = 0.0;
     double brakeAvg = 0.0;   // smoothed gas - friction torque
@@ -964,6 +976,26 @@ struct engineSim {
         return adv * DEGR;
     }
 
+    // cycle-to-cycle variation for the next firing: its coefficient of variation from the manifold
+    // pressure (idle vacuum ~0.3 atm -> cycleCovIdle, 0.9 atm and up -> cycleCovFull). Off on the
+    // dyno sweep (lockSpeed), whose curves should be the mean engine
+    double cycleCov() const {
+        if (lockSpeed) return 0.0;
+        double light = std::clamp((0.9 - pMan / P.pAtm) / 0.6, 0.0, 1.0);
+        return P.cycleCovFull + (P.cycleCovIdle - P.cycleCovFull) * light;
+    }
+    // about normal (sum of three uniforms: mean 0, variance 1, within +-3), from the seeded generator
+    double cycleGauss() {
+        double sum = 0.0;
+        for (int k = 0; k < 3; k++) {
+            cycleRng ^= cycleRng << 13;
+            cycleRng ^= cycleRng >> 17;
+            cycleRng ^= cycleRng << 5;
+            sum += cycleRng / 2147483648.0 - 1.0;
+        }
+        return sum;
+    }
+
     // residual-gas dilution makes low-load combustion less effective (and is why idle needs ~30 kPa)
     double loadFactor() const { return P.residualMin + (1.0 - P.residualMin) * std::clamp((pMan - 25e3) / 60e3, 0.0, 1.0); }
 
@@ -1016,11 +1048,18 @@ struct engineSim {
                 s.sparked = true;
                 s.phiSpark = phiS;
                 s.xbDone = 0.0;
-                if (ignition && !revCut && !fuelCut && !stalled && !qsCut && s.mAir > 0.0)
+                s.burn = P.burn;
+                if (ignition && !revCut && !fuelCut && !stalled && !qsCut && s.mAir > 0.0) {
                     s.qTot = tcTrim * P.etaHeat * loadFactor() * s.mAir / P.afr * P.lhv;
+                    double cov = cycleCov();
+                    if (cov > 0.0) {
+                        s.qTot *= std::max(0.5, 1.0 + cov * cycleGauss());
+                        s.burn *= std::max(0.5, 1.0 + 1.5 * cov * cycleGauss());
+                    }
+                }
             }
             if (s.qTot > 0.0 && dphi > 0.0) {
-                double u = std::clamp((phiNew - s.phiSpark) / P.burn, 0.0, 1.0);
+                double u = std::clamp((phiNew - s.phiSpark) / s.burn, 0.0, 1.0);
                 double xb = 1.0 - std::exp(-P.wiebeA * std::pow(u, P.wiebeM + 1.0));
                 double dq = s.qTot * (xb - s.xbDone);
                 if (dq > 0.0) {

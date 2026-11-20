@@ -61,7 +61,7 @@ engineParams lexusLfaParams() {
     S.airboxHz = 230.0; S.intakeHowlHz = 950.0; S.intakeGain = 1.0;
     S.popRpm = 3000.0; S.popChance = 0.25;
     S.whineGain = 0.0;
-    S.drive = 0.32;
+    S.drive = 0.418;
     S.radiateHz = 380.0;
     S.burble = 2.2;
     S.burbleFadeFrom = 3500.0; S.burbleFadeSpan = 3000.0; S.burbleHigh = 0.4;
@@ -317,7 +317,7 @@ engineParams lexusLfaTunedParams() {
     S.pipeLowHz = 4200.0;
     S.masterHz = 15000.0;
     S.radiateHz = 330.0;
-    S.drive = 0.42;
+    S.drive = 0.475;
     // the low burble: below the stock car's 2.2, since nothing muffles it now (the stock valve is shut
     // at low revs); at 2.2+ the decel boom under ~3500 rpm came out louder than full throttle
     S.burble = 1.6;

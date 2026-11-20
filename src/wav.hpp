@@ -72,14 +72,18 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
         if (type.boost == builtInBoost::turbo) for (const segment &sg : TURBO_SCRIPT) play(sg);
         else for (const segment &sg : SCRIPT) play(sg);
     }
-    // resample 40 kHz -> 44.1 kHz, linear
+    // resample 40 kHz -> 44.1 kHz, band-limited (the same resampler as the live stream). The
+    // resampler lags HALF input samples: start the output that far in, so it lines up with raw
     const unsigned RATE = engineAudio::RATE;
     std::vector<std::int16_t> pcm;
     double ratio = (1.0 / PHYS_DT) / RATE;
+    sincResampler rs;
+    rs.setStep(ratio);
+    std::size_t fed = 0;
     for (double t = 0.0; t + 1.0 < raw.size(); t += ratio) {
         std::size_t i = static_cast<std::size_t>(t);
-        double f = t - i;
-        double v = raw[i] + (raw[i + 1] - raw[i]) * f;
+        while (fed <= i + sincResampler::HALF) rs.push(fed < raw.size() ? raw[fed++] : (fed++, 0.f));
+        double v = rs.at(t - i);
         pcm.push_back(static_cast<std::int16_t>(std::clamp(v, -1.0, 1.0) * 30000.0));
     }
     std::ofstream f(path, std::ios::binary);
@@ -92,6 +96,9 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
     f.write("data", 4); u32(bytes);
     f.write(reinterpret_cast<const char *>(pcm.data()), bytes);
     std::printf("wrote %s (%.1f s, %u Hz mono)\n", path.c_str(), pcm.size() / double(RATE), RATE);
+    std::printf("level: peak %.3f of full scale before the limiter (%.1f dBFS), limiter on %ld samples%s\n",
+                snd.peakOut, 20.0 * std::log10(std::max(snd.peakOut, 1e-9)), snd.limitedSamples,
+                snd.limitedSamples ? ": lower soundParams::drive" : "");
     return f ? 0 : 1;
 }
 

@@ -56,7 +56,7 @@ engineParams mxkingParams() {
     S.masterHz = 9000.0;
     S.airboxHz = 160.0; S.intakeHowlHz = 600.0; S.intakeGain = 0.4;
     S.popRpm = 3000.0; S.popChance = 0.08;
-    S.drive = 0.4;
+    S.drive = 0.046;
     S.radiateHz = 250.0;
     S.burble = 3.5;
     S.tick = 0.15;
@@ -243,7 +243,7 @@ engineParams mxkingTunedParams() {
     S.flapShutHz = 4000.0; S.flapShutGain = 1.0;
     S.intakeGain = 0.9;             // open filter: the intake honk comes through
     S.popChance = 0.4;
-    S.drive = 0.5;
+    S.drive = 0.0446;
     S.radiateHz = 300.0;
     S.burble = 4.0;
     S.tick = 0.25;

@@ -45,7 +45,7 @@ engineParams myengineParams() {
     S.masterHz = 12000.0;
     S.intakeGain = 1.0;
     S.popChance = 0.3;
-    S.drive = 0.3;
+    S.drive = 0.1;                  // output gain: set it from the "level:" line of --wav (soundParams::drive)
     S.radiateHz = 300.0;
     S.burble = 3.0;
     return P;

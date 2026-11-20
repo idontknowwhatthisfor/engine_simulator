@@ -32,7 +32,7 @@ struct paramDumper {
 // a field added to a parameter struct must be added to its dump below; these trip when one is not
 static_assert(sizeof(soundParams) == 248, "soundParams changed: update dumpSound()");
 static_assert(sizeof(turboParams) == 328, "turboParams changed: update dumpTurbo()");
-static_assert(sizeof(engineParams) == 1160, "engineParams changed: update dumpEngine()");
+static_assert(sizeof(engineParams) == 1176, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 448, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
 static_assert(sizeof(carSpec) == 552, "carSpec changed: update dumpCarSpec()");
@@ -66,7 +66,7 @@ void dumpEngine(const paramDumper &d, const engineParams &P) {
     DUMP(d, P, bore); DUMP(d, P, compression); DUMP(d, P, gamma); DUMP(d, P, ivc); DUMP(d, P, evo);
     DUMP(d, P, blowdown); DUMP(d, P, pAtm); DUMP(d, P, pExhaust); DUMP(d, P, pCrankcase); DUMP(d, P, tIntake);
     DUMP(d, P, rGas); DUMP(d, P, afr); DUMP(d, P, lhv); DUMP(d, P, etaHeat); DUMP(d, P, burn);
-    DUMP(d, P, wiebeA); DUMP(d, P, wiebeM); DUMP(d, P, leakTau); DUMP(d, P, mRecip); DUMP(d, P, inertia);
+    DUMP(d, P, wiebeA); DUMP(d, P, wiebeM); DUMP(d, P, cycleCovIdle); DUMP(d, P, cycleCovFull); DUMP(d, P, leakTau); DUMP(d, P, mRecip); DUMP(d, P, inertia);
     DUMP(d, P, vManifold); DUMP(d, P, throttleArea); DUMP(d, P, throttleCd); DUMP(d, P, idleBase);
     DUMP(d, P, idleMin); DUMP(d, P, idleMax); DUMP(d, P, idleKp); DUMP(d, P, idleKi); DUMP(d, P, idleBand);
     DUMP(d, P, idleSparkBase); DUMP(d, P, idleSparkGain); DUMP(d, P, idleRpm); DUMP(d, P, starterTorque);

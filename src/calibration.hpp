@@ -16,6 +16,7 @@ void applyCalibrationEnv(engineParams &P) {
     env("SCAV_LEN", P.scavLen); env("SCAV_C", P.scavSound); env("SCAV_GAIN", P.scavGain); env("SCAV_DECAY", P.scavDecay);
     // friction, combustion, crank, starter
     env("FMEP_A", P.fmepA); env("FMEP_B", P.fmepB); env("FMEP_C", P.fmepC);
+    env("CYC_IDLE", P.cycleCovIdle); env("CYC_FULL", P.cycleCovFull);  // cycle-to-cycle variation
     env("RESID", P.residualMin); env("ETA", P.etaHeat); env("INERTIA", P.inertia); env("STARTER", P.starterTorque);
     // idle control
     env("IDLE_KP", P.idleKp); env("IDLE_KI", P.idleKi); env("IDLE_SG", P.idleSparkGain);

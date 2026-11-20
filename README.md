@@ -3,14 +3,20 @@
 A real-time 3D engine simulator. The crank, rods and pistons move on exact slider-crank geometry, and
 the crank speed comes from a physics model, not a fixed rate:
 
-- a pressure model for each cylinder (intake, compression, Wiebe combustion, expansion, blowdown);
+- a pressure model for each cylinder (intake, compression, Wiebe combustion, expansion, blowdown),
+  with no two combustions alike: each firing's heat release and burn duration vary a few percent at
+  random (3% at idle, 1.2% at full load: `engineParams::cycleCovIdle`, `cycleCovFull`), seeded so
+  every run is the same;
 - how well each engine breathes over its rev range, with the pressure waves in its intake runners and
   exhaust headers putting real humps and dips on the torque curve ([wave tuning](#wave-tuning));
 - the gas and reciprocating-mass torques on the crank;
 - friction, a starter motor and an ECU that controls the idle, the rev limiter and the fuel cut;
 - a clutch, a gearbox and the vehicle the engine pushes.
 
-The sound is synthesised from the same simulation.
+The sound is synthesised from the same simulation, at the physics rate (40 kHz), and resampled to
+the sound card's 44.1 kHz through a windowed-sinc filter. Each engine's level (`soundParams::drive`)
+is linear and set so its loudest moments stay under full scale; a limiter near full scale is only a
+safety net, so the waveform is not flattened.
 
 It has eight engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
@@ -141,7 +147,7 @@ A typical big-turbo build (estimates, not one tuner's car) on the stock 82.5 × 
 | Gearbox | Stock ratios; a gearbox tune: more clutch clamping (950 N·m), full-throttle upshifts at ~7300 rpm, launch control a little higher (~4900 rpm on 1.5 bar) |
 | Results (sim) | 0–100 km/h 3.0 s with launch control (3.6 s floored from idle), 0–200 km/h 10.8 s |
 | 3D | Straight pipe: the downpipe and the mid pipe a size up, straight pipes where the catalyst and the rear silencer were, no flap, bigger blued titanium tips. The physics is unchanged by it (the header's waves reflect at the manifold's merge over the turbine, upstream) |
-| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~4 dB at idle, ~2–3 dB on lift-off, under 1 dB at full throttle, which stays the loudest), more crackle, more turbo |
+| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~4–5 dB at idle, 1–2 dB on lift-off, ~1 dB at full throttle, which stays the loudest), more crackle, more turbo |
 
 
 ### `lfa`: Lexus LFA (2010-2012), 1LR-GUE 72° V10
@@ -185,7 +191,7 @@ A typical straight-pipe build with an ECU tune (estimates, not one tuner's car) 
 | Output (sim) | 479 N·m at 7000 rpm, 425 kW (570 hp) at 9500 (stock: 480 N·m, 408 kW at 9000) |
 | Gearbox | Stock ratios; full-throttle upshifts at ~9400 rpm |
 | Results (sim) | 0–100 km/h 3.6 s floored, 3.2 s with launch control (no grip limit), 0–200 km/h 9.7 s |
-| Sound | No silencer or valve: always open, the pipe rings harder (2.4 m, more reflection), brighter and louder (+5 dB at idle, +2 dB at full throttle), more crackle on the overrun; the low burble held under the stock car's so the decel boom stays below full throttle, and the rasp at the stock eighth |
+| Sound | No silencer or valve: always open, the pipe rings harder (2.4 m, more reflection), brighter and louder (+3 dB at idle, +2 dB at full throttle), more crackle on the overrun; the low burble held under the stock car's so the decel boom stays below full throttle, and the rasp at the stock eighth |
 
 ### `v4`: Ducati Desmosedici Stradale (Panigale V4)
 
@@ -687,6 +693,7 @@ tools/meshlib.py            the mesh builders' shared steps and the ENGMSHv3 wri
 scripts/
   fetch_assets.py           downloads the large model files (make assets)
   regress.sh, pngdiff.py    the behaviour regression check (see Testing)
+  spectrogram.py            a WAV as a spectrogram PNG, over a reference recording; --stats for levels
 plan.md                     development log (design notes and measurements, phase by phase)
 ```
 
@@ -758,7 +765,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    parameters while you try values, for every engine: `VE_BASE VE_PEAK VE_RPM VE_WIDTH` (and `VEL_*`
    for a low-cam lobe), the wave tuning `RAM_LEN RAM_DIA RAM_C RAM_GAIN RAM_DECAY SCAV_LEN SCAV_C
    SCAV_GAIN SCAV_DECAY`, `FMEP_A FMEP_B FMEP_C`, `RESID ETA INERTIA STARTER`,
-   `IDLE_KP IDLE_KI IDLE_SG IDLE_BASE IDLE_SPARK IDLE_MIN`, `SC_PR SC_FLOW SC_CHOKE SC_RELIEF`,
+   `IDLE_KP IDLE_KI IDLE_SG IDLE_BASE IDLE_SPARK IDLE_MIN`, the cycle-to-cycle variation `CYC_IDLE CYC_FULL`, `SC_PR SC_FLOW SC_CHOKE SC_RELIEF`,
    `TURBO_AREA TURBO_WG TURBO_BOOST TURBO_INERTIA TURBO_KNOCK TURBO_FALL TURBO_TOPRPM TURBO_TOP
    TURBO_CHARGE` and, for
    `--wav`, `SND_*` (`src/calibration.hpp` lists them). `--dyno` (hidden) prints the full-throttle
@@ -779,6 +786,12 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
   list. A screenshot within `JITTER_PIXELS` pixels and `JITTER_LEVELS` levels (50, 8) passes as GPU
   jitter; a shot the baseline does not have yet is listed as NEW. Everything it prints is also saved
   in `regress/<baseline|check>/report.txt`. Output goes to `regress/` (not in git).
+- Sound: `--wav out.wav` ends with a `level:` line, the loudest output before the limiter and how many
+  samples the limiter touched (it should be none: lower `soundParams::drive` if not).
+  `python3 -I scripts/spectrogram.py out.wav` draws its spectrogram (log frequency, 20 Hz–12 kHz);
+  `--ref real.wav --ref-offset S` draws a recording under it on the same time scale, lined up by
+  skipping S seconds of the recording, and `--stats` prints the peak, the clipping and the loudness
+  of every half second. Keep recordings out of git (`*.wav` is ignored) or check their licence.
 
 ## Credits
 

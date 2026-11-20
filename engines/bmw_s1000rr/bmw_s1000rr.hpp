@@ -52,7 +52,7 @@ engineParams bmwS1000rrParams() {
     S.intakeGain = 1.0;
     S.popChance = 0.3;
     S.whineGain = 0.02;
-    S.drive = 0.25;
+    S.drive = 0.1;
     S.radiateHz = 300.0;
     S.burble = 3.0;
     S.tick = 0.5;
@@ -159,7 +159,7 @@ engineParams bmwS1000rrTunedParams() {
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
     S.flapShutGain = 1.0;
     S.popChance = 0.5;
-    S.drive = 0.3;
+    S.drive = 0.115;
     S.pipeLength = 1.05;            // the short race can: a shorter pipe, a higher note
     S.pipeResHz = 240.0;
     return P;

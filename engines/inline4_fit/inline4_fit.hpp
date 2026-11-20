@@ -221,7 +221,7 @@ engineParams inline4FitTunedParams() {
     S.pipeLowHz = 1300.0;
     S.pipeResGain = 1.8;
     S.masterHz = 9000.0;
-    S.drive = 0.85;
+    S.drive = 0.185;
     return P;
 }
 

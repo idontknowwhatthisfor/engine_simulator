@@ -165,7 +165,7 @@ struct engineSound {
             double induction = intake.run(0.4 * intakeFlow + 3.0 * sim.throttleFlow * noise());
             double knock = 0.15 * clatter.run(noise() * std::min(1.0, heat / 5e6));
             double mix = master.run(body + rasp + induction + knock + starterWhine(sim)) + turboVoice(sim);
-            return static_cast<float>(0.8 * std::tanh(sp.drive * mix));
+            return output(mix);
         }
 
         // ---- detailed voice (soundParams::detailed) ----------------------------------------------
@@ -235,7 +235,24 @@ struct engineSound {
         double ticks = sp.tick * tickBand.run(noise() * tickEnv);
         tickEnv *= std::exp(-1.0 / (0.0015 * fs));
         double mix = master.run(exhaustOut + induction + pops + whine + knock + ticks + starterWhine(sim)) + turboVoice(sim);
-        return static_cast<float>(0.8 * std::tanh(sp.drive * mix));
+        return output(mix);
+    }
+
+    // the output level: linear (sp.drive is the gain, set per engine so its loudest moments stay
+    // clearly under full scale), then a limiter that only acts on what would still go over: below
+    // LIMIT_KNEE nothing is touched, above it the excess is folded softly into the last 1 - knee so
+    // the output never reaches 1. A shaping stage here (the old 0.8 tanh(drive x)) would flatten
+    // the loud pulses and add harmonics the engine does not make.
+    static constexpr double LIMIT_KNEE = 0.85;
+    double peakOut = 0.0;      // loudest output before the limiter (|drive * mix|), for --wav's report
+    long limitedSamples = 0;   // samples the limiter had to touch
+    float output(double mix) {
+        double y = sp.drive * mix, a = std::fabs(y);
+        peakOut = std::max(peakOut, a);
+        if (a <= LIMIT_KNEE) return static_cast<float>(y);
+        limitedSamples++;
+        double room = 1.0 - LIMIT_KNEE;
+        return static_cast<float>(std::copysign(LIMIT_KNEE + room * std::tanh((a - LIMIT_KNEE) / room), y));
     }
 
 private:
@@ -316,6 +333,81 @@ private:
     std::atomic<std::size_t> wr{0}, rd{0};
 };
 
+// band-limited resampling from the physics rate (40 kHz) to the sound card's: windowed-sinc
+// interpolation (64 taps, Kaiser window, beta 9: ~90 dB stopband) read from a polyphase table with
+// 1024 phases, linearly interpolated between them. The pass band ends at 0.9 of the input's Nyquist
+// (18 kHz from 40 kHz), so the images that linear interpolation leaves above 20 kHz (which fold back
+// at 44.1 kHz) are gone and the top octave is not dulled. Reading faster than the input (step > 1)
+// moves the cutoff down with the step, so a downsample does not alias either.
+// Feed it input samples with push(); at(frac) is the signal frac (0..1) of the way from the
+// HALF-th newest sample to the next one (a fixed latency of HALF samples: 0.8 ms at 40 kHz).
+class sincResampler {
+public:
+    static constexpr int HALF = 32, TAPS = 2 * HALF, PHASES = 1024;
+
+    sincResampler() { build(0.9); }
+
+    void push(float v) {
+        // each sample is written twice, so the newest TAPS always sit contiguous at hist[pos .. pos+TAPS)
+        hist[pos] = hist[pos + TAPS] = v;
+        pos = (pos + 1) % TAPS;
+    }
+
+    // the step between output samples, in input samples: above 1 the cutoff follows it down
+    void setStep(double step) {
+        double want = 0.9 * std::min(1.0, 1.0 / std::max(step, 1e-6));
+        if (std::fabs(want - cutoff) > 0.01 * cutoff) build(want);
+    }
+
+    float at(double frac) const {
+        double ph = std::clamp(frac, 0.0, 1.0) * PHASES;
+        int p = std::min(static_cast<int>(ph), PHASES - 1);
+        float f = static_cast<float>(ph - p);
+        const float *a = &table[p * TAPS], *b = &table[(p + 1) * TAPS], *x = &hist[pos];
+        float ya = 0.f, yb = 0.f;
+        for (int j = 0; j < TAPS; j++) {
+            ya += a[j] * x[j];
+            yb += b[j] * x[j];
+        }
+        return ya + (yb - ya) * f;
+    }
+
+private:
+    std::array<float, 2 * TAPS> hist{};
+    int pos = 0;  // hist[pos] is the oldest of the newest TAPS samples, hist[pos + TAPS - 1] the newest
+    std::vector<float> table = std::vector<float>((PHASES + 1) * TAPS);
+    double cutoff = 0.0;
+
+    static double besselI0(double x) {
+        double sum = 1.0, term = 1.0;
+        for (int k = 1; k < 30; k++) {
+            term *= (x / (2.0 * k)) * (x / (2.0 * k));
+            sum += term;
+        }
+        return sum;
+    }
+
+    // row p: the taps for an output frac = p / PHASES past hist[pos + HALF - 1]; tap j weighs
+    // hist[pos + j], which sits d = HALF - 1 + frac - j samples before the output point
+    void build(double fc) {
+        const double PI = 3.14159265358979323846, BETA = 9.0, norm = besselI0(BETA);
+        cutoff = fc;
+        for (int p = 0; p <= PHASES; p++) {
+            double frac = static_cast<double>(p) / PHASES, sum = 0.0;
+            float *row = &table[p * TAPS];
+            for (int j = 0; j < TAPS; j++) {
+                double d = HALF - 1 + frac - j;
+                double r = d / HALF;
+                double w = std::fabs(r) < 1.0 ? besselI0(BETA * std::sqrt(1.0 - r * r)) / norm : 0.0;
+                double sinc = std::fabs(d) < 1e-9 ? 1.0 : std::sin(PI * fc * d) / (PI * fc * d);
+                row[j] = static_cast<float>(fc * sinc * w);
+                sum += row[j];
+            }
+            for (int j = 0; j < TAPS; j++) row[j] = static_cast<float>(row[j] / sum);  // unity gain at DC
+        }
+    }
+};
+
 // streams the synthesised samples to the sound card, resampling from the physics rate. In slow
 // motion fewer samples arrive per second and they are stretched, so the pitch drops like a slowed
 // recording. The read rate is nudged to keep about 50 ms queued, which absorbs frame jitter.
@@ -332,23 +424,25 @@ public:
 private:
     std::vector<std::int16_t> out = std::vector<std::int16_t>(512);
     double frac = 0.0;
-    float s0 = 0.f, s1 = 0.f, vol = 1.f;
+    float last = 0.f, vol = 1.f;
+    sincResampler rs;
 
     bool onGetData(Chunk &data) override {
         double base = simPerOut.load();
         double target = std::max(64.0, 0.05 * RATE * base);
         double fill = static_cast<double>(ring.size());
         double step = base * std::clamp(1.0 + 0.05 * (fill - target) / target, 0.9, 1.1);
+        rs.setStep(step);
         for (auto &o : out) {
             frac += step;
             while (frac >= 1.0) {
                 frac -= 1.0;
-                s0 = s1;
                 float v;
-                if (ring.pop(v)) s1 = v;
-                else s1 *= 0.995f;  // starved (paused): fade out instead of clicking
+                if (ring.pop(v)) last = v;
+                else last *= 0.995f;  // starved (paused): fade out instead of clicking
+                rs.push(last);
             }
-            float x = s0 + (s1 - s0) * static_cast<float>(frac);
+            float x = rs.at(frac);
             vol += ((muted.load() ? 0.f : 1.f) - vol) * 0.002f;
             o = static_cast<std::int16_t>(std::clamp(x * vol, -1.f, 1.f) * 30000.f);
         }
