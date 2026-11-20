@@ -13,6 +13,11 @@
 #include "render.hpp"
 #include "physics.hpp"
 
+// what a pipe is to the sound (exhaustNetwork in src/sound.hpp). automatic: a chamber (silencer) if it
+// widens abruptly to 1.6x the radius of the pipe feeding it and is at least as long as it is wide,
+// else a plain pipe
+enum class pipeAcoustic { automatic, plain, silencer, catalyst };
+
 // one tube: a smooth centreline through control points (mesh space, mm), radius tapering r0 -> r1
 struct pipeSpec {
     std::vector<vec3> pts;
@@ -24,6 +29,7 @@ struct pipeSpec {
     float segLen = 40.f;          // heat segments along the tube, mm
     bool capStart = false, capEnd = false;
     int sides = 20;
+    pipeAcoustic acoustic = pipeAcoustic::automatic;
 };
 
 // exhaust valve in the pipe, worked by a lever on a shaft that pokes out of the pipe wall

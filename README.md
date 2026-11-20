@@ -18,6 +18,18 @@ the sound card's 44.1 kHz through a windowed-sinc filter. Each engine's level (`
 is linear and set so its loudest moments stay under full scale; a limiter near full scale is only a
 safety net, so the waveform is not flattened.
 
+The exhaust you see is the exhaust you hear (every engine but the inline-4, whose simpler voice has no
+pipe stage): each drawn pipe the gas reaches is a pair of delay lines as long as sound takes to cross
+it, joined where the drawing joins them. So each cylinder's pulse reaches the merges after its own
+runner, every section rings at its own length, area changes reflect part of each wave, a silencer
+(a section that widens abruptly, or one tagged `pipeAcoustic::silencer`) damps and dulls what passes,
+a catalyst (tagged) takes a little off the top, the turbine passes a dulled share, and the drawn
+exhaust valve both opens a way past the silencer and switches the voice's valve stage (no valve drawn:
+always open). The speed of sound follows the gas temperature: hot gas from combustion, cooled by the
+blowdown and settling to the pipe walls' temperature, so a cold start rings lower and the pipe modes
+climb as the pipes heat up. `--wav` prints what it found (pipes, silencers, catalysts, open ends,
+turbine). `SND_LAYOUT=0` falls back to the single typed pipe (`soundParams::pipeLength`).
+
 It has eight engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
 
@@ -147,7 +159,7 @@ A typical big-turbo build (estimates, not one tuner's car) on the stock 82.5 × 
 | Gearbox | Stock ratios; a gearbox tune: more clutch clamping (950 N·m), full-throttle upshifts at ~7300 rpm, launch control a little higher (~4900 rpm on 1.5 bar) |
 | Results (sim) | 0–100 km/h 3.0 s with launch control (3.6 s floored from idle), 0–200 km/h 10.8 s |
 | 3D | Straight pipe: the downpipe and the mid pipe a size up, straight pipes where the catalyst and the rear silencer were, no flap, bigger blued titanium tips. The physics is unchanged by it (the header's waves reflect at the manifold's merge over the turbine, upstream) |
-| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~4–5 dB at idle, 1–2 dB on lift-off, ~1 dB at full throttle, which stays the loudest), more crackle, more turbo |
+| Sound | Straight pipe: always open (no flap), the pipe rings harder; louder (~9 dB at idle, ~1 dB on lift-off and at full throttle, which stays the loudest), more crackle, more turbo |
 
 
 ### `lfa`: Lexus LFA (2010-2012), 1LR-GUE 72° V10
@@ -171,7 +183,7 @@ other bank's cylinder half way between, so the ten fire evenly every 72°.
 | Vehicle | 1480 kg + 75 kg driver, 305/30 ZR20 rears (0.345 m), CdA 0.59 (Cd 0.31), rear-wheel drive |
 | Exhaust (3D) | Exhaust ports on the outer sides of the heads: each bank's equal-length 5-into-1 header drops down the block to a collector and a catalyst, two titanium mid pipes (the left one with the exhaust valve) into a transverse silencer, and the LFA's three tailpipes in a triangle in the middle of the rear. Intake: a carbon surge tank over the V, ten runners with their throttle bodies into the valley-side ports, the inlet duct from an airbox ahead of the engine |
 | Results (sim) | 0–100 km/h 3.6 s floored (Lexus: 3.7 s), 3.2 s with launch control (optimistic: the simulator has no tyre grip limit), 0–200 km/h 9.9 s, full-throttle upshifts at ~8900 rpm |
-| Sound | The detailed voice on a car: a short, bright exhaust for the V10's scream (the firing rate is 10 × rpm / 120, 750 Hz at 9000 rpm), the intake howl, the exhaust valve opening from ~3700 rpm, a light crackle on the overrun. The turbulent rasp is turned down to an eighth (`soundParams::raspGain`): it follows the summed exhaust flow squared, and with ten cylinders' exhaust strokes overlapping (about three at once) the flow hardly drops between pulses, so at full strength the roar was ~7 dB over the firing note |
+| Sound | The detailed voice on a car: the drawn exhaust, whose two banks of five ring apart until they meet in the silencer (the full firing rate is 10 × rpm / 120, 750 Hz at 9000 rpm), the intake howl, the exhaust valve opening from ~3700 rpm, a light crackle on the overrun. The turbulent rasp is turned down to an eighth (`soundParams::raspGain`): it follows the summed exhaust flow squared, and with ten cylinders' exhaust strokes overlapping (about three at once) the flow hardly drops between pulses, so at full strength the roar was ~7 dB over the firing note |
 
 The light crank (0.14 kg·m²) against a 4.8 L's pumping losses stops quicker than a road car's from
 3000 rpm with the ignition off, so the LFA sets its own coast-down window (`carSpec::coastLo`/`coastHi`).
@@ -191,7 +203,7 @@ A typical straight-pipe build with an ECU tune (estimates, not one tuner's car) 
 | Output (sim) | 479 N·m at 7000 rpm, 425 kW (570 hp) at 9500 (stock: 480 N·m, 408 kW at 9000) |
 | Gearbox | Stock ratios; full-throttle upshifts at ~9400 rpm |
 | Results (sim) | 0–100 km/h 3.6 s floored, 3.2 s with launch control (no grip limit), 0–200 km/h 9.7 s |
-| Sound | No silencer or valve: always open, the pipe rings harder (2.4 m, more reflection), brighter and louder (+3 dB at idle, +2 dB at full throttle), more crackle on the overrun; the low burble held under the stock car's so the decel boom stays below full throttle, and the rasp at the stock eighth |
+| Sound | No silencer or valve: always open, the pipe rings harder (more reflection at the tips), brighter and louder (about the same at idle, +4 dB at full throttle, +2 dB on lift-off), more crackle on the overrun; the low burble held under the stock car's so the decel boom stays below full throttle, and the rasp at the stock eighth |
 
 ### `v4`: Ducati Desmosedici Stradale (Panigale V4)
 
@@ -263,7 +275,7 @@ crank.
 | Rider aids | Same as the V4: quickshifter with rev-matched downshifts, slipper clutch, launch control, wheelie control |
 | Exhaust (3D) | 4-2-1 titanium headers from the front of the inclined head, under the engine (1+4 and 2+3 merge), collector, link pipe with the exhaust flap, short silencer rising on the right behind the gearbox |
 | Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 6.9 s, 308 km/h in 6th |
-| Sound | Its own voice (the inline-4 keeps the original one):<br>• radiated exhaust (brightens with revs) through a 4-2-1 quarter-wave pipe<br>• exhaust flap, shut at idle and open from ~5000 rpm or under throttle<br>• airbox honk at full throttle<br>• overrun crackle that fades out<br>• quickshifter bark<br>• straight-cut gear whine<br>• valvetrain tick |
+| Sound | Its own voice (the inline-4 keeps the original one):<br>• radiated exhaust (brightens with revs) through its drawn 4-2-1: headers, pair merges, collector and silencer<br>• exhaust flap, shut at idle and open from ~5000 rpm or under throttle<br>• airbox honk at full throttle<br>• overrun crackle that fades out<br>• quickshifter bark<br>• straight-cut gear whine<br>• valvetrain tick |
 
 #### Tuned (`--tuned yes`)
 
@@ -309,7 +321,7 @@ Built like the S 1000 RR, plus a procedural centrifugal supercharger behind the 
 | Rider aids | Same as the other bikes; launch control holds ~7500–9500 rpm, where the boost is |
 | Exhaust (3D) | The S 1000 RR's 4-2-1 layout into a bigger black silencer |
 | Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 7.0 s, ~312 km/h after 30 s in 6th (Kawasaki limits it to 299) |
-| Sound | The S 1000 RR's voice with a longer pipe, less airbox honk, more gear whine, and the supercharger's whine (impeller blade pass) and rush on top, with the bypass valve's chirp on each snap shut |
+| Sound | The S 1000 RR's voice through its own drawn exhaust (a bigger silencer), less airbox honk, more gear whine, and the supercharger's whine (impeller blade pass) and rush on top, with the bypass valve's chirp on each snap shut |
 
 **How the supercharger is modelled.** It uses the turbo's compressor model (`turboParams` with
 `supercharger = true`): the shaft is geared to the crank instead of driven by a turbine, so there is
@@ -371,7 +383,7 @@ bore and stroke, without the supercharger), on a procedural flat-plane crank, wi
 | Rider aids | Same as the other bikes; launch control holds the clutch higher (~7500–9500 rpm) |
 | Exhaust (3D) | The S 1000 RR's 4-2-1 layout into a bigger dark silencer |
 | Results (sim) | 0–100 km/h 3.5 s, 0–200 km/h 7.0 s, ~315 km/h after 30 s in 6th (on the limiter; the real bike is limited to 299) |
-| Sound | The inline-4 superbike voice with a longer pipe, a lower note, more airbox honk (the ram-air box sits under the rider) and a little more gear whine than the BMW |
+| Sound | The inline-4 superbike voice through its own drawn exhaust (a bigger silencer), a lower note, more airbox honk (the ram-air box sits under the rider) and a little more gear whine than the BMW |
 
 Its 1st gear is taller than the BMW's (10.5:1 overall against 11.8:1), so in the sim it peaks at
 ~1.05 g on a launch, short of the test's 1.15 g "front in the air" mark. It sets
@@ -427,7 +439,7 @@ from the inline-4's scaled parts, the barrel laid 70° forward, a forward-turnin
 | Exhaust (3D) | One header out of the underside of the head, back under the crankcase into a black-shielded silencer on the right |
 | Wave tuning | Strong on a single (one big pulse per cycle): airbox boot, throttle body and port, ~0.27 m, ram at ~7000 rpm, the quoted torque peak; the header into the silencer, 0.58 m acoustically (measured on the drawn exhaust). A hump at 6000–7000 rpm (+3%) and a fall toward the limiter (−6% at 9500–10000) (runner: estimate) |
 | Results (sim) | 0–100 km/h 14.1 s, ~117 km/h after 30 s in 5th |
-| Sound | The superbike stages tuned for a single: one thump every other turn, a longer pipe, a small silencer with no exhaust valve, little crackle |
+| Sound | The superbike stages tuned for a single: one thump every other turn, a long header into a small silencer with no exhaust valve, little crackle |
 
 The heavier crank (0.012 kg·m², flywheel included) idles with a ~200 rpm ripple, pulls away from a
 clutch dump at idle after nearly stalling (`bikeSpec::dumpMinRpm`), and needs up to ~400 ms to blip up

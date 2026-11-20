@@ -83,7 +83,7 @@ engineParams kawasakiH2Params() {
     S.detailed = true;
     S.pipeResGain = 0.6;
     S.masterHz = 12000.0;
-    S.drive = 0.0845;
+    S.drive = 0.1016;
     S.radiateHz = 300.0;
     S.burble = 3.0;
     S.pipeLength = 1.25;
@@ -91,7 +91,7 @@ engineParams kawasakiH2Params() {
     S.intakeGain = 0.7;             // the airbox is the plenum: less honk, more whistle
     S.popChance = 0.25;
     S.whineGain = 0.025;            // dog-ring box, straight-cut gears
-    S.turboGain = 1.6;
+    S.turboGain = 1.0;             // the exhaust network made the pipes darker: less supercharger over them
     S.tick = 0.4;
     return P;
 }
@@ -217,7 +217,7 @@ engineParams kawasakiH2TunedParams() {
     S.flapOpenRpm = 0.0; S.flapSpan = 1.0;
     S.flapShutGain = 1.0;
     S.popChance = 0.5;
-    S.drive = 0.104;
+    S.drive = 0.1352;
     S.pipeLength = 1.1;             // the short race can (kawasakiH2TunedExhaust): a shorter pipe, a higher note
     S.pipeResHz = 230.0;
     return P;

@@ -30,9 +30,9 @@ struct paramDumper {
 #define DUMP(d, obj, f) (d).put(#f, (obj).f)
 
 // a field added to a parameter struct must be added to its dump below; these trip when one is not
-static_assert(sizeof(soundParams) == 248, "soundParams changed: update dumpSound()");
+static_assert(sizeof(soundParams) == 272, "soundParams changed: update dumpSound()");
 static_assert(sizeof(turboParams) == 328, "turboParams changed: update dumpTurbo()");
-static_assert(sizeof(engineParams) == 1176, "engineParams changed: update dumpEngine()");
+static_assert(sizeof(engineParams) == 1200, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 448, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
 static_assert(sizeof(carSpec) == 552, "carSpec changed: update dumpCarSpec()");
@@ -45,7 +45,8 @@ void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, intakeGain); DUMP(d, S, popRpm); DUMP(d, S, popChance); DUMP(d, S, whineGain);
     DUMP(d, S, drive); DUMP(d, S, radiateHz); DUMP(d, S, burble); DUMP(d, S, burbleFadeFrom);
     DUMP(d, S, burbleFadeSpan); DUMP(d, S, burbleHigh); DUMP(d, S, tick); DUMP(d, S, tickHz);
-    DUMP(d, S, turboGain); DUMP(d, S, raspGain); DUMP(d, S, dcBlockHz);
+    DUMP(d, S, turboGain); DUMP(d, S, raspGain); DUMP(d, S, dcBlockHz); DUMP(d, S, pipeFromLayout);
+    DUMP(d, S, chamberHz); DUMP(d, S, chamberLoss); DUMP(d, S, wallLoss);
 }
 
 void dumpTurbo(const paramDumper &d, const turboParams &T) {
@@ -151,7 +152,7 @@ void dumpExhaust(const paramDumper &d, const exhaustLayout &L) {
         paramDumper q = d.sub("pipe[" + std::to_string(k) + "].");
         DUMP(q, p, pts); DUMP(q, p, r0); DUMP(q, p, r1); DUMP(q, p, cyl); DUMP(q, p, from); DUMP(q, p, rgba);
         DUMP(q, p, rough); DUMP(q, p, metal); DUMP(q, p, segLen); DUMP(q, p, capStart); DUMP(q, p, capEnd);
-        DUMP(q, p, sides);
+        DUMP(q, p, sides); q.put("acoustic", static_cast<int>(p.acoustic));
     }
     for (std::size_t k = 0; k < L.boxes.size(); k++) {
         const boxSpec &b = L.boxes[k];

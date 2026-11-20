@@ -367,7 +367,10 @@ int main(int argc, char **argv) {
 
     // sound: synthesised per physics step, streamed on SFML's audio thread (off for scripted screenshots)
     std::unique_ptr<engineAudio> audio;
-    engineSound snd(1.0 / PHYS_DT, sim);
+    // the sound follows the drawn exhaust whether or not it is shown (--engine-only)
+    exhaustLayout soundLayout;
+    if (type.exhaust) soundLayout = type.exhaust(eng);
+    engineSound snd(1.0 / PHYS_DT, sim, type.exhaust ? &soundLayout : nullptr);
     if (opt.sound && opt.screenshot.empty()) {
         audio = std::make_unique<engineAudio>();
         audio->play();

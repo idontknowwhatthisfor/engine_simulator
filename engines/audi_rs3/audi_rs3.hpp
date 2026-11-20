@@ -87,7 +87,7 @@ engineParams audiRs3Params() {
     S.airboxHz = 160.0; S.intakeHowlHz = 650.0; S.intakeGain = 0.5;
     S.popRpm = 2500.0; S.popChance = 0.45;
     S.whineGain = 0.0;              // helical gears
-    S.drive = 0.086;
+    S.drive = 0.1091;
     S.radiateHz = 260.0;
     S.burble = 3.5;
     S.burbleFadeFrom = 4000.0; S.burbleFadeSpan = 2500.0; S.burbleHigh = 0.5;
@@ -221,6 +221,7 @@ exhaustLayout audiRs3Exhaust(const engineModel &e) {
     int down = pipe({{T.x, T.y, T.z + 4.f}, {T.x, T.y, T.z - 45.f}, {T.x - 10.f, T.y + 90.f, T.z - 80.f},
                      {T.x - 25.f, LINE_Y, T.z}, {LINE_X, LINE_Y, 120.f}}, 36.f, 36.f, {feed}, STEEL);
     int cat = pipe({{LINE_X, LINE_Y, 115.f}, {LINE_X, LINE_Y, 290.f}}, 62.f, 62.f, {down}, ALU, true);
+    L.pipes[cat].acoustic = pipeAcoustic::catalyst;
     int mid = pipe({{LINE_X, LINE_Y, 285.f}, {LINE_X, LINE_Y, 520.f}, {LINE_X, LINE_Y, 700.f}}, 34.f, 34.f, {cat}, STEEL);
     int muf = pipe({{LINE_X, LINE_Y, 695.f}, {LINE_X, LINE_Y, 905.f}}, 82.f, 82.f, {mid}, ALU, true);
     // the two oval RS tailpipes (drawn round), splayed apart behind the silencer
@@ -342,7 +343,7 @@ engineParams audiRs3TunedParams() {
     S.pipeReflect = 0.65;
     S.pipeLowHz = 2300.0;
     S.popChance = 0.75;
-    S.drive = 0.084;
+    S.drive = 0.0907;
     S.pipeLength = 2.3;
     S.intakeGain = 0.8;
     S.turboGain = 1.2;
@@ -394,6 +395,7 @@ exhaustLayout audiRs3TunedExhaust(const engineModel &e) {
         if (p.r0 == 36.f && p.r1 == 36.f) { p.r0 = p.r1 = 40.f; }                 // the downpipe, 3.5 in
         else if ((p.r0 == 62.f && p.r1 == 62.f) || (p.r0 == 82.f && p.r1 == 82.f)) {  // catalyst, silencer: straight pipe
             p.r0 = p.r1 = 40.f; p.rgba = STEEL; p.capStart = p.capEnd = false;
+            p.acoustic = pipeAcoustic::automatic;
         } else if (p.r0 == 34.f && p.r1 == 34.f) { p.r0 = p.r1 = 40.f; }          // the mid pipe
         else if (p.r0 == 30.f && p.r1 == 30.f && !p.from.empty()) { p.r0 = p.r1 = 36.f; }  // the links to the tips
         else if (p.r0 == 48.f && p.r1 == 48.f) { p.r0 = p.r1 = 52.f; p.rgba = BLUED; p.metal = 0.95f; p.rough = 0.25f; }

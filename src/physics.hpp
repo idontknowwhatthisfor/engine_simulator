@@ -29,11 +29,23 @@ double wrapCycle(double a) {
 struct soundParams {
     double pipeLowHz = 700.0, pipeResHz = 110.0, pipeResGain = 1.5, masterHz = 7000.0;
     bool detailed = false;
-    // 4-2-1 exhaust as a quarter-wave pipe: valve end closed, tailpipe open, so it rings at the odd
-    // multiples of c / 4L. The reflection loses highs every round trip.
-    double pipeLength = 1.15;       // m, header + link pipe + silencer
-    double gasSpeed = 520.0;        // m/s, speed of sound in ~670 K exhaust gas
+    // the exhaust pipes. With the engine's drawn exhaust (engineType::exhaust) the sound runs through
+    // its pipes (exhaustNetwork, src/sound.hpp): lengths, merges, areas and silencers from the drawing.
+    // pipeFromLayout = false, or no drawing, falls back to one quarter-wave pipe of pipeLength: valve
+    // end closed, tailpipe open, so it rings at the odd multiples of c / 4L.
+    bool pipeFromLayout = true;
+    double pipeLength = 1.15;       // m, header + link pipe + silencer (the single pipe only)
+    // the speed of sound in the gas: 0 = from the exhaust gas temperature (exhaustGasTemp: ~500 m/s
+    // in ~670 K gas, slower in cold pipes); > 0 fixes it (m/s)
+    double gasSpeed = 0.0;
+    // the open tailpipe end(s): reflection (inverted) and the corner of its high-frequency loss
     double pipeReflect = 0.55, pipeDampHz = 3500.0;
+    // a chamber in the drawn exhaust (a pipe 1.6x or more wider than the one feeding it: silencer,
+    // catalyst): the packing's low-pass corner and the share that gets through each pass
+    double chamberHz = 900.0, chamberLoss = 0.8;
+    // the drawn pipes' losses (friction, heat to the walls, eddies at bends and joints): amplitude
+    // e-folds per metre at 20 mm radius. 0.2 keeps every engine's full throttle over its overrun
+    double wallLoss = 0.2;
     // silencer flap: shut at idle and light load (muffled), open from ~5000 rpm or with the throttle up
     double flapOpenRpm = 5000.0, flapSpan = 1500.0;
     double flapShutHz = 1600.0, flapOpenHz = 6500.0, flapShutGain = 0.55;

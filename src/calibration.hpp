@@ -38,4 +38,6 @@ void applyCalibrationEnv(engineParams &P) {
     env("SND_BURBLE", S.burble); env("SND_BFROM", S.burbleFadeFrom); env("SND_BSPAN", S.burbleFadeSpan);
     env("SND_BHIGH", S.burbleHigh); env("SND_TICK", S.tick); env("SND_WHINE", S.whineGain);
     env("SND_POP", S.popChance); env("SND_TURBO", S.turboGain); env("SND_RASP", S.raspGain);
+    env("SND_C", S.gasSpeed); env("SND_CHAMBER", S.chamberHz); env("SND_CLOSS", S.chamberLoss); env("SND_WALL", S.wallLoss);
+    if (const char *v = std::getenv("SND_LAYOUT")) S.pipeFromLayout = std::atoi(v) != 0;  // 0: the single typed pipe
 }

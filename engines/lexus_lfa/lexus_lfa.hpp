@@ -61,7 +61,7 @@ engineParams lexusLfaParams() {
     S.airboxHz = 230.0; S.intakeHowlHz = 950.0; S.intakeGain = 1.0;
     S.popRpm = 3000.0; S.popChance = 0.25;
     S.whineGain = 0.0;
-    S.drive = 0.418;
+    S.drive = 0.2826;
     S.radiateHz = 380.0;
     S.burble = 2.2;
     S.burbleFadeFrom = 3500.0; S.burbleFadeSpan = 3000.0; S.burbleHigh = 0.4;
@@ -195,6 +195,7 @@ exhaustLayout lexusLfaExhaustWith(const engineModel &e, bool straight) {
         int col = pipe({MERGE, {MERGE.x, MERGE.y + 40.f, MERGE.z + 40.f}, {sx * 230.f, LINE_Y, MERGE.z + 130.f}}, 30.f, 32.f, runners, STEEL);
         if (straight) { cats.push_back(col); continue; }
         cats.push_back(pipe({{sx * 230.f, LINE_Y, MERGE.z + 125.f}, {sx * 230.f, LINE_Y, MERGE.z + 290.f}}, 58.f, 58.f, {col}, ALU, true));
+        L.pipes.back().acoustic = pipeAcoustic::catalyst;
     }
     const float MUF_Z = 1150.f, MUF_Y = 200.f;
     if (straight) {
@@ -317,7 +318,7 @@ engineParams lexusLfaTunedParams() {
     S.pipeLowHz = 4200.0;
     S.masterHz = 15000.0;
     S.radiateHz = 330.0;
-    S.drive = 0.475;
+    S.drive = 0.1664;
     // the low burble: below the stock car's 2.2, since nothing muffles it now (the stock valve is shut
     // at low revs); at 2.2+ the decel boom under ~3500 rpm came out louder than full throttle
     S.burble = 1.6;

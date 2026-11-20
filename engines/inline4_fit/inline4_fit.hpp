@@ -171,6 +171,7 @@ exhaustLayout inline4FitExhaustWith(const engineModel &e, bool turbo) {
         return L;
     }
     int cat = pipe({{240.f, lineY, 200.f}, {240.f, lineY, 360.f}}, 55.f, 55.f, {col}, ALU, true);
+    L.pipes[cat].acoustic = pipeAcoustic::catalyst;
     int mid = pipe({{240.f, lineY, 355.f}, {240.f, lineY, 480.f}}, 25.f, 25.f, {cat}, ALU);
     int muf = pipe({{240.f, lineY, 475.f}, {240.f, lineY, 665.f}}, 66.f, 66.f, {mid}, ALU, true);
     pipe({{240.f, lineY, 660.f}, {240.f, lineY, 730.f}}, 22.f, 22.f, {muf}, CHROME);

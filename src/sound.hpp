@@ -1,6 +1,7 @@
 // engine sound: synthesised from the simulation at the physics rate, streamed to the sound card
 #pragma once
 #include "physics.hpp"
+#include "exhaust.hpp"
 
 // ---------------------------------------------------------------------------------------------
 // engine sound: synthesised from the simulation at the physics rate
@@ -46,6 +47,296 @@ double dcBlockCutoff(const soundParams &sp, double idleRpm, int cylinders) {
     return std::clamp(0.6 * idleFiringHz, 1.0, 15.0);
 }
 
+// a delay line read at a fractional delay (linear interpolation), for the exhaust's pipes. Read
+// before writing each sample: read(d) is what was written d samples ago (d >= 1)
+struct fracDelay {
+    std::vector<double> buf;
+    std::size_t pos = 0;  // where the next sample goes
+    void init(double maxDelay) { buf.assign(static_cast<std::size_t>(maxDelay) + 4, 0.0); pos = 0; }
+    double read(double d) const {
+        std::size_t n = buf.size();
+        d = std::clamp(d, 1.0, static_cast<double>(n - 2));
+        std::size_t k = static_cast<std::size_t>(d);
+        double f = d - k;
+        double a = buf[(pos + n - k) % n], b = buf[(pos + n - k - 1) % n];
+        return a + (b - a) * f;
+    }
+    void write(double v) { buf[pos] = v; pos = (pos + 1) % buf.size(); }
+};
+
+// the exhaust's gas temperature, for the speed of sound in it (c = sqrt(gamma R T)):
+//   - the gas leaving the cylinders: the burned-gas temperature at exhaust valve opening (from the
+//     combustion, ~800-2000 K) cooled by the blowdown's expansion to ~0.7 of it (so ~600-1100 K in
+//     the headers, as measured on real engines), or ~450 K when nothing burned (overrun, fuel cut), averaged over the
+//     cylinders and smoothed over ~0.2 s; it falls to the air's 300 K when the engine stops
+//   - the pipe walls (0 cold .. 1 at the exhaustModel's full heat), heating over seconds and cooling
+//     slower, from the same heat input the drawn pipes glow with (exhaustModel::heatTarget)
+//   - along the pipe the gas settles to the walls' temperature: cold pipes chill it, hot ones keep
+//     even the overrun's cooler air warm
+// So a cold start rings lower (slower sound, longer delays), the pitch of the pipe modes climbs as
+// the system heats up over a long pull, and drops a little on the overrun.
+struct exhaustGasTemp {
+    double gas = 300.0, wall = 0.0;
+    bool started = false;
+    void update(const engineSim &sim, double dt) {
+        double exitT = 300.0, wallT = 0.0;
+        int n = sim.cylCount();
+        if (n > 0 && std::fabs(sim.rpm()) > 50.0) {
+            exitT = 0.0;
+            for (int c = 0; c < n; c++) {
+                const cylinderState &s = sim.cyl[c];
+                // blowdown expands the gas from ~4-6 bar to the pipe's pressure before it gets there:
+                // isentropic, (1/5)^((1.35 - 1) / 1.35) = 0.66, so ~0.7 of the in-cylinder temperature
+                exitT += s.qTot > 0.0 ? 0.7 * (800.0 + 1200.0 * s.glowEvo) : 450.0;
+                wallT += exhaustModel::heatTarget(sim, c);
+            }
+            exitT /= n;
+            wallT /= n;
+        }
+        if (!started) {  // a run that starts with the engine already going (--simtime) starts settled
+            started = true;
+            if (sim.time > 1.0) { gas = exitT; wall = wallT; return; }
+        }
+        gas += (exitT - gas) * (1.0 - std::exp(-dt / 0.2));
+        wall += (wallT - wall) * (1.0 - std::exp(-dt / (wallT > wall ? 4.0 : 10.0)));
+    }
+    // K, d metres down the pipes from the ports: the gas trades heat with the walls, settling to
+    // their temperature over ~1 m; the walls are as hot as the drawn pipes (exhaustModel: 40 +
+    // 860 * heat deg C at the port, cooling along the pipe over ~1.4 m)
+    double wallAt(double d) const { return 313.0 + 860.0 * wall * std::exp(-d / 1.4); }
+    double at(double d) const {
+        double w = wallAt(d);
+        return w + (gas - w) * std::exp(-d / 1.0);
+    }
+    static double soundSpeed(double T) { return std::sqrt(1.35 * 287.0 * T); }
+};
+
+// the drawn exhaust (exhaustLayout) as an acoustic network, so the sound follows the pipes on screen.
+// Every pipe the cylinders' gas reaches is a pair of delay lines, one each way, as long as the sound
+// takes to travel its centreline at the local gas temperature. Where pipes meet (a merge, a split,
+// an X-pipe) a scattering junction shares each arriving wave between them by area: a wave going into
+// a bigger pipe partly reflects inverted, into a smaller one partly reflects upright. So:
+//   - each cylinder's pulse reaches the merges after its own runner (unequal headers: uneven timing)
+//   - every section rings at its own length; two banks ring separately until they meet
+//   - a silencer (pipeSpec::acoustic, or automatically a pipe that widens abruptly to 1.6x the radius
+//     feeding it and is at least as long as it is wide): besides the reflections its area steps give,
+//     its packing damps and dulls what passes through (soundParams::chamberHz, chamberLoss); a drawn
+//     exhaust valve, as it opens, lets the gas past the packing (setValve)
+//   - a catalyst (tagged in the layout): its area steps, and its monolith takes a little off the top
+//   - the turbine (exhaustLayout::turbo) passes a damped, dulled share of the pulses and reflects
+//     much of them back into the manifold
+//   - every pass along a pipe loses soundParams::wallLoss per metre (at 20 mm radius; narrower pipes
+//     lose more): friction, heat to the walls, the eddies at bends and joints
+//   - each header starts at its exhaust port: a closed valve reflects almost all, an open one less
+//     (the cylinder's volume behind it); the cylinder's pulse enters there
+//   - every pipe end nothing continues from is open: it reflects inverted and lossy
+//     (soundParams::pipeReflect, pipeDampHz) and radiates the flow that leaves it
+// step() returns the summed outflow at the open ends, in units of a header's flow.
+// Pipes the gas does not reach (intake runners, ducts) are left out.
+class exhaustNetwork {
+public:
+    bool ok = false;
+
+    // false (and nothing built) when the layout cannot carry the sound: a cylinder without a header
+    bool build(const exhaustLayout &L, int nCyl, double fs_, const soundParams &sp_) {
+        fs = fs_;
+        sp = sp_;
+        ok = false;
+        const std::size_t n = L.pipes.size();
+        std::vector<char> reach(n, 0);
+        std::vector<std::vector<float>> dist(n, std::vector<float>(nCyl, -1.f));
+        std::vector<double> len(n, 0.0);
+        port.assign(nCyl, -1);
+        for (std::size_t k = 0; k < n; k++) {
+            const pipeSpec &ps = L.pipes[k];
+            std::vector<vec3> c = exhaustModel::centreline(ps.pts);
+            for (std::size_t j = 1; j < c.size(); j++) len[k] += length(c[j] - c[j - 1]);
+            if (ps.cyl >= 0 && ps.cyl < nCyl) {
+                reach[k] = 1;
+                dist[k][ps.cyl] = 0.f;
+                if (port[ps.cyl] < 0) port[ps.cyl] = static_cast<int>(k);
+            }
+            for (int f : ps.from)
+                if (f >= 0 && f < static_cast<int>(k) && reach[f]) {
+                    reach[k] = 1;
+                    for (int cy = 0; cy < nCyl; cy++)
+                        if (dist[f][cy] >= 0.f) dist[k][cy] = std::max(dist[k][cy], dist[f][cy] + static_cast<float>(len[f]));
+                }
+        }
+        for (int c = 0; c < nCyl; c++)
+            if (port[c] < 0) return false;
+        // the pipes, renumbered
+        std::vector<int> idx(n, -1);
+        pipes.clear();
+        double headerArea = 0.0;
+        for (std::size_t k = 0; k < n; k++) {
+            if (!reach[k]) continue;
+            const pipeSpec &ps = L.pipes[k];
+            pipeAc p;
+            p.len = std::max(len[k], 1.0) * 1e-3;
+            p.a0 = ps.r0 * ps.r0;
+            p.a1 = ps.r1 * ps.r1;
+            p.r = 0.5e-3 * (ps.r0 + ps.r1);
+            float d = 1e9f;
+            for (int cy = 0; cy < nCyl; cy++)
+                if (dist[k][cy] >= 0.f) d = std::min(d, dist[k][cy]);
+            p.mid = (d + 0.5 * len[k]) * 1e-3;
+            double upR = 0.0;
+            for (int f : ps.from)
+                if (f >= 0 && idx[f] >= 0) upR = std::max(upR, static_cast<double>(L.pipes[f].r1));
+            // a chamber widens abruptly and is at least as long as it is wide (a short wide tip is not)
+            if (ps.acoustic == pipeAcoustic::automatic)
+                p.kind = upR > 0.0 && ps.r0 >= 1.6 * upR && len[k] >= 2.0 * ps.r0 ? pipeAcoustic::silencer : pipeAcoustic::plain;
+            else
+                p.kind = ps.acoustic;
+            if (ps.cyl >= 0) headerArea = std::max(headerArea, p.a0);
+            double maxDelay = p.len / exhaustGasTemp::soundSpeed(280.0) * fs + 2.0;
+            p.fwd.init(maxDelay);
+            p.bwd.init(maxDelay);
+            idx[k] = static_cast<int>(pipes.size());
+            pipes.push_back(std::move(p));
+        }
+        aRef = headerArea > 0.0 ? headerArea : 1.0;
+        for (int &c : port) c = idx[c];
+        // terminals 2k (start of pipe k) and 2k + 1 (its end) that meet are one node (union-find)
+        const int T = 2 * static_cast<int>(pipes.size());
+        std::vector<int> parent(T);
+        for (int t = 0; t < T; t++) parent[t] = t;
+        auto find = [&](int t) {
+            while (parent[t] != t) t = parent[t] = parent[parent[t]];
+            return t;
+        };
+        for (std::size_t k = 0; k < n; k++) {
+            if (idx[k] < 0) continue;
+            for (int f : L.pipes[k].from)
+                if (f >= 0 && f < static_cast<int>(k) && idx[f] >= 0) parent[find(2 * idx[f] + 1)] = find(2 * idx[k]);
+        }
+        std::vector<std::vector<int>> groups(T);
+        for (int t = 0; t < T; t++) groups[find(t)].push_back(t);
+        junctions.clear();
+        outlets.clear();
+        for (int t = 0; t < T; t++) {
+            const std::vector<int> &g = groups[t];
+            if (g.empty()) continue;
+            if (g.size() == 1) {
+                int k = g[0] / 2;
+                if (g[0] % 2 == 1) outlets.push_back({k});
+                continue;  // a lone start is a header's port
+            }
+            junction j;
+            j.terms = g;
+            // the turbine: the junction where a pipe starts at the turbine's outlet face
+            if (L.turbo.on && g.size() == 2)
+                for (std::size_t k = 0; k < n; k++)
+                    if (idx[k] >= 0 && (g[0] == 2 * idx[k] || g[1] == 2 * idx[k]) && length(L.pipes[k].pts.front() - L.turbo.at) < 60.f)
+                        j.turbine = true;
+            junctions.push_back(j);
+        }
+        double a = std::exp(-2.0 * 3.14159265358979323846 * sp.pipeDampHz / fs);
+        openA = a;
+        chamberA = std::exp(-2.0 * 3.14159265358979323846 * sp.chamberHz / fs);
+        catalystA = std::exp(-2.0 * 3.14159265358979323846 * 4000.0 / fs);
+        turbineA = std::exp(-2.0 * 3.14159265358979323846 * 1500.0 / fs);
+        ok = !outlets.empty();
+        setValve(0.0);
+        return ok;
+    }
+
+    // the delays from the gas temperature (or soundParams::gasSpeed when it is set)
+    void setTemperature(const exhaustGasTemp &gt) {
+        for (pipeAc &p : pipes) {
+            double c = sp.gasSpeed > 0.0 ? sp.gasSpeed : exhaustGasTemp::soundSpeed(gt.at(p.mid));
+            p.delay = std::max(1.0, p.len / c * fs);
+            p.loss = std::exp(-sp.wallLoss * 0.02 / p.r * p.len);  // per pass; narrow pipes lose more
+        }
+    }
+
+    // the exhaust valve (0 shut .. 1 open) opens a way past the silencers' packing: their corner rises
+    // to 4x soundParams::chamberHz and their loss falls toward 0.95 per pass
+    void setValve(double v) {
+        if (std::fabs(v - valve) < 1e-3 && silA > 0.0) return;
+        valve = v;
+        silA = std::pow(chamberA, 1.0 + 3.0 * v);
+        silG = sp.chamberLoss + (0.95 - sp.chamberLoss) * v;
+    }
+
+    // src: each cylinder's pulse; open: its exhaust valve is open
+    double step(const double *src, const int *open) {
+        // what arrives at both ends of every pipe this sample
+        for (pipeAc &p : pipes) {
+            p.inStart = p.loss * p.bwd.read(p.delay);
+            p.inEnd = p.loss * p.fwd.read(p.delay);
+            if (p.kind == pipeAcoustic::silencer || p.kind == pipeAcoustic::catalyst) {
+                // a silencer's packing: duller and weaker on the way through; a catalyst's monolith
+                // only takes a little off the top
+                bool sil = p.kind == pipeAcoustic::silencer;
+                double a = sil ? silA : catalystA, g = sil ? silG : 0.92;
+                p.lpS = (1.0 - a) * p.inStart + a * p.lpS;
+                p.lpE = (1.0 - a) * p.inEnd + a * p.lpE;
+                p.inStart = g * p.lpS;
+                p.inEnd = g * p.lpE;
+            }
+            p.outStart = p.outEnd = 0.0;
+        }
+        for (std::size_t c = 0; c < port.size(); c++) {
+            pipeAc &p = pipes[port[c]];
+            p.outStart = (open[c] ? 0.5 : 0.9) * p.inStart + src[c];
+        }
+        for (junction &j : junctions) {
+            auto in = [&](int t) { return t % 2 ? pipes[t / 2].inEnd : pipes[t / 2].inStart; };
+            auto out = [&](int t) -> double & { return t % 2 ? pipes[t / 2].outEnd : pipes[t / 2].outStart; };
+            auto area = [&](int t) { return t % 2 ? pipes[t / 2].a1 : pipes[t / 2].a0; };
+            if (j.turbine) {
+                int up = j.terms[0] % 2 ? j.terms[0] : j.terms[1], down = up == j.terms[0] ? j.terms[1] : j.terms[0];
+                j.lp = (1.0 - turbineA) * in(up) + turbineA * j.lp;
+                out(up) = 0.6 * in(up);
+                out(down) = 0.45 * j.lp + 0.6 * in(down);
+                continue;
+            }
+            double sy = 0.0, syp = 0.0;
+            for (int t : j.terms) { sy += area(t); syp += area(t) * in(t); }
+            double pj = 2.0 * syp / sy;
+            for (int t : j.terms) out(t) = pj - in(t);
+        }
+        double flow = 0.0;
+        for (outlet &o : outlets) {
+            pipeAc &p = pipes[o.pipe];
+            o.lp = (1.0 - openA) * p.inEnd + openA * o.lp;
+            p.outEnd = -sp.pipeReflect * o.lp;
+            flow += p.a1 / aRef * (p.inEnd - p.outEnd);
+        }
+        for (pipeAc &p : pipes) {
+            p.fwd.write(p.outStart);
+            p.bwd.write(p.outEnd);
+        }
+        return flow;
+    }
+
+    std::size_t pipeCount() const { return pipes.size(); }
+    std::size_t outletCount() const { return outlets.size(); }
+    std::size_t count(pipeAcoustic k) const { return std::count_if(pipes.begin(), pipes.end(), [k](const pipeAc &p) { return p.kind == k; }); }
+    bool hasTurbine() const { return std::any_of(junctions.begin(), junctions.end(), [](const junction &j) { return j.turbine; }); }
+
+private:
+    struct pipeAc {
+        double len = 0.0, a0 = 1.0, a1 = 1.0, mid = 0.0;  // m, mm^2 at the start / end, m from the ports to its middle
+        double r = 0.02;                                   // mean radius, m
+        pipeAcoustic kind = pipeAcoustic::plain;
+        double delay = 1.0, loss = 1.0;
+        fracDelay fwd, bwd;                                // toward the tail / back toward the ports
+        double inStart = 0, inEnd = 0, outStart = 0, outEnd = 0, lpS = 0, lpE = 0;
+    };
+    struct junction { std::vector<int> terms; bool turbine = false; double lp = 0.0; };
+    struct outlet { int pipe; double lp = 0.0; };
+    double fs = 40000.0, aRef = 1.0, openA = 0.0, chamberA = 0.0, catalystA = 0.0, turbineA = 0.0;
+    double valve = -1.0, silA = 0.0, silG = 0.8;  // the silencers' packing as the exhaust valve has it
+    soundParams sp;
+    std::vector<pipeAc> pipes;
+    std::vector<int> port;           // per cylinder: its header
+    std::vector<junction> junctions;
+    std::vector<outlet> outlets;
+};
+
 struct engineSound {
     double fs;
     soundParams sp;
@@ -53,9 +344,17 @@ struct engineSound {
     std::uint32_t rng = 0x12345678u;
     double gearPhase = 0.0, armaturePhase = 0.0;
     // the detailed voice's stages (soundParams::detailed)
-    std::vector<double> pipeBuf;      // round trip of the exhaust pipe
-    std::size_t pipePos = 0;
-    double pipeFrac = 0.0, pipeDampZ = 0.0, pipeDampA = 0.0;
+    // the exhaust: the drawn layout as a network of pipes (exhaustNetwork), or without one a single
+    // quarter-wave pipe of soundParams::pipeLength (the round trip in pipeLine)
+    exhaustNetwork net;
+    biquad netBlock;                  // the DC out of the network's outflow (as dcBlock for the single pipe)
+    exhaustGasTemp gasTemp;
+    fracDelay pipeLine;
+    double pipeDelay = 1.0, pipeDampZ = 0.0, pipeDampA = 0.0;
+    int tempCountdown = 0;            // samples to the next delay update from the gas temperature
+    bool hasFlap = true;              // the layout draws an exhaust valve (or there is no layout)
+    cylArray<double> cylSrc;          // per cylinder: this sample's exhaust pulse (for the network)
+    cylArray<int> cylOpen;            // ... and whether its exhaust valve is open
     biquad flapShut, flapOpen, airbox, howl, popBand, popThump, whineBand, burbleLow;
     double flap = 0.0;                // 0 shut .. 1 open, follows rpm and throttle with a servo lag
     double lastTube = 0.0;
@@ -71,8 +370,10 @@ struct engineSound {
     biquad whoosh, bovBand, bovHigh, flutterBand, flutterThump;
     double whistlePhase = 0.0, splitterPhase = 0.0;
 
-    // for this simulation's engine (its sound parameters, idle speed and cylinder count)
-    engineSound(double sampleRate, const engineSim &sim) : fs(sampleRate), sp(sim.P.sound) {
+    // for this simulation's engine (its sound parameters, idle speed and cylinder count) and, when
+    // given, its drawn exhaust: the detailed voice's pipes then follow the layout (unless
+    // soundParams::pipeFromLayout is off), and its exhaust valve exists only if the layout has one
+    engineSound(double sampleRate, const engineSim &sim, const exhaustLayout *layout = nullptr) : fs(sampleRate), sp(sim.P.sound) {
         dcBlock = biquad::make(biquad::HIGHPASS, fs, dcBlockCutoff(sp, sim.P.idleRpm, sim.cylCount()), 0.707);
         pipeLow = biquad::make(biquad::LOWPASS, fs, sp.pipeLowHz, 0.9);
         pipeRes = biquad::make(biquad::BANDPASS, fs, sp.pipeResHz, 3.0);
@@ -88,9 +389,12 @@ struct engineSound {
         if (sp.detailed) {
             // the quarter-wave pipe: one round trip (2L / c) of delay with an inverting, lossy
             // reflection at the open end
-            double delay = 2.0 * sp.pipeLength / sp.gasSpeed * fs;
-            pipeBuf.assign(static_cast<std::size_t>(delay) + 2, 0.0);
-            pipeFrac = delay - std::floor(delay);
+            if (layout && sp.pipeFromLayout) net.build(*layout, sim.cylCount(), fs, sp);
+            netBlock = dcBlock;
+            if (layout) hasFlap = layout->flap.on;
+            pipeLine.init(2.0 * sp.pipeLength / exhaustGasTemp::soundSpeed(280.0) * fs + 2.0);
+            cylSrc.assign(sim.cylCount(), 0.0);
+            cylOpen.assign(sim.cylCount(), 0);
             pipeDampA = std::exp(-2.0 * 3.14159265358979323846 * sp.pipeDampHz / fs);
             flapShut = biquad::make(biquad::LOWPASS, fs, sp.flapShutHz, 0.707);
             flapOpen = biquad::make(biquad::LOWPASS, fs, sp.flapOpenHz, 0.707);
@@ -111,16 +415,23 @@ struct engineSound {
         return rng / 2147483648.0 - 1.0;
     }
 
-    // quarter-wave exhaust pipe: y = x - r * damped(y delayed by one round trip)
+    // quarter-wave exhaust pipe (no layout): y = x - r * damped(y delayed by one round trip)
     double pipe(double x) {
-        // the write head walks backwards, so the sample written k steps ago sits at pipePos + k
-        std::size_t n = pipeBuf.size(), d = n - 2;  // whole samples of the round trip
-        double old = pipeBuf[(pipePos + d) % n] * (1.0 - pipeFrac) + pipeBuf[(pipePos + d + 1) % n] * pipeFrac;
+        double old = pipeLine.read(pipeDelay);
         pipeDampZ = (1.0 - pipeDampA) * old + pipeDampA * pipeDampZ;
         double y = x - sp.pipeReflect * pipeDampZ;
-        pipeBuf[pipePos] = y;
-        pipePos = (pipePos + n - 1) % n;
+        pipeLine.write(y);
         return y;
+    }
+
+    // every 32 samples: the gas temperature, and from it the pipes' delays
+    void updateTemperature(const engineSim &sim) {
+        if (--tempCountdown > 0) return;
+        tempCountdown = 32;
+        gasTemp.update(sim, 32.0 / fs);
+        if (net.ok) net.setTemperature(gasTemp);
+        double c = sp.gasSpeed > 0.0 ? sp.gasSpeed : exhaustGasTemp::soundSpeed(gasTemp.at(0.5 * sp.pipeLength));
+        pipeDelay = std::max(1.0, 2.0 * sp.pipeLength / c * fs);
     }
 
     // one output sample for the current simulation state; call once per physics step
@@ -149,8 +460,13 @@ struct engineSound {
                     double u = std::clamp(since / 30.0, 0.0, 1.0);
                     blow *= u * u * (3.0 - 2.0 * u);
                 }
-                exhaust += blow + 1.2 * charge * std::max(0.0, -pistonSpeed);
+                double pulse = blow + 1.2 * charge * std::max(0.0, -pistonSpeed);
+                exhaust += pulse;
+                if (sp.detailed) cylSrc[c] = pulse;
+            } else if (sp.detailed) {
+                cylSrc[c] = 0.0;
             }
+            if (sp.detailed) cylOpen[c] = s.region == 2;
             if (s.region == 0) intakeFlow += std::max(0.0, pistonSpeed) * sim.pMan / sim.P.pAtm;
             heat += s.heatRate;
             if (sp.detailed) {
@@ -174,10 +490,14 @@ struct engineSound {
         // exhaust flap: opens with revs or throttle (a servo, ~0.3 s)
         double want = std::clamp((rpm - sp.flapOpenRpm) / sp.flapSpan + 0.5, 0.0, 1.0);
         want = std::max(want, std::clamp((demand - 0.25) / 0.25, 0.0, 1.0) * std::clamp((rpm - 2500.0) / 1500.0, 0.0, 1.0));
+        if (!hasFlap) want = 1.0;  // no valve drawn: nothing to shut
         flap += (want - flap) * std::min(1.0, 1.0 / (0.3 * fs));
 
-        // header: the firing pulses ring in the pipe; the quarter-wave modes give the hollow howl
-        double tube = pipe(ex);
+        // the exhaust: the firing pulses ring in the pipes (the drawn network, or the single
+        // quarter-wave pipe); their modes give the hollow howl
+        updateTemperature(sim);
+        if (net.ok && hasFlap) net.setValve(flap);
+        double tube = net.ok ? netBlock.run(net.step(cylSrc.begin(), cylOpen.begin())) : pipe(ex);
         double radiated = (tube - lastTube) * fs / (2.0 * 3.14159265358979323846 * sp.radiateHz);
         lastTube = tube;
         double body = pipeLow.run(radiated) + sp.pipeResGain * pipeRes.run(tube) + burbleGain(rpm) * burbleLow.run(tube);

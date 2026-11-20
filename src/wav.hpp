@@ -9,7 +9,15 @@ int renderWav(const engineModel &e, const engineType &type, const std::string &p
     setupSim(sim, e, type, e.cyls[0].theta0, type.bike);  // a bike engine revs on its stand
     sim.P.turbo.bov = bov;
     applyCalibrationEnv(sim.P);  // SND_* for the voice, and the engine overrides (src/calibration.hpp)
-    engineSound snd(1.0 / PHYS_DT, sim);
+    exhaustLayout layout;
+    if (type.exhaust) layout = type.exhaust(e);
+    engineSound snd(1.0 / PHYS_DT, sim, type.exhaust ? &layout : nullptr);
+    if (snd.net.ok)
+        std::printf("exhaust sound: the drawn layout, %zu pipes, %zu silencers, %zu catalysts, %zu open ends%s\n", snd.net.pipeCount(),
+                    snd.net.count(pipeAcoustic::silencer), snd.net.count(pipeAcoustic::catalyst), snd.net.outletCount(),
+                    snd.net.hasTurbine() ? ", turbine" : "");
+    else if (sim.P.sound.detailed)
+        std::printf("exhaust sound: one %.2f m pipe (soundParams::pipeLength)\n", sim.P.sound.pipeLength);
     std::vector<float> raw;
     struct segment { double until; bool starter, ignition; double throttle; const char *what; };
     const segment SCRIPT[] = {
