@@ -20,7 +20,7 @@ engineParams mxkingParams() {
     P.burn = 50.0 * DEGR;
     P.residualMin = 0.7;            // little overlap: a cleaner idle than the superbikes
     P.mRecip = 0.20;                // kg: 57 mm piston, pin, 1/3 of the rod
-    P.inertia = 0.012;              // kg m^2: crank and the magneto's flywheel rotor
+    P.inertia = 0.010;              // kg m^2: crank and the magneto's flywheel rotor
     P.vManifold = 0.25e-3;          // m^3: short intake runner behind the airbox
     P.throttleArea = 6.16e-4;       // m^2: one 28 mm throttle body
     // the idle valve, scaled from the superbike preset's 1000 cc four to 150 cc
@@ -28,7 +28,6 @@ engineParams mxkingParams() {
     P.idleRpm = 1400.0;
     P.starterTorque = 30.0;         // N m at the crank: enough to carry it over compression
     P.revLimit = 10300.0; P.revResume = 10000.0;
-    P.pedalRate = 7.0;
     // VE: tuned to the published 13.8 N m at 7000 and 11.3 kW at 8500
     P.veBase = 0.556; P.vePeak = 0.465; P.veRpm = 7600.0; P.veWidth = 3300.0;
     // pressure-wave tuning (estimates), strong on a single (one big pulse per cycle, nothing to blur
@@ -98,7 +97,7 @@ drivetrainParams mxkingDriveParams() {
     P.pickRpm = 5000.0; P.pickMax = 9500.0;
     P.qsMaxRpm = 10000.0;
     P.qsMatchTimeout = 0.4;                     // the heavier crank takes longer to blip up to the lower gear
-    P.clutchReleaseRate = 0.7;                  // a commuter's lever, let out gently
+    P.clutchReleaseRate = 1.2;                  // the bike preset's rate
     return P;
 }
 
@@ -136,9 +135,7 @@ bikeSpec mxkingSpec() {
     S.shiftRpm = 9000; S.shiftRpmGentle = 8000;
     S.neutralRevMin = 6500;
     S.rejoinHi = 10500;
-    S.takeoffMinRpm = 700;                      // a single lugs down on the gentle take-off
-    S.stallsOnClutchDump = false;               // the flywheel drags it through: it nearly stalls, then pulls
-    S.dumpMinRpm = 120;                         // ... from as low as this
+    S.takeoffMinRpm = 450;                      // a single lugs down hard on the gentle take-off
     S.liftsFront = false;
     S.downshiftMaxMs = 450;                     // the 1st-2nd step is 1.51: a long blip for a single
     return S;
@@ -221,7 +218,7 @@ engineParams mxkingTunedParams() {
     P.burn = 46.0 * DEGR;           // faster burn: more squish, more advance
     P.residualMin = 0.55;           // big overlap: a lumpy idle
     P.mRecip = 0.21;                // forged slipper piston: a bigger bore for little more mass
-    P.inertia = 0.011;              // lighter magneto rotor (0.012 stock)
+    P.inertia = 0.0095;             // lighter magneto rotor (0.010 stock)
     P.vManifold = 0.20e-3;          // short race manifold
     P.throttleArea = 8.04e-4;       // one 32 mm throttle body
     P.idleBase = 3.6e-6; P.idleMin = 2.2e-6; P.idleMax = 2.4e-5;
@@ -299,6 +296,8 @@ bikeSpec mxkingTunedSpec() {
     S.shiftRpm = 11500; S.shiftRpmGentle = 10000;
     S.neutralRevMin = 8000;
     S.rejoinHi = 13500;
+    S.stallsOnClutchDump = false;               // the race build still pulls away from a clutch dump at its
+    S.dumpMinRpm = 120;                         // 1800 rpm idle: it nearly stalls, then pulls
     return S;
 }
 
