@@ -16,6 +16,7 @@
 #include "src/bike_gearbox.hpp"
 #include "src/turbo.hpp"
 #include "src/dyno.hpp"
+#include "src/drag_stats.hpp"
 #include "src/dump_params.hpp"
 #include "src/test_synth.hpp"
 #include "src/hud.hpp"
@@ -53,6 +54,7 @@ struct options {
     bool selftest = false, phystest = false;
     bool dumpParams = false; // --dump-params (hidden): print every parameter and quit (scripts/regress.sh)
     bool dyno = false;       // --dyno (hidden): print the WOT dyno curve (calibration env applied) and quit
+    bool dragStats = false;  // --drag-stats (hidden): specs, dyno peaks and a drag run as key=value (stats.md)
     int synthTest = -1;      // --synthtest N (hidden): test an N-cylinder engine built in memory, then quit
     std::string cmpA, cmpB;
 };
@@ -127,6 +129,7 @@ options parseArgs(int argc, char **argv) {
         else if (a == "--phystest") o.phystest = true;
         else if (a == "--dump-params") o.dumpParams = true;
         else if (a == "--dyno") o.dyno = true;
+        else if (a == "--drag-stats") o.dragStats = true;
         else if (a == "--synthtest") o.synthTest = std::stoi(next());
         else if (a == "--compare") {
             o.cmpA = next();
@@ -223,6 +226,7 @@ int main(int argc, char **argv) {
         applyCalibrationEnv(s.P);
         return dynoSweep{}.print(s);
     }
+    if (opt.dragStats) return dragStats(eng, type);
     if (opt.selftest) {
         std::vector<double> pattern;  // the published firing intervals the mesh must give (bikes)
         if (type.spec) pattern = type.spec().pattern;

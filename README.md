@@ -80,6 +80,10 @@ It has nine engines. `engine_sim` is the single entry point, and you pick the en
 | `zx10r` | Kawasaki Ninja ZX-10R inline-4, 998 cc | a ZX-10R (bike) | `zx-10r`, `ninja-zx10r`, `ninja-zx-10r`, `zx10`, `kawasaki-zx10r` |
 | `mxking` | Yamaha MX King 150 single, 149.7 cc | an MX King underbone (bike) | `mx-king`, `jupiter-mx`, `t150`, `yamaha150` |
 
+[stats.md](stats.md) compares every engine and its tuned version: power, torque, weight and one drag run
+each (launch control, 0–100 km/h, ⅛ and ¼ mile, top speed after a minute flat out). It is generated:
+`make stats` (`scripts/gen_stats.py`, which runs `engine_sim --drag-stats` for each).
+
 ```bash
 ./engine_sim --engine-type list
 ```

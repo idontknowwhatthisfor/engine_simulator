@@ -71,7 +71,11 @@ test: all
 clean:
 	rm -f engine_sim
 
-.PHONY: all run test clean FORCE
+# stats.md: every engine and version's specs and a drag run (scripts/gen_stats.py)
+stats: all
+	python3 scripts/gen_stats.py
+
+.PHONY: all run test clean stats FORCE
 
 assets:
 	python3 -I scripts/fetch_assets.py
