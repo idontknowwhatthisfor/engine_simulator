@@ -65,7 +65,7 @@ tailpipe beams backward: orbit behind a car and the exhaust comes up, in front o
 the engine do; a bike's far side, away from its silencer, is quieter. From the starting view every
 source plays at its mono level, so the balance there is the mono one.
 
-It has eight engines. `engine_sim` is the single entry point, and you pick the engine with
+It has nine engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
 
 | `--engine-type` | Engine | Drives | Also accepted |
@@ -73,6 +73,7 @@ It has eight engines. `engine_sim` is the single entry point, and you pick the e
 | `inline4` (default) | 2.3 L inline-4 (the Sketchfab model); `--tuned yes`: turbocharged, straight pipe | a car with Honda Fit 5-speed gearing | `fit`, `honda-fit`, `inline4-fit`, `i4` |
 | `rs3` | Audi RS 3 2.5 TFSI turbocharged inline-5, 2480 cc | an RS 3 (8Y) with the 7-speed S tronic | `audi`, `audi-rs3`, `rs-3`, `inline5`, `i5`, `2.5tfsi`, `daza` |
 | `lfa` | Lexus LFA 1LR-GUE 72° V10, 4805 cc | an LFA with the 6-speed ASG | `lexus`, `lexus-lfa`, `v10`, `1lr-gue`, `1lr` |
+| `mustang-v6` | 2014 Ford Mustang V6: 3.7 L Cyclone 60° V6, 3726 cc; `--tuned yes`: twin-screw supercharger, straight pipe and an ECU tune | a Mustang V6 with the MT82 6-speed manual | `mustang`, `ford`, `ford-mustang`, `mustang-3.7`, `cyclone`, `duratec37`, `v6`, `3.7` |
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
 | `h2` | Kawasaki Ninja H2 supercharged inline-4, 998 cc | a Ninja H2 (bike) | `kawasaki`, `kawasaki-h2`, `ninja-h2` |
@@ -106,7 +107,7 @@ in its place.
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
 meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run ENGINE=<id>`
-or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-mxking`; aliases work too). `make test` runs
+or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-mustang-v6`, `make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-mxking`; aliases work too). `make test` runs
 the headless checks for every engine and version of one (`./engine_sim --engine-type list --ids`), and
 fails if any of them fails.
 
@@ -239,6 +240,66 @@ A typical straight-pipe build with an ECU tune (estimates, not one tuner's car) 
 | Gearbox | Stock ratios; full-throttle upshifts at ~9400 rpm |
 | Results (sim) | 0–100 km/h 3.6 s floored, 3.2 s with launch control (no grip limit), 0–200 km/h 9.7 s |
 | Sound | No silencer or valve: always open, the pipe rings harder (more reflection at the tips), brighter and louder (about the same at idle, +4 dB at full throttle, +2 dB on lift-off), more crackle on the overrun; the low burble held under the stock car's so the decel boom stays below full throttle, and the rasp at the stock eighth |
+
+### `mustang-v6`: Ford Mustang V6 (2014), 3.7 L Cyclone 60° V6
+
+```bash
+./engine_sim --engine-type mustang-v6
+```
+
+A V built like the LFA (the inline-4's piston and rod scaled to the 95.5 mm bore, a procedural
+crankcase, two banks, heads and black cam covers) in a front-engined, rear-drive car. A 60° V6 fires
+evenly only with a split-pin crank: each of the three pairs carries one rod per bank on its own half
+pin, the two halves 60° apart and joined by a thin flying web, so the builder makes its own crank
+(four main bearings) instead of meshlib's `build_crank`.
+
+| | |
+|---|---|
+| Engine | 95.5 × 86.7 mm = 3726 cc, 10.5:1, 60° V, banks 30° either side of vertical, split crankpins 60° apart, pairs 108 mm apart (estimate), 150 mm rods (estimate), DOHC 24 valves with Ti-VCT, port injection, ~70 mm throttle. Ford numbering: 1-3 the right bank (−x, forward), 4-6 the left bank (+x) |
+| Firing | 1-4-2-5-3-6, every 120°. No free 1st- or 2nd-order force, only rocking couples (the test checks them against the textbook) |
+| Output (sim) | 389 N·m at 4500 rpm, 225 kW (302 hp) at 6500 (Ford: 380 N·m / 280 lb·ft at 4250, 227 kW / 305 hp at 6500); idle ~720 rpm, limiter 7000, idle to the limiter in 0.61 s in neutral |
+| Wave tuning | ~0.42 m composite-manifold runners ram in the mid range; short manifolds into close-coupled catalysts give little scavenging (estimates) |
+| Gearbox | Getrag MT82 6-speed manual: 3.66 / 2.43 / 1.69 / 1.32 / 1.00 / 0.65, reverse 3.42 (estimate), 3.31 axle. Driven by the simulator's automatic clutch like every car, with a manual's slower changes (0.08 s out, 0.22 s in) |
+| Vehicle | 1600 kg + 75 kg driver, P235/55 R17 (0.345 m), CdA 0.77 (Cd 0.35), rear-wheel drive |
+| Exhaust (3D) | Exhaust ports on the outer sides: each bank's short 3-into-1 manifold runs back along the head to a close-coupled catalyst, two mid pipes back under the gearbox joined by an H-pipe, two rear mufflers and a chrome tip at each rear corner. No exhaust valve. Intake: the composite plenum over the V with a runner into each valley-side port, the throttle body at its front and the duct forward to the airbox |
+| Results (sim) | 0–100 km/h 5.8 s (road tests: 0–60 mph 5.4–5.9 s with the manual), 0–200 km/h 19.8 s, full-throttle upshifts at ~6850–6950 rpm |
+| Sound | The detailed voice: three firings a revolution (350 Hz at 7000 rpm) through true dual exhaust that meets only at the H-pipe, a hollow intake moan, a mild burble and the odd crackle on the overrun |
+
+The idle air floor (`idleMin`) sits close to what the idle needs, so braking hard to a stop in 2nd
+(sport) does not pull the revs under 500 rpm before the clutch opens.
+
+#### Tuned (`--tuned yes`): twin-screw supercharger, straight pipe
+
+```bash
+./engine_sim --engine-type mustang-v6 --tuned yes
+```
+
+What a typical blown, straight-piped 3.7 Mustang does (estimates, not one tuner's kit), on the stock
+engine and gearing:
+
+- **Supercharger:** a twin-screw blower on top of the V, about 1.5 L per turn of the male rotor,
+  belted from the crank at 1.9:1 (~14k rotor rpm at the limiter). It sits on an intercooled lower
+  manifold (an air-to-water core) in place of the composite plenum, fed through a throttle body on its
+  rear inlet. A bypass valve, opened by manifold vacuum, lets it idle against no pressure off throttle
+  (F toggles it, like a turbo's blow-off valve).
+- **Exhaust:** the catalysts and both mufflers out, the H-pipe swapped for an X-pipe, two 2.5 in pipes
+  straight back to two big burnt tips.
+- **ECU:** more advance off boost and 6° per bar taken out with it, the cams re-phased for the top
+  end, an 800 rpm idle, the limiter from 7000 to 7400 rpm, full-throttle changes at ~7300 rpm.
+
+The blower is positive displacement (`turboParams::screw`, `src/physics.hpp`): each turn of the male
+rotor pushes `screwDisp` of inlet air into the charge pipes whatever the pressure, less what leaks back
+through the rotor clearances (`screwLeak`, a nozzle driven by the pressure rise). Unlike a turbo or the
+H2's centrifugal impeller, the boost is there from just off idle and holds nearly flat to the limiter;
+the pulley ratio (`driveRatio`) sets how much. The crank pays for the compression through the belt.
+`SC_DRIVE`, `SC_DISP` and `SC_LEAK` override the three while calibrating.
+
+| | |
+|---|---|
+| Output (sim) | ~0.2 bar by 2000 rpm, 0.2–0.3 bar to the limiter; 488 N·m at 5000 rpm (391 N·m already at 2000), 341 kW (458 hp) at 7000 (stock: 389 N·m, 225 kW) |
+| Results (sim) | 0–100 km/h 5.0 s, 0–200 km/h 14.1 s, full-throttle upshifts at ~7250–7380 rpm |
+| Drawn | `mustang_v6_blower.mesh` (built with the engine by `build_mustang_v6.py`, placed at the mesh's `supercharger_at`): a see-through figure-8 rotor case, the 4-lobe male rotor with its pulley and the 6-lobe female rotor of the other hand, each turning about its own axis (`turboModel::ROTOR_A`, `ROTOR_B`), the female the other way at 4/6 speed, and the belt from the crank damper |
+| Sound | The straight pipe as before, plus the blower's whine: the male rotor's lobe pass (4 × rotor speed, ~900 Hz at the limiter) and its harmonics, ~12 dB under the exhaust at full throttle and growing with the boost. The bypass's steady recirculation is near silent; only its snap open is heard |
 
 ### `v4`: Ducati Desmosedici Stradale (Panigale V4)
 
@@ -813,7 +874,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    - the `engineType`: id, labels, mesh path, physics test, for bikes the gearbox placement and an
      optional `ride` for `--wav`; other versions of the engine go in `variants` (`--variant <name>`).
 4. **Register.** The header ends with `REGISTER_ENGINE(<type function>, <key>)`; the key orders
-   `--engine-type list` (inline4 10, rs3 15, lfa 17, v4 20, s1000rr 30, h2 40, zx10r 45, mxking 50), pick a free one. `engine.mk` lists the
+   `--engine-type list` (inline4 10, rs3 15, lfa 17, mustang-v6 18, v4 20, s1000rr 30, h2 40, zx10r 45, mxking 50), pick a free one. `engine.mk` lists the
    header and the mesh rule. Nothing outside the folder needs an edit: the Makefile includes every
    `engine.mk` and generates `engines/all.hpp`, `make test` picks the engine up, and the help line
    and HUD follow from what it has (bike or car, boost, wheelie control).

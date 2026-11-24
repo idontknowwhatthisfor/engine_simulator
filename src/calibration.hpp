@@ -24,6 +24,7 @@ void applyCalibrationEnv(engineParams &P) {
     // supercharger / turbo compressor map and relief valve
     env("SC_PR", P.turbo.prRef); env("SC_FLOW", P.turbo.flowPeakRef); env("SC_CHOKE", P.turbo.chokeFall);
     env("SC_RELIEF", P.turbo.reliefP);
+    env("SC_DRIVE", P.turbo.driveRatio); env("SC_DISP", P.turbo.screwDisp); env("SC_LEAK", P.turbo.screwLeak);
     // exhaust turbo: turbine nozzle, wastegate, boost target (Pa absolute), shaft inertia
     env("TURBO_AREA", P.turbo.turbineArea); env("TURBO_WG", P.turbo.wastegateArea); env("TURBO_BOOST", P.turbo.boostMap);
     env("TURBO_INERTIA", P.turbo.inertia); env("TURBO_KNOCK", P.turbo.knockRetard);

@@ -99,9 +99,21 @@ struct soundParams {
 // wastegate, the boost follows the revs, and the crank pays for the compressor's power (through a
 // gear train of efficiency driveEff). ramGain: share of the dynamic pressure of the oncoming air a
 // ram-air intake recovers at the compressor inlet.
+// screw = true (with supercharger; the tuned Mustang V6): a twin-screw, positive-displacement blower in
+// place of the impeller. Each turn of the male rotor pushes screwDisp of inlet air into the charge
+// pipes whatever the pressure, less what leaks back through the rotor clearances (a nozzle of area
+// screwLeak driven by the pressure rise, so it matters most at low rotor speed). The boost is set by
+// the pulley ratio (driveRatio): it comes in early and stays nearly flat over the revs. The bypass
+// valve (bovArea, opened by manifold vacuum) lets the blower idle against no pressure off throttle.
+// Drawn rotors: screwLobes on the male rotor, screwLobesB on the female, which turns the other way
+// screwLobes / screwLobesB as fast; the whine is the male rotor's lobe pass.
 struct turboParams {
     bool on = false;
     bool supercharger = false;
+    bool screw = false;
+    double screwDisp = 1.6e-3;      // m^3 of inlet air per male-rotor turn
+    double screwLeak = 1.2e-4;      // m^2, effective leakage area back through the clearances
+    int screwLobes = 4, screwLobesB = 6;
     double driveRatio = 9.2;        // impeller rpm per crank rpm (supercharger)
     double driveEff = 0.95;         // gear train
     double ramGain = 0.0;
@@ -1306,7 +1318,7 @@ struct engineSim {
             pExh = std::clamp(pExh + R_EX * tExh / T.vExhaust * (mExh - mOut) * dt, P.pAtm, 4.0e5);
             mTurb = mOut * aT / (aT + aW);
         } else {
-            turboOmega = std::fabs(omega) * T.driveRatio;  // geared to the crank
+            turboOmega = std::fabs(omega) * T.driveRatio;  // geared (or belted) to the crank
         }
         // ram air: the oncoming air is slowed in the intake duct and raises the inlet pressure
         double vAir = std::fabs(drive.v);
@@ -1315,8 +1327,18 @@ struct engineSim {
 
         // compressor duct (the air column accelerates on the pressure difference), then the charge
         // pipes fill with the new flow (semi-implicit, so the duct-plenum ringing stays bounded)
-        compFlow += (pInlet + inScale * compressorRise(turboOmega, compFlow) - pCharge) / T.ductLA * dt;
-        compFlow = std::clamp(compFlow, -0.3, 0.6);
+        if (T.screw) {
+            // positive displacement: the swept inlet air, less the leakage back through the clearances
+            double rhoIn = pInlet / (P.rGas * P.tIntake);
+            double swept = rhoIn * T.screwDisp * turboOmega / (2.0 * 3.14159265358979323846);
+            double dp = pCharge - pInlet;
+            double rhoOut = std::max(pCharge, pInlet) / (P.rGas * std::max(tComp, P.tIntake));
+            double leak = 0.7 * T.screwLeak * std::sqrt(2.0 * rhoOut * std::fabs(dp)) * (dp >= 0.0 ? 1.0 : -1.0);
+            compFlow += (std::max(0.0, swept - leak) - compFlow) * std::min(1.0, dt / 0.002);
+        } else {
+            compFlow += (pInlet + inScale * compressorRise(turboOmega, compFlow) - pCharge) / T.ductLA * dt;
+            compFlow = std::clamp(compFlow, -0.3, 0.6);
+        }
         double pr = std::max(1.0, pCharge / pInlet);
         tComp = P.tIntake * (1.0 + (std::pow(pr, K) - 1.0) / T.etaC);
         // blow-off valve: its diaphragm sees the charge pressure against the manifold's

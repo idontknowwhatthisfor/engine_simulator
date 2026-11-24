@@ -31,8 +31,8 @@ struct paramDumper {
 
 // a field added to a parameter struct must be added to its dump below; these trip when one is not
 static_assert(sizeof(soundParams) == 272, "soundParams changed: update dumpSound()");
-static_assert(sizeof(turboParams) == 328, "turboParams changed: update dumpTurbo()");
-static_assert(sizeof(engineParams) == 1200, "engineParams changed: update dumpEngine()");
+static_assert(sizeof(turboParams) == 352, "turboParams changed: update dumpTurbo()");
+static_assert(sizeof(engineParams) == 1224, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 448, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
 static_assert(sizeof(carSpec) == 552, "carSpec changed: update dumpCarSpec()");
@@ -51,6 +51,7 @@ void dumpSound(const paramDumper &d, const soundParams &S) {
 
 void dumpTurbo(const paramDumper &d, const turboParams &T) {
     DUMP(d, T, on); DUMP(d, T, supercharger); DUMP(d, T, driveRatio); DUMP(d, T, driveEff);
+    DUMP(d, T, screw); DUMP(d, T, screwDisp); DUMP(d, T, screwLeak); DUMP(d, T, screwLobes); DUMP(d, T, screwLobesB);
     DUMP(d, T, ramGain); DUMP(d, T, reliefP); DUMP(d, T, reliefSpan); DUMP(d, T, reliefArea);
     DUMP(d, T, bov); DUMP(d, T, inertia); DUMP(d, T, maxRpm); DUMP(d, T, prRef); DUMP(d, T, rpmRef);
     DUMP(d, T, flowPeakRef); DUMP(d, T, shutoffHead); DUMP(d, T, chokeFall); DUMP(d, T, ductLA);

@@ -805,11 +805,23 @@ private:
         double flow = std::clamp(sim.compFlow / 0.15, 0.0, 1.5);
         double spin = std::clamp(sim.turboRpm() / 60000.0, 0.0, 1.0);
         double whistle = 0.0;
+        if (sim.P.turbo.screw) {
+            // twin-screw: the lobe pass (male lobes x its speed: ~1 kHz at 15k rpm) and its 2nd and 3rd
+            // harmonics, a hard-edged whine that grows with the pressure the rotors work against
+            double lobes = sim.P.turbo.screwLobes, pr = std::max(0.0, sim.pCharge / sim.P.pAtm - 1.0);
+            whistlePhase = std::fmod(whistlePhase + TWO_PI * shaftHz * lobes / fs, TWO_PI);
+            splitterPhase = std::fmod(splitterPhase + TWO_PI * shaftHz * 2.0 * lobes / fs, TWO_PI);
+            if (shaftHz * lobes < 0.45 * fs) whistle += std::sin(whistlePhase) + 0.3 * std::sin(3.0 * whistlePhase);
+            if (shaftHz * 2.0 * lobes < 0.45 * fs) whistle += 0.5 * std::sin(splitterPhase);
+            double sSpin = std::clamp(sim.turboRpm() / 15000.0, 0.0, 1.0);
+            whistle *= 0.05 * sSpin * (0.15 + flow + 1.5 * pr);
+        } else {
         whistlePhase = std::fmod(whistlePhase + TWO_PI * shaftHz * 6.0 / fs, TWO_PI);
         splitterPhase = std::fmod(splitterPhase + TWO_PI * shaftHz * 12.0 / fs, TWO_PI);
         if (shaftHz * 6.0 < 0.45 * fs) whistle += std::sin(whistlePhase);
         if (shaftHz * 12.0 < 0.45 * fs) whistle += 0.35 * std::sin(splitterPhase);
         whistle *= 0.035 * spin * (0.25 + flow);
+        }
         double pr = std::max(0.0, sim.pCharge / sim.P.pAtm - 1.0);
         double rush = 0.35 * whoosh.run(noise() * flow * (0.3 + pr));
         double vent = std::pow(std::clamp(sim.bovFlow / 0.05, 0.0, 1.5), 1.5);  // a trickle at idle vacuum is near silent
@@ -818,7 +830,10 @@ private:
             // instead of venting it: it chirps as it snaps open (the part of the flow that is new,
             // over its ~0.15 s average) and the steady recirculation is only a faint rush
             ventAvg += (vent - ventAvg) * (1.0 - std::exp(-1.0 / (0.15 * fs)));
-            vent = std::max(0.0, vent - ventAvg) + 0.12 * vent;
+            // a twin-screw pushes its whole flow through the open bypass whenever the throttle is
+            // shut: that steady recirculation is all but silent, only the snap open is heard
+            vent = sim.P.turbo.screw ? 0.4 * std::max(0.0, vent - ventAvg) + 0.01 * vent
+                                     : std::max(0.0, vent - ventAvg) + 0.12 * vent;
         }
         double pssh = 0.9 * bovHigh.run(bovBand.run(noise() * vent));
         double back = std::clamp(-sim.compFlow / 0.03, 0.0, 1.5);

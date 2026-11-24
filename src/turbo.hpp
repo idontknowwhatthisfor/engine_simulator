@@ -6,18 +6,25 @@
 #include "exhaust.hpp"
 
 struct turboModel {
-    enum : std::uint32_t { HOUSING = 0, ROTOR = 1, BEARING = 2 };
+    // ROTOR turns about the frame's x axis itself (a turbo's or impeller's wheel). A twin-screw
+    // blower's rotors sit off that axis, so each turns about its own (parallel to x, through the middle
+    // of its vertices): ROTOR_A (the male rotor and its pulley) like ROTOR, ROTOR_B (the female rotor)
+    // the other way at the lobe ratio
+    enum : std::uint32_t { HOUSING = 0, ROTOR = 1, BEARING = 2, ROTOR_B = 3, ROTOR_A = 4 };
     struct part {
         std::uint32_t kind;
         float rgba[4];
         float rough, metal;
         meshBuf mesh;
+        float cy = 0.f, cz = 0.f;  // ROTOR_A / ROTOR_B: its own axis (frame y, z)
     };
     std::vector<part> parts;
     mat4 place = identity();       // turbo frame -> mesh space
     vec3 lo{1e9f, 1e9f, 1e9f}, hi{-1e9f, -1e9f, -1e9f};  // mesh-space bounds
 
     double angle = 0.0;            // drawn rotor angle, rad
+    double ratioB = 1.0;           // ROTOR_B turns -ratioB times as fast (male / female lobes)
+    double fullRpm = 80000.0;      // shaft rpm drawn at full drawn speed
     double lastTime = -1.0;
 
     // the drawn rotor turns at most this fast: the real 100k+ rpm would just strobe at the frame rate
@@ -42,6 +49,14 @@ struct turboModel {
             rd.getArray(p.mesh.i.data(), p.mesh.i.size());
             for (std::uint32_t idx : p.mesh.i)
                 if (idx >= nv) throw std::runtime_error("turbo mesh: bad index");
+            if ((p.kind == ROTOR_A || p.kind == ROTOR_B) && nv > 0) {
+                float ylo = 1e9f, yhi = -1e9f, zlo = 1e9f, zhi = -1e9f;
+                for (std::uint32_t k = 0; k < nv; k++) {
+                    ylo = std::min(ylo, p.mesh.v[k * 6 + 1]); yhi = std::max(yhi, p.mesh.v[k * 6 + 1]);
+                    zlo = std::min(zlo, p.mesh.v[k * 6 + 2]); zhi = std::max(zhi, p.mesh.v[k * 6 + 2]);
+                }
+                p.cy = 0.5f * (ylo + yhi); p.cz = 0.5f * (zlo + zhi);
+            }
             for (std::uint32_t k = 0; k < nv; k++) {
                 vec3 q = transformPoint(place, {p.mesh.v[k * 6], p.mesh.v[k * 6 + 1], p.mesh.v[k * 6 + 2]});
                 lo = {std::min(lo.x, q.x), std::min(lo.y, q.y), std::min(lo.z, q.z)};
@@ -69,7 +84,12 @@ struct turboModel {
     void update(const engineSim &sim) {
         double dt = lastTime < 0.0 ? 0.0 : std::clamp(sim.time - lastTime, 0.0, 0.5);
         lastTime = sim.time;
-        double revS = DRAW_MAX_REV_S * std::min(1.0, sim.turboRpm() / 80000.0);
+        const turboParams &T = sim.P.turbo;
+        if (T.screw) {             // a blower turns ~15k rpm, not 100k+
+            fullRpm = 15000.0;
+            ratioB = static_cast<double>(T.screwLobes) / std::max(1, T.screwLobesB);
+        }
+        double revS = DRAW_MAX_REV_S * std::min(1.0, sim.turboRpm() / fullRpm);
         angle = std::fmod(angle + 2.0 * PI * revS * dt, 2.0 * PI);
     }
 
@@ -78,7 +98,12 @@ struct turboModel {
         mat4 base = world * place;
         for (const part &p : parts) {
             if (p.kind == HOUSING && ghost != 0) continue;
-            mat4 m = p.kind == ROTOR ? base * rotateX(static_cast<float>(angle)) : base;
+            mat4 m = base;
+            if (p.kind == ROTOR) m = base * rotateX(static_cast<float>(angle));
+            if (p.kind == ROTOR_A || p.kind == ROTOR_B) {
+                float a = static_cast<float>(p.kind == ROTOR_A ? angle : -angle * ratioB);
+                m = base * translate({0.f, p.cy, p.cz}) * rotateX(a) * translate({0.f, -p.cy, -p.cz});
+            }
             out.push_back({&p.mesh, m, {p.rgba[0], p.rgba[1], p.rgba[2], p.rgba[3]}, p.rough, p.metal});
         }
     }
