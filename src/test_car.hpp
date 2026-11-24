@@ -342,7 +342,8 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
         bool want200 = S.zeroTo200What != nullptr;
         while (sim.time - t0 < 30.0 && (t100 < 0.0 || (want200 && t200 < 0.0))) {
             run(0.001, [&] {
-                if (sim.drive.shiftPhase == 1 && sim.drive.targetGear != lastGear) {
+                // a change starting: the clutch opening (1) or a seamless dual-clutch handover (3)
+                if ((sim.drive.shiftPhase == 1 || sim.drive.shiftPhase == 3) && sim.drive.targetGear != lastGear) {
                     shifts.push_back({sim.drive.targetGear, lastRpm});
                     lastGear = sim.drive.targetGear;
                 }

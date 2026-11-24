@@ -121,9 +121,12 @@ drivetrainParams audiRs3DriveParams() {
     P.clutchStiffness = 600.0;
     P.inputInertia = 0.03;
     P.brakeDecel = 10.0;
-    // dual clutch: the next gear is preselected, one clutch hands over to the other in a few hundredths
+    // dual clutch: the next gear is preselected, one clutch hands over to the other in a few hundredths.
+    // Power-on upshifts are seamless (the drive never drops, the ECU cuts the engine through the
+    // handover); downshifts and take-off open and close the clutch in 0.03 s and 0.08 s
     P.shiftOpen = 0.03; P.shiftClose = 0.08;
     P.dualClutch = true;            // drawn with its two wet clutch packs
+    P.seamlessUp = true;
     P.normalDown = 1300.0;
     P.sportUp = 6900.0; P.sportDown = 4500.0;
     P.matchHold = 0.3;
