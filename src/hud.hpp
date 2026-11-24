@@ -94,7 +94,7 @@ hudParts hudText(const engineSim &sim, const engineType &type, const engineModel
     }
     auto gname = [](int g) { return g == 0 ? std::string("N") : g < 0 ? std::string("R") : std::to_string(g); };
     std::string gearName = gname(dv.gear);
-    if (dv.shiftPhase) gearName += ">" + gname(dv.targetGear);
+    if (dv.shiftPhase && dv.targetGear != dv.gear) gearName += ">" + gname(dv.targetGear);
     if (dv.qsPhase != 0) gearName += ">" + gname(dv.targetGear);  // a quickshift (bikes)
     gearName.resize(std::max<std::size_t>(gearName.size(), 3), ' ');  // "2" and "2>3" take the same room
     double slipRpm = (sim.omega - dv.omegaIn) * 60.0 / (2.0 * 3.14159265358979323846);

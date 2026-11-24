@@ -70,7 +70,7 @@ It has nine engines. `engine_sim` is the single entry point, and you pick the en
 
 | `--engine-type` | Engine | Drives | Also accepted |
 |---|---|---|---|
-| `inline4` (default) | 2.3 L inline-4 (the Sketchfab model); `--tuned yes`: turbocharged, straight pipe | a car with Honda Fit 5-speed gearing | `fit`, `honda-fit`, `inline4-fit`, `i4` |
+| `inline4` (default) | 2.3 L inline-4 (the Sketchfab model); `--tuned yes`: turbocharged, straight pipe | a car with Honda Fit 5-speed gearing; tuned: a close-ratio 6-speed dual-clutch | `fit`, `honda-fit`, `inline4-fit`, `i4` |
 | `rs3` | Audi RS 3 2.5 TFSI turbocharged inline-5, 2480 cc | an RS 3 (8Y) with the 7-speed S tronic | `audi`, `audi-rs3`, `rs-3`, `inline5`, `i5`, `2.5tfsi`, `daza` |
 | `lfa` | Lexus LFA 1LR-GUE 72° V10, 4805 cc | an LFA with the 6-speed ASG | `lexus`, `lexus-lfa`, `v10`, `1lr-gue`, `1lr` |
 | `mustang-v6` | 2014 Ford Mustang V6: 3.7 L Cyclone 60° V6, 3726 cc; `--tuned yes`: twin-screw supercharger, straight pipe and an ECU tune | a Mustang V6 with the MT82 6-speed manual | `mustang`, `ford`, `ford-mustang`, `mustang-3.7`, `cyclone`, `duratec37`, `v6`, `3.7` |
@@ -145,9 +145,18 @@ The same engine with a turbocharger and a straight pipe: everything under
 turbine the exhaust is a straight pipe: no catalyst or silencer, the 3 in downpipe carried straight
 back to a big burnt-titanium tip. The physics is unchanged by it (past the turbine the gas goes to the
 air either way in the model, and the header's waves reflect at the merge over the turbine), so the
-output is the turbo's: 366 N·m, 226 kW, 0–100 km/h in 4.7 s. The voice is louder and brighter with the
+output is the turbo's: 366 N·m, 226 kW, 0–100 km/h in 4.5 s. The voice is louder and brighter with the
 pipe's ring left in (~3 dB at idle and on lift-off, ~2 dB at full throttle); the turbine takes the edge
 off the pulses, so it is a loud, raw drone rather than a scream. The clutch is 1.5× the stock one.
+
+The gearbox is changed for racing: a close-ratio 6-speed dual-clutch in place of the Fit's 5-speed.
+
+| | |
+|---|---|
+| Ratios | 3.308 / 1.870 / 1.391 / 1.039 / 0.776 / 0.580, final drive 4.62 (the Fit's 1st, 2nd and final drive). 2nd–6th step evenly (×1.34) |
+| Power band | Full-throttle upshifts at 6400 rpm (98% of peak power, clear of the 6800 rpm cut, whose fuel cut would dump the boost). Every change from 2nd up lands at ~4800 rpm, on the torque plateau and on boost. 6th reaches its drag-limited 286 km/h at ~6660 rpm, on the power peak (the Fit's 5th held it on the limiter at 228 km/h) |
+| Shifts | Power-on upshifts are seamless (`drivetrainParams::seamlessUp`), in automatic and manual DCT: the next gear is already selected on the other input shaft, so the oncoming clutch takes the drive at the engine's torque while the ECU cuts the engine, and the slip pulls the revs down to the new gear in ~0.06 s (~0.1 s for 1st to 2nd) with no gap in the drive and the boost held. Downshifts and pulling away open and close the clutch in 0.03 s and 0.08 s. Drawn as a dual-clutch box, like the RS 3's |
+| Results (sim) | 0–100 km/h 3.8 s with launch control, 0–200 km/h 14.9 s, ¼ mile 12.05 s; see [stats.md](stats.md). The ratios and shift point came from sweeping them with `--drag-stats` |
 
 ### `rs3`: Audi RS 3 (8Y, 2021-), 2.5 TFSI turbocharged inline-5
 
@@ -701,7 +710,8 @@ intercooler ahead of the crank snout; the cooled charge comes back up the intake
 - **What it does (sim).** Boost comes in at ~3000 rpm and is held at 0.58 bar to the limiter:
   366 N·m at 4000–4500 rpm, 226 kW at 7000 rpm (225 N·m / 132 kW without). Floored at 3000 rpm, it
   reaches 90% boost in 1.3 s (the intake's dip at 3000–3250 rpm starves the turbine a little).
-  0–100 km/h takes 4.7 s (6.9 s without); the car model has no
+  0–100 km/h takes 4.5 s floored from idle, 3.8 s with launch control (6.9 s without the turbo,
+  on the Fit's gearing); the car model has no
   wheelspin. The HUD shows the boost, wastegate, back pressure, charge and compressor-outlet
   temperatures, the blow-off valve and surge, and the shaft speed (~105–125k rpm on boost). The
   wheels are drawn turning at a readable speed in proportion to the shaft, since the real speed
@@ -727,7 +737,7 @@ calibrated so that the published torque and power come out of the physics.
 | I | Ignition on/off |
 | S (hold) | Brake. With the throttle too, at a standstill (automatic or manual DCT): launch control. The box lets the clutch carry only what the brakes hold, so the car stays put while the engine works against them at the launch rpm and a turbo builds boost; let go of S to launch. Stopped with the throttle shut, the brakes also hold the car on a hill (hill-hold) until the throttle opens, in automatic and manual DCT |
 | T | Automatic / manual |
-| Z | Automatic: sport mode (holds gears, rev-matched downshifts). Cars in manual: NORMAL / DCT. NORMAL needs the clutch (C) for every change and to pull away, and stalls if you stop in gear without it. DCT works like a dual-clutch box's manual mode: you pick the gears with E/Q and the box works the clutch: take-off (with launch control), each change in a few hundredths of a second (blipping to the lower gear's speed on a downshift, refusing one that would over-rev), anti-stall (the clutch opens near idle and it drops to 1st as you stop), hill-hold, and launch control with the brake (S). The HUD shows MANUAL or MANUAL DCT |
+| Z | Automatic: sport mode (holds gears, rev-matched downshifts). Cars in manual: NORMAL / DCT. NORMAL needs the clutch (C) for every change and to pull away, and stalls if you stop in gear without it. DCT works like a dual-clutch box's manual mode: you pick the gears with E/Q and the box works the clutch: take-off (with launch control), each change at the car's own shift speed (a few hundredths of a second on the RS 3 and the tuned inline-4, whose power-on upshifts are also seamless; ~0.15 s on the LFA; ~0.3 s on the stock inline-4 and the Mustang) (blipping to the lower gear's speed on a downshift, refusing one that would over-rev), anti-stall (the clutch opens near idle and it drops to 1st as you stop), hill-hold, and launch control with the brake (S). The HUD shows MANUAL or MANUAL DCT |
 | E / Q | Shift up / down. Car: Q at a stop selects R. Bikes: the quickshifter works while moving, no clutch needed. Cars in manual DCT mode: no clutch needed either. |
 | N | Neutral (bikes) |
 | C (hold) | Clutch |

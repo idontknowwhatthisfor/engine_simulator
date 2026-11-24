@@ -33,7 +33,7 @@ struct paramDumper {
 static_assert(sizeof(soundParams) == 272, "soundParams changed: update dumpSound()");
 static_assert(sizeof(turboParams) == 352, "turboParams changed: update dumpTurbo()");
 static_assert(sizeof(engineParams) == 1224, "engineParams changed: update dumpEngine()");
-static_assert(sizeof(drivetrainParams) == 448, "drivetrainParams changed: update dumpDrive()");
+static_assert(sizeof(drivetrainParams) == 456, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
 static_assert(sizeof(carSpec) == 552, "carSpec changed: update dumpCarSpec()");
 
@@ -97,6 +97,7 @@ void dumpDrive(const paramDumper &d, const drivetrainParams &P) {
     DUMP(d, P, launchPedal); DUMP(d, P, upBase); DUMP(d, P, upPedal); DUMP(d, P, upMargin);
     DUMP(d, P, downMax); DUMP(d, P, kickRpm); DUMP(d, P, kickMax); DUMP(d, P, loadDownMax);
     DUMP(d, P, pickRpm); DUMP(d, P, pickMax); DUMP(d, P, slipper); DUMP(d, P, quickshiftTime); DUMP(d, P, dualClutch);
+    DUMP(d, P, seamlessUp); DUMP(d, P, handoverTimeout);
     DUMP(d, P, qsUnloadTorque); DUMP(d, P, qsMatchTol); DUMP(d, P, qsMatchTimeout); DUMP(d, P, qsMaxRpm);
     DUMP(d, P, wheelieAccel);
     for (int g = 1; g <= P.gears; g++) {

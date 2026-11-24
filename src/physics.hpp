@@ -296,6 +296,13 @@ struct drivetrainParams {
     double slipper = 1.0;           // share of the clutch capacity that passes engine braking
     double quickshiftTime = 0.0;    // s of ignition cut (up) or blip (down) per clutchless shift; 0 = none
     bool dualClutch = false;        // cars: a dual-clutch box (drawn with two clutch packs; the RS 3's S tronic)
+    // dual-clutch power-on upshift (automatic and manual DCT): the next gear is already selected on the
+    // other input shaft, so the oncoming clutch takes the drive as the outgoing one lets go, with no gap.
+    // It carries the torque the drive had, the ECU cuts the engine, and the clutch's slip pulls the
+    // engine down to the new gear's speed (shiftPhase 3; engineSim ends it once they meet). Off: every
+    // change opens the clutch, swaps gears and closes it (shiftOpen, shiftClose), the drive cut meanwhile
+    bool seamlessUp = false;
+    double handoverTimeout = 0.15;  // s: the handover ends by then even if the speeds haven't met
     // quickshift down, rev-matched: blip until the drive torque through the dogs crosses zero (or
     // quickshiftTime runs out), the old gear drops out, the ECU revs the engine to the lower gear's
     // speed, and the new gear goes in once the speeds agree (or after qsMatchTimeout)
@@ -367,7 +374,10 @@ struct drivetrain {
     double grade = 0.0;            // rise / run
     double cargo = 0.0;            // extra kg
     double clutchTorque = 0.0, wheelForce = 0.0, accel = 0.0, distance = 0.0;
-    int shiftPhase = 0;            // 0 none, 1 clutch opening, 2 clutch closing
+    double clutchTorqueFilt = 0.0;  // clutchTorque over ~50 ms (the driveline's shuffle smoothed out)
+    double engineTorque = 0.0;      // set by engineSim: what the engine makes while it fires (the ECU's estimate)
+    int shiftPhase = 0;            // 0 none, 1 clutch opening, 2 clutch closing, 3 dual-clutch handover
+    double handoverTimer = 0.0;    // shiftPhase 3: time left before it ends regardless
     double lastShift = -10.0;
     double inputAngle = 0.0, outputAngle = 0.0;  // for drawing
     std::string message;
@@ -378,7 +388,7 @@ struct drivetrain {
         gear = targetGear = autoMode ? 1 : 0;
         clutch = 0.0;
         clutchPedal = brake = false;
-        v = omegaIn = clutchTorque = wheelForce = accel = distance = 0.0;
+        v = omegaIn = clutchTorque = clutchTorqueFilt = wheelForce = accel = distance = 0.0;
         shiftPhase = 0;
         qsPhase = 0;
         qsTimer = 0.0;
@@ -474,6 +484,26 @@ struct drivetrain {
         say(g == 0 ? "N" : std::to_string(g), now);
     }
 
+    // a seamless dual-clutch upshift (P.seamlessUp) to g, if this change can be one: up one gear, in
+    // gear with the clutch closed and driving. The new gear goes in at once; the clutch, now standing
+    // for the oncoming pack, slips at the torque the drive had or the engine makes, whichever is more
+    // (a change made on the limiter, whose cut drags the average down, still gets the engine's torque)
+    bool beginHandover(int g, double now) {
+        if (!P.seamlessUp || gear < 1 || g != gear + 1 || clutch < 0.9 || clutchTorqueFilt <= 0.0) return false;
+        double carry = std::max({clutchTorqueFilt, engineTorque, 0.2 * P.clutchCapacity});
+        gear = targetGear = g;
+        clutch = std::min(1.0, carry / P.clutchCapacity);
+        shiftPhase = 3;
+        handoverTimer = P.handoverTimeout;
+        lastShift = now;
+        revMatch = false;
+        return true;
+    }
+    void endHandover() {
+        shiftPhase = 0;
+        clutch = 1.0;
+    }
+
     void requestShift(int dir, double now) {
         if (P.bike) { bikeShift(dir, now, false); return; }
         bool stopped = std::fabs(v) < 0.5;
@@ -503,6 +533,10 @@ struct drivetrain {
             if (g < gear && landing > P.qsMaxRpm) {  // over-rev protection
                 say("downshift refused: " + std::to_string(g) + " would be " +
                         std::to_string(static_cast<int>(std::lround(landing / 100.0) * 100)) + " rpm", now);
+                return;
+            }
+            if (g > gear && beginHandover(g, now)) {
+                say(std::to_string(g - 1) + " -> " + std::to_string(g), now);
                 return;
             }
             targetGear = g;
@@ -613,6 +647,7 @@ struct drivetrain {
             clutch = std::clamp(clutch + (clutchPedal ? -P.clutchPressRate : P.clutchReleaseRate) * dt, 0.0, 1.0);
             return;
         }
+        if (shiftPhase == 3) return;  // dual-clutch handover: engineSim::step ends it
         // a shift the box is working the clutch for: automatic, or manual DCT
         if (shiftPhase != 0 && revMatch) matchRpm = outputOmega() * P.primary * P.ratios[targetGear] * 60.0 / (2.0 * 3.14159265358979323846);
         if (shiftPhase == 1) {  // clutch out, then swap gears
@@ -699,6 +734,11 @@ struct drivetrain {
         else if (gear > 1 && pedal > 0.85 && rpmFilt < P.kickRpm && rpmIn(gear - 1) < P.kickMax) { want = gear - 1; why = "kickdown"; }
         else if (gear > 1 && losing && rpmIn(gear - 1) < P.loadDownMax) { want = gear - 1; why = "downshift (load)"; }
         if (want != gear) {
+            int from = gear;
+            if (want > gear && beginHandover(want, now)) {
+                say(std::string(why) + " " + std::to_string(from) + " -> " + std::to_string(want), now);
+                return;
+            }
             targetGear = want;
             shiftPhase = 1;
             lastShift = now;
@@ -752,6 +792,7 @@ struct drivetrain {
             v += a * dt;
         }
         accel += (a - accel) * std::min(1.0, dt / 0.5);
+        clutchTorqueFilt += (clutchTorque - clutchTorqueFilt) * std::min(1.0, dt / 0.05);
         if (!coupled()) omegaIn += (clutchTorque - 0.3 * std::tanh(omegaIn)) / P.inputInertia * dt;
         else omegaIn = omegaFromWheels();
         inputAngle += omegaIn * dt;
@@ -788,6 +829,7 @@ struct engineSim {
     // outputs
     double gasTorque = 0.0, frictionTorque = 0.0, starterTorque = 0.0, loadTorque = 0.0;
     double brakeAvg = 0.0;   // smoothed gas - friction torque
+    double firingTorque = 0.0;  // the same over ~0.1 s, only while the engine fires (no limiter or shift cut)
     double time = 0.0;
     double alpha = 0.0;      // crank angular acceleration this step
     double alphaFilt = 0.0;  // ... averaged over ~a firing interval (the quickshift blip predicts with it)
@@ -877,7 +919,7 @@ struct engineSim {
         qsCut = false;
         tcTrim = 1.0;
         wheelForceFilt = 0.0;
-        brakeAvg = 0.0;
+        brakeAvg = firingTorque = 0.0;
         time = 0.0;
         alpha = throttleFlow = 0.0;
         shakeForce = rollMoment = pitchMoment = 0.0;
@@ -1134,6 +1176,12 @@ struct engineSim {
         // idle air PI: holds idle rpm with the throttle closed once the engine has started
         rpmFilt += (r - rpmFilt) * std::min(1.0, dt / 0.1);
         if (!standalone) drive.control(dt, pedal, rpmFilt, time);
+        // dual-clutch handover: over once the clutch's slip has pulled the engine down to the new gear
+        if (!standalone && drive.shiftPhase == 3) {
+            drive.handoverTimer -= dt;
+            if (omega <= drive.omegaFromWheels() * (1.0 + drive.P.qsMatchTol) || drive.handoverTimer <= 0.0)
+                drive.endHandover();
+        }
         if (std::fabs(r) < 120.0 && !starter) stalled = true;
         if (starter || std::fabs(r) > 300.0) stalled = false;
         // rev-match blip: once the clutch is mostly open, drive the engine up to the lower gear's rpm
@@ -1150,7 +1198,8 @@ struct engineSim {
         double demand = std::max(pedal, blip);
         // overrun fuel cut only while the wheels really drive the engine (not between gears)
         fuelCut = !standalone && drive.coupled() && drive.clutch > 0.9 && demand < 0.02 && rpmFilt > P.fuelCutRpm;
-        qsCut = !standalone && drive.qsPhase > 0;
+        // the quickshifter's cut, and the ECU's through a dual-clutch handover
+        qsCut = !standalone && (drive.qsPhase > 0 || drive.shiftPhase == 3);
         // launch control holds the revs while the clutch slips (and the plain bite logic when not)
         if (!standalone && drive.boxWorksClutch() && drive.P.launchPedal > 0.0 && drive.launching(r) && r > drive.launchRpm(demand) + 300.0)
             qsCut = true;
@@ -1283,6 +1332,8 @@ struct engineSim {
         pvLast = idx;
 
         brakeAvg += (gasTorque - frictionTorque - brakeAvg) * std::min(1.0, dt / 0.25);
+        if (!revCut && !qsCut) firingTorque += (gasTorque - frictionTorque - firingTorque) * std::min(1.0, dt / 0.1);
+        drive.engineTorque = firingTorque;
     }
 
     // compressor map: pressure rise (Pa) at shaft speed w (rad/s) and flow m (kg/s). Peak at the surge
