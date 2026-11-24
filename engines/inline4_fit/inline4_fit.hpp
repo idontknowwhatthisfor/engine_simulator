@@ -226,8 +226,16 @@ engineParams inline4FitTunedParams() {
     return P;
 }
 
+// gearing for the turbo's power: on the Fit's 0.727 5th it rode the limiter at 228 km/h with power to
+// spare. A tall 5th (0.580) puts the drag-limited top speed at ~6660 rpm, on the power peak: 286 km/h.
+// 4th goes from 0.949 to 0.920 to close the gap to it; 1st-3rd and the 4.62 final drive stay, so the
+// launch and the 1/4 mile (finished in 4th) are unchanged. Found by sweeping ratios with --drag-stats:
+// close-ratio and shorter boxes don't beat the Fit's lower gears over the 1/4 mile, a 5th taller than
+// ~0.57 loses top speed to drag and one shorter than ~0.59 ends on the limiter. The automatic's shift
+// points stay: later upshifts touch the cut, which collapses the boost, and are slower
 drivetrainParams inline4FitTunedDriveParams() {
     drivetrainParams P = inline4FitDriveParams();
+    P.ratios = {0.0, 3.308, 1.870, 1.303, 0.920, 0.580};
     P.clutchCapacity *= 1.5;        // a stronger clutch spring for the boost
     return P;
 }
@@ -237,7 +245,7 @@ const engineType &inline4FitTunedType() {
         engineType t = inline4FitType();
         t.id = "inline4-tuned";
         t.name = "inline-4 (turbo)";
-        t.summary = "2.3 L inline-4 with a turbocharger (~0.6 bar), front-mounted intercooler and a straight pipe, Honda Fit gearing";
+        t.summary = "2.3 L inline-4 with a turbocharger (~0.6 bar), front-mounted intercooler and a straight pipe, Honda Fit gearing with a tall 4th and 5th";
         t.label = "inline-4, 2.3 L turbo, straight pipe";
         t.windowTitle = "inline-4 engine (turbo)";
         t.hudTag = "TURBO";
