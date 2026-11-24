@@ -35,7 +35,7 @@ std::string helpText(const engineSim &sim) {
         if (sim.P.turbo.on) s += sim.P.turbo.supercharger ? "  F: bypass" : "  F: BOV";  // the boost valve
         s += "\n";
     }
-    s += "[ ]: slow-mo  , .: step  G: ghost  B: blur  M: sound  K: leveller  O: speakers  D: dyno  X: shake  P: pause  R: reset";
+    s += "[ ]: slow-mo  , .: step  U: hud  G: ghost  B: blur  M: sound  K: leveller  O: speakers  D: dyno  X: shake  P: pause  R: reset";
     return s;
 }
 
@@ -54,7 +54,20 @@ struct hudView {
     bool showTurbo = false;       // the turbo or supercharger is drawn
 };
 
-std::string hudText(const engineSim &sim, const engineType &type, const engineModel &eng, const hudView &v) {
+// the stats in two blocks, which U shows one, the other, both or neither of (hudMode): the top is the
+// engine and the car (rpm, gear, pedal, boost, torque, clutch, exhaust, the flags), the bottom the
+// shaking, the sound and view settings and the firing order with each cylinder's stroke
+struct hudParts {
+    std::string top, bottom;
+};
+enum class hudMode { top, bottom, both, none };
+hudMode nextHudMode(hudMode m) {
+    return m == hudMode::top ? hudMode::bottom : m == hudMode::bottom ? hudMode::both : m == hudMode::both ? hudMode::none : hudMode::top;
+}
+bool hudShowsTop(hudMode m) { return m == hudMode::top || m == hudMode::both; }
+bool hudShowsBottom(hudMode m) { return m == hudMode::bottom || m == hudMode::both; }
+
+hudParts hudText(const engineSim &sim, const engineType &type, const engineModel &eng, const hudView &v) {
     auto f0 = [](double x) { return numToStr(static_cast<float>(x), 0); };
     // fixed-width fields for the numbers that change while it runs (the font is monospaced)
     auto p0 = [](double x, std::size_t w) { return numPad(static_cast<float>(x), 0, w); };
@@ -131,10 +144,13 @@ std::string hudText(const engineSim &sim, const engineType &type, const engineMo
     }
     // the flags keep their line even when there are none, so the lines under it do not jump as
     // FUEL CUT, REV CUT... come and go
-    s += "\n" + flags + "\n shake 1st " + p2(sim.shake1() / 1000.0, 5) +
+    hudParts out;
+    out.top = s + "\n" + flags;
+    std::string b = " shake 1st " + p2(sim.shake1() / 1000.0, 5) +
          " kN  2nd " + p2(sim.shake2() / 1000.0, 5) + " kN  roll +-" + p0(sim.rollAmp(), 4) + " N m" +
          "\n sound " + v.sound + (v.leveller ? " lvl +" + f0(v.levelGainDb) + " dB" : " lvl off") + (v.speaker ? " spk" : "") + "  shake view x" + f0(v.shakeView) + "  block " + (v.ghost ? "ghost" : "hidden") + "  blur " +
          (v.blur ? "on" : "off");
-    if (type.hudFiringLine) s += "\n firing (" + hudFiring(type, eng) + "):";
-    return s + strokes;
+    if (type.hudFiringLine) b += "\n firing (" + hudFiring(type, eng) + "):";
+    out.bottom = b + strokes;
+    return out;
 }

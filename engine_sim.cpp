@@ -35,6 +35,7 @@ struct options {
     float stopAt = -1.f;     // after --simtime, run on until cylinder 1 reaches this cycle angle (0..720), then pause
     bool blur = true;
     bool hud = true;         // --nohud for pixel regression shots
+    std::string hudStart = "top";  // --hud: the HUD blocks shown at start (U cycles them)
     bool sound = true;
     bool engineOnly = false; // --engine-only: no gearbox, original framing (pixel baselines)
     std::string engineType = "inline4";  // --engine-type: an engine's id or alias, or list (src/engines.hpp)
@@ -77,6 +78,11 @@ options parseArgs(int argc, char **argv) {
         else if (a == "--stopat") o.stopAt = std::stof(next());
         else if (a == "--noblur") o.blur = false;
         else if (a == "--nohud") o.hud = false;
+        else if (a == "--hud") {
+            o.hudStart = next();
+            if (o.hudStart != "top" && o.hudStart != "bottom" && o.hudStart != "both" && o.hudStart != "none")
+                throw std::runtime_error("--hud takes top, bottom, both or none, not \"" + o.hudStart + "\"");
+        }
         else if (a == "--mute") o.sound = false;
         else if (a == "--engine-only") o.engineOnly = true;
         else if (a == "--engine-type") o.engineType = next();
@@ -158,7 +164,7 @@ int main(int argc, char **argv) {
         for (const engineType *t : engineTypes()) ids += std::string(ids.empty() ? "" : "|") + t->id;
         std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type %s] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
-                             "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--manual] [--dct] [--no-wheelie]\n"
+                             "                  [--noblur] [--nohud] [--hud top|bottom|both|none] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--manual] [--dct] [--no-wheelie]\n"
                              "                  [--bov yes|no] [--tuned yes|no] [--variant name] [--save-audio yes|no]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
@@ -420,7 +426,9 @@ int main(int argc, char **argv) {
     int fpsFrames = 0;
     float prevDelta = static_cast<float>(sim.theta - eng.cyls[0].theta0);
     frameEffects fx;
-    sf::Text text(font, "", 16);
+    sf::Text text(font, "", 16), textBottom(font, "", 16);  // the HUD's top and bottom blocks (hudText)
+    hudMode hudShown = opt.hudStart == "bottom" ? hudMode::bottom : opt.hudStart == "both" ? hudMode::both
+                     : opt.hudStart == "none" ? hudMode::none : hudMode::top;  // U cycles top, bottom, both, none
     sf::Text help(font, helpText(sim), 14);
     help.setFillColor(sf::Color(150, 150, 160));
     sf::Text credit(font, std::string(type.credit) + (showTurbo && turboModelCredit && type.boost == builtInBoost::turbo && *type.turboCredit ? std::string("\n") + type.turboCredit : ""), 12);
@@ -493,6 +501,7 @@ int main(int argc, char **argv) {
                 if (e->code == K::K && audio) audio->levelling = !audio->levelling;  // playback leveller
                 if (e->code == K::O && audio) audio->speakerMode = !audio->speakerMode;  // small-speaker voicing
                 if (e->code == K::D) showDyno = !showDyno;
+                if (e->code == K::U) hudShown = nextHudMode(hudShown);
                 if (e->code == K::X) shakeIdx = (shakeIdx + 1) % 3;
                 if (e->code == K::P) paused = !paused;
                 if (e->code == K::R) {
@@ -589,7 +598,9 @@ int main(int argc, char **argv) {
             hv.blur = blur;
             hv.exhaust = showExhaust ? &exhaust : nullptr;
             hv.showTurbo = showTurbo;
-            text.setString(hudText(sim, type, eng, hv));
+            hudParts parts = hudText(sim, type, eng, hv);
+            text.setString(parts.top);
+            textBottom.setString(parts.bottom);
         }
 
         // 3D pass
@@ -684,9 +695,29 @@ int main(int argc, char **argv) {
         credit.setPosition({float(winSize.x) - credit.getLocalBounds().size.x - 12.f, 8.f});
         sf::Text angle(font, " crank " + numPad(crankDegrees(eng, delta), 1, 5) + " deg   cyl 1 cycle " +
                                  numPad(static_cast<float>(sim.theta / DEGR), 0, 3) + " / 720", 16);
-        angle.setPosition({0.f, text.getLocalBounds().size.y + 14.f});
-        window.draw(text);
-        window.draw(angle);
+        // the blocks U shows, one under the other: the bottom block starts a line under the top one
+        // (counted in lines, so the empty flags line keeps its place and nothing jumps as flags come and
+        // go); the crank line goes under the bottom block, the bars under whatever is shown
+        const bool showTop = hudShowsTop(hudShown), showBottom = hudShowsBottom(hudShown);
+        const float lineH = font.getLineSpacing(16);
+        auto lines = [](const sf::Text &t) {
+            const std::string str = t.getString().toAnsiString();
+            return static_cast<float>(std::count(str.begin(), str.end(), '\n') + 1);
+        };
+        float underY = 0.f;  // where the next line goes
+        if (showTop) {
+            text.setPosition({0.f, 0.f});
+            window.draw(text);
+            underY = lines(text) * lineH;
+        }
+        if (showBottom) {
+            textBottom.setPosition({0.f, underY});
+            window.draw(textBottom);
+            angle.setPosition({0.f, underY + textBottom.getLocalBounds().size.y + 14.f});
+            window.draw(angle);
+            underY = angle.getPosition().y + 22.f;
+        }
+        if (hudShown != hudMode::none) {
 
         // rpm and throttle bars under the stats
         auto bar = [&](float y, float frac, sf::Color fill, float mark) {
@@ -706,7 +737,7 @@ int main(int argc, char **argv) {
             f.setFillColor(fill);
             window.draw(f);
         };
-        float barY = angle.getPosition().y + 36.f;
+        float barY = underY + 14.f;
         float rpmFrac = static_cast<float>(sim.rpm() / sim.P.rpmScale);
         bar(barY, rpmFrac, sim.rpm() > sim.P.revLimit - 300.0 ? sf::Color(235, 80, 80) : sf::Color(80, 200, 120),
             static_cast<float>(sim.P.revLimit / sim.P.rpmScale));
@@ -720,6 +751,7 @@ int main(int argc, char **argv) {
             msg.setPosition({14.f, barY + 52.f});  // under the bars, clear of the stats and the dyno panel
             window.draw(msg);
         }
+        }  // hudShown != none
 
         // full-throttle dyno chart: torque (lb-ft) and power (hp) against rpm on one shared scale, so the
         // curves cross at 5252 rpm as on a real dyno sheet; with where the engine is right now
@@ -838,8 +870,8 @@ int main(int argc, char **argv) {
         }
         }
         if (opt.hud) {
-            window.draw(help);
-            window.draw(credit);
+            if (hudShown != hudMode::none) window.draw(help);
+            window.draw(credit);  // the model's CC-BY licence wants it on screen, HUD or not
         }
         window.popGLStates();
 

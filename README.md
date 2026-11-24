@@ -730,12 +730,13 @@ calibrated so that the published torque and power come out of the physics.
 | V | Wheelie control on/off (bikes) |
 | H / J | Hill up / down |
 | L | Cargo (car) / passenger (bikes) |
-| F | Blow-off valve on/off (`rs3`, the tuned `inline4`); bypass valve on/off (`h2`) |
+| F | Blow-off valve on/off (`rs3`, the tuned `inline4`); bypass valve on/off (`h2`, the tuned `mustang-v6`) |
 | `[` / `]` | Slow motion / back toward real time (×1 … ×0.01) |
 | `,` / `.` | When paused: step the crank by 1° |
 | G / B / M / D / X | See-through block / motion blur / sound: mono → stereo → muted / full-throttle dyno chart / shake view (×1, ×20, ×100) |
 | K | Playback leveller on / off (lifts the quiet stretches in the window; `--wav` is never levelled) |
 | O | Speaker voicing on / off (virtual bass for laptop / phone speakers; window only) |
+| U | HUD: top block (engine and car: rpm, gear, pedal, boost, torque, clutch, exhaust) → bottom block (shaking, sound and view settings, firing order and strokes, crank angle) → both → none (only the credit and the dyno chart, if D shows it). Starts on the top block; the rpm / pedal / clutch bars sit under whichever block is shown |
 | P / R / Esc | Pause / reset / quit |
 
 ## Command-line options
@@ -750,6 +751,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--save-audio yes\|no` | Record what the window plays (stereo, 44.1 kHz, after the leveller and speaker voicing, so M / K / O and slow motion are all heard as played) to `<engine>-<date>-<time>.wav` in the current folder. Default `no`. The file is finished when the window closes; a run killed from the terminal still leaves a playable file (up to the last second). `--mute` records nothing. |
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
+| `--hud top\|bottom\|both\|none` | The HUD blocks shown at start (U cycles them; default `top`) |
 | `--grade pct --reverse --sport --manual --dct --no-wheelie` | Starting conditions (`--manual`: start in manual, in neutral; `--dct`: a car's manual mode is DCT) |
 | `--bov yes\|no` | A turbo engine (`rs3`, the tuned `inline4`): fit the blow-off valve (default `yes`). `no` lets the compressor surge on lift-offs |
 | `--variant name` | Another version of the engine (every engine has one: `tuned`) |
