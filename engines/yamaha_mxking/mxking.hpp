@@ -56,10 +56,14 @@ engineParams mxkingParams() {
     S.masterHz = 9000.0;
     S.airboxHz = 160.0; S.intakeHowlHz = 600.0; S.intakeGain = 0.4;
     S.popRpm = 3000.0; S.popChance = 0.08;
-    S.drive = 0.0349;
-    S.radiateHz = 250.0;
-    S.burble = 3.5;
-    S.tick = 0.15;
+    // A single's thump is nearly all under 150 Hz, which the ear hears poorly and small speakers not
+    // at all: the burble (under 300 Hz) is kept down, so its peaks leave room for the gain, and the
+    // radiated bark (radiateHz) and the rocker-arm tappet tick carry it, about level with the
+    // four-cylinder bikes' A-weighted loudness at idle and full throttle
+    S.drive = 0.0701;
+    S.radiateHz = 130.0;
+    S.burble = 1.8;
+    S.tick = 0.7;
     return P;
 }
 
@@ -243,10 +247,11 @@ engineParams mxkingTunedParams() {
     S.flapShutHz = 4000.0; S.flapShutGain = 1.0;
     S.intakeGain = 0.9;             // open filter: the intake honk comes through
     S.popChance = 0.4;
-    S.drive = 0.0937;
-    S.radiateHz = 300.0;
-    S.burble = 4.0;
-    S.tick = 0.25;
+    S.drive = 0.1697;
+    S.radiateHz = 140.0;
+    S.burble = 2.0;
+    S.tick = 0.35;
+    S.raspGain = 1.5;               // the short can's thin packing lets more of the flow noise out
     return P;
 }
 
