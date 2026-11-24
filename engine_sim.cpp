@@ -48,6 +48,7 @@ struct options {
     bool bov = true;         // --bov no: the turbo without its blow-off valve (it surges on lift-off)
     std::string variant;     // --variant name: another version of the engine (--tuned yes = --variant tuned)
     std::string wav;         // --wav out.wav: render a scripted run to a file and quit
+    bool saveAudio = false;  // --save-audio yes: record the window's sound to <engine>-<date>-<time>.wav
     bool selftest = false, phystest = false;
     bool dumpParams = false; // --dump-params (hidden): print every parameter and quit (scripts/regress.sh)
     bool dyno = false;       // --dyno (hidden): print the WOT dyno curve (calibration env applied) and quit
@@ -110,6 +111,12 @@ options parseArgs(int argc, char **argv) {
             else throw std::runtime_error("--bov takes yes or no, not \"" + v + "\"");
         }
         else if (a == "--wav") o.wav = next();
+        else if (a == "--save-audio" || a.rfind("--save-audio=", 0) == 0) {
+            std::string v = a == "--save-audio" ? next() : a.substr(13);
+            if (v == "yes") o.saveAudio = true;
+            else if (v == "no") o.saveAudio = false;
+            else throw std::runtime_error("--save-audio takes yes or no, not \"" + v + "\"");
+        }
         else if (a == "--selftest") o.selftest = true;
         else if (a == "--phystest") o.phystest = true;
         else if (a == "--dump-params") o.dumpParams = true;
@@ -152,7 +159,7 @@ int main(int argc, char **argv) {
         std::fprintf(stderr, "%s\nusage: engine_sim [--engine-type %s] [--screenshot out.png] [--frames n] [--yaw r] [--pitch r]\n"
                              "                  [--zoom s] [--ghost 0|1] [--crank deg] [--simtime s] [--start] [--throttle 0..1] [--stopat deg]\n"
                              "                  [--noblur] [--nohud] [--mute] [--engine-only] [--grade pct] [--reverse] [--sport] [--manual] [--dct] [--no-wheelie]\n"
-                             "                  [--bov yes|no] [--tuned yes|no] [--variant name]\n"
+                             "                  [--bov yes|no] [--tuned yes|no] [--variant name] [--save-audio yes|no]\n"
                              "       engine_sim [--engine-type t] --selftest | --phystest | --wav out.wav\n"
                              "       engine_sim --compare a.png b.png\n"
                              "       engine_sim --engine-type list [--ids]\n", ex.what(), ids.c_str());
@@ -380,6 +387,15 @@ int main(int argc, char **argv) {
     soundMode soundOut = soundMode::mono;
     if (opt.sound && opt.screenshot.empty()) {
         audio = std::make_unique<engineAudio>();
+        if (opt.saveAudio) {
+            char stamp[32];
+            std::time_t now = std::time(nullptr);
+            std::strftime(stamp, sizeof stamp, "%Y%m%d-%H%M%S", std::localtime(&now));
+            std::string path = std::string(type.id) + "-" + stamp + ".wav";
+            audio->recorder = std::make_unique<wavRecorder>(path, engineAudio::RATE);
+            if (audio->recorder->ok()) std::printf("recording audio to %s (written when the window closes)\n", path.c_str());
+            else std::fprintf(stderr, "--save-audio: cannot write %s\n", path.c_str());
+        }
         audio->play();
     }
     bool showDyno = true;

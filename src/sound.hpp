@@ -1061,6 +1061,56 @@ private:
     }
 };
 
+// --save-audio yes: writes the live window's stream (exactly what plays: 44.1 kHz stereo, 16-bit) to
+// a WAV as it goes. The header's sizes are brought up to date about once a second, so a run killed
+// from the terminal still leaves a playable file; close() writes the final sizes.
+class wavRecorder {
+public:
+    wavRecorder(const std::string &path, unsigned rate) : path(path), rate(rate), f(std::fopen(path.c_str(), "wb")) {
+        if (f) header();
+    }
+    ~wavRecorder() { close(); }
+    bool ok() const { return f != nullptr; }
+    const std::string &file() const { return path; }
+    double seconds() const { return frames / static_cast<double>(rate); }
+
+    // interleaved stereo samples, from the audio thread
+    void write(const std::int16_t *s, std::size_t count) {
+        if (!f) return;
+        std::fwrite(s, sizeof(std::int16_t), count, f);
+        frames += count / 2;
+        if (frames - lastHeader >= rate) {
+            header();
+            lastHeader = frames;
+        }
+    }
+    void close() {
+        if (!f) return;
+        header();
+        std::fclose(f);
+        f = nullptr;
+    }
+
+private:
+    std::string path;
+    unsigned rate;
+    std::FILE *f;
+    std::uint64_t frames = 0, lastHeader = 0;
+
+    void header() {
+        long at = std::ftell(f);
+        std::fseek(f, 0, SEEK_SET);
+        auto u32 = [&](std::uint32_t v) { std::fwrite(&v, 4, 1, f); };
+        auto u16 = [&](std::uint16_t v) { std::fwrite(&v, 2, 1, f); };
+        std::uint32_t bytes = static_cast<std::uint32_t>(std::min<std::uint64_t>(frames * 4, 0xFFFFFFFFull - 36));
+        std::fwrite("RIFF", 1, 4, f); u32(36 + bytes); std::fwrite("WAVEfmt ", 1, 8, f);
+        u32(16); u16(1); u16(2); u32(rate); u32(rate * 4); u16(4); u16(16);
+        std::fwrite("data", 1, 4, f); u32(bytes);
+        if (at > 44) std::fseek(f, at, SEEK_SET);
+        std::fflush(f);
+    }
+};
+
 // streams the synthesised samples to the sound card, resampling from the physics rate. In slow
 // motion fewer samples arrive per second and they are stretched, so the pitch drops like a slowed
 // recording. The read rate is nudged to keep about 50 ms queued, which absorbs frame jitter. Always
@@ -1075,8 +1125,16 @@ public:
     std::atomic<float> levelGain{1.f};  // its current gain, for the HUD
     std::atomic<bool> speakerMode{false};  // small-speaker voicing (src/speaker.hpp), O in the window
 
+    std::unique_ptr<wavRecorder> recorder;  // --save-audio yes: set before play()
+
     engineAudio() { initialize(2, RATE, {sf::SoundChannel::FrontLeft, sf::SoundChannel::FrontRight}); }
-    ~engineAudio() override { stop(); }
+    ~engineAudio() override {
+        stop();
+        if (recorder && recorder->ok()) {
+            recorder->close();
+            std::printf("saved audio %s (%.1f s, %u Hz stereo)\n", recorder->file().c_str(), recorder->seconds(), RATE);
+        }
+    }
 
 private:
     std::vector<std::int16_t> out = std::vector<std::int16_t>(1024);  // 512 frames, interleaved
@@ -1117,6 +1175,7 @@ private:
         voicing.on = speakerMode.load();
         leveller.maxGain = voicing.on ? playbackLeveller::MAX_GAIN_SPEAKER : playbackLeveller::MAX_GAIN;
         levelGain = static_cast<float>(leveller.gain());
+        if (recorder) recorder->write(out.data(), out.size());
         data.samples = out.data();
         data.sampleCount = out.size();
         return true;

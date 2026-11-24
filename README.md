@@ -686,6 +686,7 @@ calibrated so that the published torque and power come out of the physics.
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
 | `--wav out.wav` | Render a scripted run to a WAV file. The bikes play a ride: start, blips, limiter, launch through the gears, braking with rev-matched downshifts. The inline-4 plays a start / rev / lift-off script; the RS 3 (and the tuned inline-4) two full-throttle pulls in the car with lift-offs. Mono. |
+| `--save-audio yes\|no` | Record what the window plays (stereo, 44.1 kHz, after the leveller and speaker voicing, so M / K / O and slow motion are all heard as played) to `<engine>-<date>-<time>.wav` in the current folder. Default `no`. The file is finished when the window closes; a run killed from the terminal still leaves a playable file (up to the last second). `--mute` records nothing. |
 | `--screenshot out.png [--frames n]` | Save a frame and quit. Framing: `--yaw r --pitch r --zoom s`. State: `--crank deg`, `--simtime s --start --throttle x`, `--stopat deg` |
 | `--nohud --noblur --mute --ghost 0\|1` | Options for regression shots |
 | `--grade pct --reverse --sport --manual --dct --no-wheelie` | Starting conditions (`--manual`: start in manual, in neutral; `--dct`: a car's manual mode is DCT) |
