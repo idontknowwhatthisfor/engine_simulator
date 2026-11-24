@@ -261,17 +261,24 @@ exhaustLayout mustangV6ExhaustWith(const engineModel &e, bool straight) {
             int w = pipe(pts, 10.f, 10.f, {}, BLACK);
             L.pipes[w].rough = 0.9f; L.pipes[w].metal = 0.f;
         };
-        // hot side: out of the manifold's front, forward clear of the damper, down to the top of the tank
-        hose({{80.f, TOP_Y, OUT_Z}, {80.f, TOP_Y, OUT_Z - 130.f}, {170.f, -240.f, OUT_Z - 230.f}, {TANK_X, HX_Y0 + 20.f, HX_Z1 + 80.f},
-              {TANK_X, HX_Y0 + 20.f, HX_Z1 - 10.f}});
-        // cold side: out of the bottom of the tank, back through the pump, up into the manifold
-        const vec3 PUMP{200.f, 60.f, OUT_Z - 260.f};
-        hose({{TANK_X, HX_Y1 - 20.f, HX_Z1 - 10.f}, {TANK_X, HX_Y1 - 20.f, HX_Z1 + 80.f}, {PUMP.x + 40.f, PUMP.y + 10.f, PUMP.z - 70.f},
-              {PUMP.x, PUMP.y, PUMP.z - 40.f}});
+        // both hoses leave the manifold's front, drop straight down just ahead of the engine (clear of
+        // the crank pulley and the belt) and run forward low into the tank. Control points about evenly
+        // spaced: the tube's Catmull-Rom centreline overshoots where a long span meets a short one.
+        // hot side, into the top of the tank
+        hose({{110.f, TOP_Y, OUT_Z}, {110.f, TOP_Y, OUT_Z - 50.f}, {110.f, TOP_Y + 60.f, OUT_Z - 85.f},
+              {110.f, -250.f, OUT_Z - 95.f}, {110.f, -120.f, OUT_Z - 100.f}, {110.f, 0.f, OUT_Z - 105.f},
+              {120.f, 55.f, OUT_Z - 150.f}, {170.f, 60.f, OUT_Z - 240.f}, {240.f, 60.f, OUT_Z - 330.f},
+              {300.f, 60.f, OUT_Z - 420.f}, {TANK_X, HX_Y0 + 20.f, HX_Z1 + 30.f}, {TANK_X, HX_Y0 + 20.f, HX_Z1 - 10.f}});
+        // cold side, from the bottom of the tank through the pump on its low run and back up
+        const vec3 PUMP{215.f, 195.f, OUT_Z - 330.f};
+        hose({{TANK_X, HX_Y1 - 20.f, HX_Z1 - 10.f}, {TANK_X, HX_Y1 - 20.f, HX_Z1 + 30.f}, {290.f, 200.f, OUT_Z - 440.f},
+              {PUMP.x + 25.f, PUMP.y, PUMP.z - 70.f}, {PUMP.x, PUMP.y, PUMP.z - 40.f}});
         int pump = pipe({{PUMP.x, PUMP.y, PUMP.z - 42.f}, {PUMP.x, PUMP.y, PUMP.z + 42.f}}, 24.f, 24.f, {}, BLACK, true);
         L.pipes[pump].rough = 0.6f; L.pipes[pump].metal = 0.3f;
-        L.boxes.push_back({{PUMP.x - 18.f, PUMP.y - 40.f, PUMP.z - 20.f}, {PUMP.x + 18.f, PUMP.y - 22.f, PUMP.z + 20.f}, ALU, 0.5f, 0.6f});
-        hose({{PUMP.x, PUMP.y, PUMP.z + 40.f}, {PUMP.x - 40.f, -150.f, OUT_Z - 170.f}, {50.f, TOP_Y, OUT_Z - 120.f}, {50.f, TOP_Y, OUT_Z}});
+        L.boxes.push_back({{PUMP.x - 18.f, PUMP.y - 42.f, PUMP.z - 20.f}, {PUMP.x + 18.f, PUMP.y - 22.f, PUMP.z + 20.f}, ALU, 0.5f, 0.6f});
+        hose({{PUMP.x, PUMP.y, PUMP.z + 40.f}, {PUMP.x - 40.f, 185.f, OUT_Z - 240.f}, {110.f, 165.f, OUT_Z - 165.f},
+              {60.f, 110.f, OUT_Z - 125.f}, {50.f, 0.f, OUT_Z - 110.f}, {50.f, -120.f, OUT_Z - 105.f},
+              {50.f, -250.f, OUT_Z - 100.f}, {50.f, TOP_Y + 60.f, OUT_Z - 85.f}, {50.f, TOP_Y, OUT_Z - 50.f}, {50.f, TOP_Y, OUT_Z}});
         // throttle body on the rear inlet, the duct from it forward along the left to the airbox
         L.boxes.push_back({{-48.f, B.y - 48.f, B.z + 160.f}, {48.f, B.y + 48.f, B.z + 205.f}, ALU, 0.4f, 0.7f});
         int duct = pipe({{0.f, B.y, B.z + 203.f}, {0.f, B.y, B.z + 260.f}, {-150.f, B.y - 20.f, B.z + 230.f},
@@ -373,7 +380,7 @@ engineParams mustangV6TunedParams() {
     S.drive = 0.081;                // peak ~0.75 in --wav (the blower adds its whine): above the stock car's ~0.5
     S.burble = 2.0;
     S.popRpm = 2500.0; S.popChance = 0.7;
-    S.raspGain = 0.6;
+    S.raspGain = 0.42;
     S.intakeGain = 0.9;
     S.turboGain = 8.0;              // the twin-screw's lobe-pass whine (src/sound.hpp turboVoice): ~12 dB under the exhaust at full throttle
     return P;
