@@ -334,7 +334,7 @@ const engineType &mustangV6Type() {
 //     pipes straight back to two big tips. Less back pressure, so the top end breathes;
 //   - an ECU tune (93 octane): more advance off boost and spark pulled with it, the Ti-VCT re-phased
 //     for the top end, the limiter from 7000 to 7400 rpm;
-//   - full-throttle changes at ~7200 rpm. Ratios and the 3.31 axle stay stock.
+//   - race gearing: close, even MT82 ratios on a 3.73 axle, full-throttle changes at 7000 rpm.
 // Kits like this make ~400-450 hp on the stock 3.7; with the straight pipe the sim makes ~340 kW.
 engineParams mustangV6TunedParams() {
     engineParams P = mustangV6Params();
@@ -386,10 +386,22 @@ engineParams mustangV6TunedParams() {
     return P;
 }
 
+// race gearing for the blower's power band: torque sits at 465-485 N m from 4000 to 6500 rpm and power
+// climbs to the 7400 limiter, so it changes up at 7000 and every change lands at ~5200 rpm, on the
+// torque peak. The MT82's 3.66 1st stays, on a 3.73 axle (the usual drag swap from the 3.31) for a
+// shorter launch; 1st-6th step evenly (x1.35) down to a 0.810 6th whose drag-limited top speed falls
+// at ~7190 rpm, on the power peak: 310 km/h. On the stock ratios 5th rode the limiter at 286 km/h, 6th
+// was a 4400 rpm overdrive, and the 1st-2nd and 2nd-3rd changes dropped it to ~4800-5000 rpm. Found by
+// sweeping ratios, axle and shift point with --drag-stats: changes at 7200 flare into the cut during
+// the manual's ~0.3 s shift and are slower; a progressive box (wider low steps) gains 0-100 km/h but
+// loses the 1/4 mile
 drivetrainParams mustangV6TunedDriveParams() {
     drivetrainParams P = mustangV6DriveParams();
-    P.upPedal = 5200.0;             // full pedal: change up at 7200, just under the 7400 limiter
-    P.sportUp = 7200.0;
+    P.ratios = {0.0, 3.660, 2.707, 2.003, 1.481, 1.096, 0.810};
+    P.finalDrive = 3.73;
+    P.upPedal = 5000.0;             // full pedal: change up at 7000, clear of the 7400 limiter
+    P.sportUp = 7000.0;
+    P.firstGearSpeed = 12.0 / 3.6;  // the shorter gears: braking to a stop, drop to 1st sooner
     P.downMax = 6700.0; P.kickMax = 6600.0;
     return P;
 }
@@ -408,7 +420,7 @@ carSpec mustangV6TunedCar() {
     S.cylMaxLo = 90; S.cylMaxHi = 150;
     S.idleLo = 730; S.idleHi = 870;
     S.liftLo = 700; S.liftHi = 1000;
-    S.carWhat = "1675 kg with driver, MT82 6-speed manual (tuned), 3.31 axle, rear-wheel drive, twin-screw, straight pipe";
+    S.carWhat = "1675 kg with driver, MT82 6-speed manual, close-ratio gears, 3.73 axle, rear-wheel drive, twin-screw, straight pipe";
     S.zeroTo100What = "0-100 km/h (twin-screw)"; S.zeroTo100Lo = 4.0; S.zeroTo100Hi = 5.6;
     S.zeroTo200What = "0-200 km/h (twin-screw)"; S.zeroTo200Lo = 11.0; S.zeroTo200Hi = 18.0;
     S.wotUpLo = 6900;

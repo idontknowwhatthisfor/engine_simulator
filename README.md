@@ -73,7 +73,7 @@ It has nine engines. `engine_sim` is the single entry point, and you pick the en
 | `inline4` (default) | 2.3 L inline-4 (the Sketchfab model); `--tuned yes`: turbocharged, straight pipe | a car with Honda Fit 5-speed gearing; tuned: a close-ratio 6-speed dual-clutch | `fit`, `honda-fit`, `inline4-fit`, `i4` |
 | `rs3` | Audi RS 3 2.5 TFSI turbocharged inline-5, 2480 cc | an RS 3 (8Y) with the 7-speed S tronic | `audi`, `audi-rs3`, `rs-3`, `inline5`, `i5`, `2.5tfsi`, `daza` |
 | `lfa` | Lexus LFA 1LR-GUE 72° V10, 4805 cc | an LFA with the 6-speed ASG | `lexus`, `lexus-lfa`, `v10`, `1lr-gue`, `1lr` |
-| `mustang-v6` | 2014 Ford Mustang V6: 3.7 L Cyclone 60° V6, 3726 cc; `--tuned yes`: twin-screw supercharger, straight pipe and an ECU tune | a Mustang V6 with the MT82 6-speed manual | `mustang`, `ford`, `ford-mustang`, `mustang-3.7`, `cyclone`, `duratec37`, `v6`, `3.7` |
+| `mustang-v6` | 2014 Ford Mustang V6: 3.7 L Cyclone 60° V6, 3726 cc; `--tuned yes`: twin-screw supercharger, straight pipe and an ECU tune | a Mustang V6 with the MT82 6-speed manual; tuned: close-ratio gears on a 3.73 axle | `mustang`, `ford`, `ford-mustang`, `mustang-3.7`, `cyclone`, `duratec37`, `v6`, `3.7` |
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
 | `h2` | Kawasaki Ninja H2 supercharged inline-4, 998 cc | a Ninja H2 (bike) | `kawasaki`, `kawasaki-h2`, `ninja-h2` |
@@ -288,7 +288,7 @@ The idle air floor (`idleMin`) sits close to what the idle needs, so braking har
 ```
 
 What a typical blown, straight-piped 3.7 Mustang does (estimates, not one tuner's kit), on the stock
-engine and gearing:
+engine, with the gearing changed for racing:
 
 - **Supercharger:** a twin-screw blower on top of the V, about 1.5 L per turn of the male rotor,
   belted from the crank at 1.9:1 (~14k rotor rpm at the limiter). It sits on an intercooled lower
@@ -298,7 +298,7 @@ engine and gearing:
 - **Exhaust:** the catalysts and both mufflers out, the H-pipe swapped for an X-pipe, two 2.5 in pipes
   straight back to two big burnt tips.
 - **ECU:** more advance off boost and 6° per bar taken out with it, the cams re-phased for the top
-  end, an 800 rpm idle, the limiter from 7000 to 7400 rpm, full-throttle changes at ~7300 rpm.
+  end, an 800 rpm idle, the limiter from 7000 to 7400 rpm, full-throttle changes at ~7000-7300 rpm.
 
 The blower is positive displacement (`turboParams::screw`, `src/physics.hpp`): each turn of the male
 rotor pushes `screwDisp` of inlet air into the charge pipes whatever the pressure, less what leaks back
@@ -310,7 +310,9 @@ the pulley ratio (`driveRatio`) sets how much. The crank pays for the compressio
 | | |
 |---|---|
 | Output (sim) | ~0.2 bar by 2000 rpm, 0.2–0.3 bar to the limiter; 488 N·m at 5000 rpm (391 N·m already at 2000), 341 kW (458 hp) at 7000 (stock: 389 N·m, 225 kW) |
-| Results (sim) | 0–100 km/h 5.0 s, 0–200 km/h 14.1 s, full-throttle upshifts at ~7250–7380 rpm |
+| Gearing | Close-ratio MT82: 3.66 / 2.71 / 2.00 / 1.48 / 1.10 / 0.81 on a 3.73 axle (the stock 1st; the usual drag swap from the 3.31). Every step is ×1.35 |
+| Power band | Full-throttle upshifts at 7000 rpm (98% of peak power, clear of the 7400 cut, which the manual's ~0.3 s change would flare into from 7200). Every change lands at ~5200 rpm, on the 485 N·m torque peak (stock ratios dropped to ~4800–5000 rpm after 1st and 2nd). 6th reaches its drag-limited 310 km/h at ~7190 rpm, on the power peak (on the stock ratios 5th held it on the limiter at 286 km/h, and 6th was a 4400 rpm overdrive) |
+| Results (sim) | 0–100 km/h 4.6 s floored from idle, 4.1 s with launch control, 0–200 km/h 13.5 s, ¼ mile 12.15 s; see [stats.md](stats.md). The ratios, axle and shift point came from sweeping them with `--drag-stats` |
 | Drawn | `mustang_v6_blower.mesh` (built with the engine by `build_mustang_v6.py`, placed at the mesh's `supercharger_at`): a see-through figure-8 rotor case, the 4-lobe male rotor with its pulley and the 6-lobe female rotor of the other hand, each turning about its own axis (`turboModel::ROTOR_A`, `ROTOR_B`), the female the other way at 4/6 speed, and the belt from the crank damper |
 | Sound | The straight pipe as before, plus the blower's whine: the male rotor's lobe pass (4 × rotor speed, ~900 Hz at the limiter) and its harmonics, ~12 dB under the exhaust at full throttle and growing with the boost. The bypass's steady recirculation is near silent; only its snap open is heard |
 
