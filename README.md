@@ -566,7 +566,7 @@ runner length, the exhaust valve and the wet weight.
 
 MV's own tune of this engine: the F4 RC (Reparto Corse, 2015), with the racing kit fitted. MV's F4 RC spec
 sheet rates it at 158.0 kW (212 hp) at 13600 rpm and 115 N·m at 9300 rpm (151 kW / 205 hp in street
-trim). Bore, stroke, 13.4:1, the gearbox and the gearing stay as on the RR. The changes MV lists:
+trim). Bore, stroke, 13.4:1 and the gearbox stay as on the RR. The changes MV lists:
 
 - a lighter crankshaft and lighter pistons and rods (sim: crank inertia 0.034 → 0.029 kg·m², reciprocating
   mass 0.30 → 0.27 kg per cylinder, both estimates);
@@ -575,7 +575,10 @@ trim). Bore, stroke, 13.4:1, the gearbox and the gearing stay as on the RR. The 
 - the racing kit: a Termignoni titanium exhaust with its mapped ECU. Drawn as the stock route in titanium
   with heat-blued headers a size up, no exhaust valve and a shorter titanium can with four titanium tips
   (the kit's real route is an estimate). It's louder, with more crackle and a higher note;
-- 175 kg dry with the kit (MV), ~193 kg wet (estimate).
+- 175 kg dry with the kit (MV), ~193 kg wet (estimate);
+- not from MV: taller track sprockets, 15/38 for the road 15/41 (estimate). On road gearing the RC runs
+  into the 14000 limiter in 6th at ~303 km/h (MV quotes 302); with them it pulls to ~330 km/h,
+  drag-limited just under the limiter, like the other tuned bikes.
 
 The limiter is not published for the RC; it stays at 14000 rpm.
 
@@ -585,7 +588,7 @@ The limiter is not published for the RC; it stays at 14000 rpm.
 | Peak power | 147.8 kW (198 hp) at 13500 rpm | 157.9 kW (212 hp) at 13500–14000 rpm | 158.0 kW (212 hp) at 13600 |
 | Mass with rider | 288 kg | 273 kg | 175 kg dry |
 | 0–200 km/h | 7.1 s | 6.9 s | |
-| After 30 s in 6th | ~304 km/h | ~304 km/h | 302 km/h |
+| After 30 s in 6th | ~304 km/h | ~326 km/h (15/38 sprockets) | 302 km/h (road gearing) |
 
 Both versions blend the TSS curves across the same ~2300 rpm span, fitted together with the curves so
 that torque stays within a few N·m of its peak through the change and power climbs without a step (at

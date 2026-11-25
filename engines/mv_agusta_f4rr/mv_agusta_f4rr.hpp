@@ -215,7 +215,7 @@ const engineType &mvAgustaF4rrType() {
 // 115 N m at 9300 rpm with the kit (151 kW / 205 hp street). What MV lists: a lighter crankshaft, light
 // pistons and rods, a cylinder head with new intake ducts, four upper Magneti Marelli injectors with more
 // fuel flow, and the racing kit: a Termignoni titanium exhaust with its mapped ECU. 175 kg dry with the
-// kit, 302 km/h. Same 13.4:1, gearbox and gearing as the RR. Not published (estimates): the limiter
+// kit, 302 km/h (road gearing). Same 13.4:1 and gearbox as the RR; taller track sprockets (estimate). Not published (estimates): the limiter
 // (kept at 14000), the crank and piston masses, the cam timing and the exhaust's route.
 engineParams mvAgustaF4rcParams() {
     engineParams P = mvAgustaF4rrParams();
@@ -245,6 +245,8 @@ exhaustLayout mvAgustaF4rcExhaust(const engineModel &e) { return mvAgustaF4Exhau
 drivetrainParams mvAgustaF4rcDriveParams() {
     drivetrainParams P = mvAgustaF4rrDriveParams();
     P.carMass = 273.0;              // 175 kg dry with the kit, ~193 kg wet (estimate), plus the rider
+    P.finalDrive = 38.0 / 15.0;     // track sprockets (estimate): 15/38 for 15/41, ~8% taller, so 6th
+                                    // reaches ~330 km/h drag-limited just under the limiter
     return P;
 }
 
@@ -257,9 +259,9 @@ bikeSpec mvAgustaF4rcSpec() {
     S.powerRpmWhat = "peak power rpm (MV Agusta F4 RC kit: 13600)";
     S.torqueLo = 108; S.torqueHi = 122; S.torqueRpmLo = 8500; S.torqueRpmHi = 10500;
     S.powerLo = 150; S.powerHi = 166; S.powerRpmLo = 13000; S.powerRpmHi = 14000;
-    S.bikeWhat = "F4 RR gearing, 273 kg with rider (F4 RC kit)";
-    S.topWhat = "top speed after 30 s, 6th gear (MV Agusta F4 RC: 302)";
-    S.topLo = 285; S.topHi = 325;
+    S.bikeWhat = "F4 RR gearbox, 15/38 track sprockets, 273 kg with rider (F4 RC kit)";
+    S.topWhat = "top speed after 30 s, 6th gear (MV: 302 on road gearing; 15/38 track sprockets)";
+    S.topLo = 305; S.topHi = 345;
     return S;
 }
 
