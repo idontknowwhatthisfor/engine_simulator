@@ -146,13 +146,15 @@ exhaustLayout mvAgustaF4Exhaust(const engineModel &e, bool race) {
     // the under-seat silencer, rising toward the tail
     int can = race ? pipe({{-355.f, -30.f, 55.f}, {-420.f, -82.f, 60.f}, {-500.f, -122.f, 63.f}}, 52.f, 48.f, -1, {link}, CAN, true)
                    : pipe({{-355.f, -30.f, 55.f}, {-430.f, -90.f, 60.f}, {-560.f, -150.f, 65.f}}, 62.f, 58.f, -1, {link}, CAN, true);
-    // the four organ pipes, two by two at the silencer's end, pointing back and a little up
-    const vec3 end = race ? vec3{-495.f, -124.f, 63.f} : vec3{-555.f, -152.f, 65.f};
-    const vec3 dir = normalize(vec3{-1.f, -0.35f, 0.1f});
-    for (float dy : {-22.f, 22.f})
-        for (float dz : {-22.f, 22.f}) {
-            vec3 s = end + vec3{0.f, dy, dz};
-            vec3 t = s + dir * 75.f;
+    // the four organ pipes, two by two in the silencer's end face, along its axis there: offsets are
+    // square to that axis and each tip starts inside the can, so none floats off the end cap
+    const std::vector<vec3> &cp = L.pipes[can].pts;
+    const vec3 end = cp.back(), dir = normalize(cp.back() - cp[cp.size() - 2]);
+    const vec3 side = normalize(cross(dir, vec3{0.f, -1.f, 0.f})), up = normalize(cross(side, dir));
+    for (float du : {-22.f, 22.f})
+        for (float ds : {-22.f, 22.f}) {
+            vec3 s = end + up * du + side * ds - dir * 30.f;
+            vec3 t = s + dir * 100.f;      // 70 mm out of the end cap
             pipe({s, t}, 15.f, 15.f, -1, {can}, CHROME, true);
             L.outlets.push_back({t, dir, 15.f});
         }
