@@ -203,6 +203,11 @@ struct engineParams {
     // runs whichever lobe breathes better at this rpm. lowCam = false: one fixed cam (the curve above)
     bool lowCam = false;
     double veLowBase = 0.0, veLowPeak = 0.0, veLowRpm = 0.0, veLowWidth = 1.0;
+    const char *camLowText = "ShiftCam: partial-load lobe", *camHighText = "ShiftCam: full lobe";  // HUD
+    // camBlend > 0: the ECU schedules the change by rpm instead (MV's TSS runners): the low curve up to
+    // camSwitchRpm - camBlend / 2, the high one from camSwitchRpm + camBlend / 2, a smooth blend between
+    // (the runners moving, the map crossfading). 0 (the default): an instant switch to whichever breathes better
+    double camSwitchRpm = 0.0, camBlend = 0.0;
     // pressure-wave (resonance) tuning: ripples on top of the smooth VE curve above, from the waves
     // that run up and down the intake runners and exhaust headers (engineSim::waveTuning explains the
     // model). The lengths are effective acoustic lengths: the pipe plus the port and the open end's
@@ -1014,9 +1019,20 @@ struct engineSim {
     double veCurveLow(double r) const {
         return P.veLowBase + P.veLowPeak * std::exp(-std::pow((r - P.veLowRpm) / P.veLowWidth, 2.0));
     }
-    // ShiftCam: the partial-load lobe while it breathes better (low and mid rpm), then the race lobe
-    bool onLowCam(double r) const { return P.lowCam && veCurveLow(r) > veCurveHigh(r); }
-    double volEff(double r) const { return (onLowCam(r) ? veCurveLow(r) : veCurveHigh(r)) * (1.0 + waveTuning(r)); }
+    // the share of the low curve: ShiftCam runs the partial-load lobe while it breathes better (low and
+    // mid rpm), then the race lobe; with camBlend set, a smoothstep across the scheduled change instead
+    double lowCamShare(double r) const {
+        if (!P.lowCam) return 0.0;
+        if (P.camBlend <= 0.0) return veCurveLow(r) > veCurveHigh(r) ? 1.0 : 0.0;
+        double x = std::clamp((r - (P.camSwitchRpm - 0.5 * P.camBlend)) / P.camBlend, 0.0, 1.0);
+        return 1.0 - x * x * (3.0 - 2.0 * x);
+    }
+    bool onLowCam(double r) const { return lowCamShare(r) > 0.5; }
+    double volEff(double r) const {
+        double w = lowCamShare(r);
+        double ve = w >= 1.0 ? veCurveLow(r) : w <= 0.0 ? veCurveHigh(r) : w * veCurveLow(r) + (1.0 - w) * veCurveHigh(r);
+        return ve * (1.0 + waveTuning(r));
+    }
 
     // manifold pressure the ECU aims for at full pedal with the turbo: boostMap, lowered at the top end
     // (boostFallRpm .. boostTopRpm) and capped by the charge (torque) limit, never below atmospheric

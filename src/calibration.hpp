@@ -11,6 +11,7 @@ void applyCalibrationEnv(engineParams &P) {
     // breathing: the main VE curve, and the low-cam lobe (BMW ShiftCam)
     env("VE_BASE", P.veBase); env("VE_PEAK", P.vePeak); env("VE_RPM", P.veRpm); env("VE_WIDTH", P.veWidth);
     env("VEL_BASE", P.veLowBase); env("VEL_PEAK", P.veLowPeak); env("VEL_RPM", P.veLowRpm); env("VEL_WIDTH", P.veLowWidth);
+    env("CAM_SWITCH", P.camSwitchRpm); env("CAM_BLEND", P.camBlend);
     // pressure-wave tuning: intake ram (runner length, bore, sound speed, gain, decay), exhaust scavenging
     env("RAM_LEN", P.ramLen); env("RAM_DIA", P.ramDia); env("RAM_C", P.ramSound); env("RAM_GAIN", P.ramGain); env("RAM_DECAY", P.ramDecay);
     env("SCAV_LEN", P.scavLen); env("SCAV_C", P.scavSound); env("SCAV_GAIN", P.scavGain); env("SCAV_DECAY", P.scavDecay);

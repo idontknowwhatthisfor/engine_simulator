@@ -104,7 +104,7 @@ hudParts hudText(const engineSim &sim, const engineType &type, const engineModel
         if (sim.tcTrim < 0.98) flags += "  WHEELIE CTRL";
         if (!dv.wheelieControl) flags += "  wheelie ctrl off";
     }
-    std::string camStr = sim.P.lowCam ? (sim.onLowCam(sim.rpm()) ? "   ShiftCam: partial-load lobe" : "   ShiftCam: full lobe") : "";
+    std::string camStr = sim.P.lowCam ? std::string("   ") + (sim.onLowCam(sim.rpm()) ? sim.P.camLowText : sim.P.camHighText) : "";
 
     std::string s = " FPS " + padLeft(v.fps > 0.f ? f0(v.fps) : std::string("--"), 3) + "   time x" +
                     numToStr(static_cast<float>(v.timeScale), 2) + (v.paused ? "   PAUSED" : "");

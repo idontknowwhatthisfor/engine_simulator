@@ -65,7 +65,7 @@ tailpipe beams backward: orbit behind a car and the exhaust comes up, in front o
 the engine do; a bike's far side, away from its silencer, is quieter. From the starting view every
 source plays at its mono level, so the balance there is the mono one.
 
-It has nine engines. `engine_sim` is the single entry point, and you pick the engine with
+It has ten engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
 
 | `--engine-type` | Engine | Drives | Also accepted |
@@ -78,6 +78,7 @@ It has nine engines. `engine_sim` is the single entry point, and you pick the en
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
 | `h2` | Kawasaki Ninja H2 supercharged inline-4, 998 cc | a Ninja H2 (bike) | `kawasaki`, `kawasaki-h2`, `ninja-h2` |
 | `zx10r` | Kawasaki Ninja ZX-10R inline-4, 998 cc | a ZX-10R (bike) | `zx-10r`, `ninja-zx10r`, `ninja-zx-10r`, `zx10`, `kawasaki-zx10r` |
+| `f4rr` | MV Agusta F4 RR inline-4, 998 cc; `--tuned yes`: the F4 RC with its racing kit (212 hp) | an F4 RR (bike) | `mv-agusta`, `mvagusta`, `mv-agusta-f4`, `mv-f4`, `f4`, `f4-rr`, `mv-f4rr` |
 | `mxking` | Yamaha MX King 150 single, 149.7 cc | an MX King underbone (bike) | `mx-king`, `jupiter-mx`, `t150`, `yamaha150` |
 
 [stats.md](stats.md) compares every engine and its tuned version: power, torque, weight and one drag run
@@ -111,7 +112,7 @@ in its place.
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
 meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run ENGINE=<id>`
-or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-mustang-v6`, `make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-mxking`; aliases work too). `make test` runs
+or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-mustang-v6`, `make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-f4rr`, `make run-mxking`; aliases work too). `make test` runs
 the headless checks for every engine and version of one (`./engine_sim --engine-type list --ids`), and
 fails if any of them fails.
 
@@ -534,6 +535,64 @@ bodies, gearbox and gearing stay stock. The changes:
 
 The HUD shows RACE KIT after the rpm.
 
+### `f4rr`: MV Agusta F4 RR (2012-)
+
+Built like the S 1000 RR and the ZX-10R: the inline-4's piston and rod scaled to the 79 mm bore, on a
+procedural flat-plane crank, with an MV red cam cover. The published figures are from MV Agusta's F4 RR
+spec sheet and brochure (the Euro 3 bike).
+
+| | |
+|---|---|
+| Engine | 79.0 × 50.9 mm = 998 cc (the shortest stroke here), 13.4:1, DOHC with four radial valves per cylinder, titanium rods, 180° flat-plane crank, forward-turning crank, Mikuni ride-by-wire throttle bodies with eight injectors, Eldor EM2.0 ECU. Estimates: 104 mm rods, block inclined 25°, ~49 mm throttle bores |
+| Firing | 1-2-4-3 |
+| TSS | MV's Torque Shift System: two-position variable-length intake runners, lifted off the throttle bodies near 10000 rpm. Modelled with the two-curve variable-intake model (as the BMW's ShiftCam): a long-runner curve for the mid range, a short-runner one for the top end. Unlike ShiftCam's instant switch, the ECU schedules the change by rpm and blends the two curves from ~9650 to ~11950 rpm (`camSwitchRpm` 10800, `camBlend` 2300), so the torque curve has no step; the HUD shows which is in use |
+| Output (sim) | 111 N·m at 9500–10000 rpm, 147.8 kW (198 hp) at 13500 rpm, no ram air (MV Agusta: 111 N·m at 9600 / 147.7 kW (201 hp) at 13600), limiter 14000 rpm (MV: 14000), idle 1250 rpm |
+| Wave tuning | One effective runner, ~0.30 m, ram at ~10000–11000 rpm (+3%); a dip at 7000–8000 (−4%) (runner: estimate) |
+| Gearbox | Cassette six-speed. Primary 48/82 (1.708); gears 14/37, 16/33, 18/31, 20/30, 22/29, 21/25; chain 15/41; 200/55 ZR17 rear (all MV's figures) |
+| Vehicle | 190 kg dry (MV), 17 l tank: ~208 kg wet (estimate) + 80 kg rider, CdA 0.31 |
+| Rider aids | Same as the other bikes: EAS 2.0 quickshifter with rev-matched downshifts, slipper clutch, launch control, wheelie control |
+| Exhaust (3D) | 4-2-1-4: headers under the engine, a link pipe with the exhaust valve climbing behind the gearbox into a dark silencer under the seat, ending in the F4's four stacked "organ pipe" tailpipes (four open ends for the sound) |
+| Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 7.1 s, ~304 km/h after 30 s in 6th (MV: 298 km/h) |
+| Sound | The inline-4 superbike voice through its own drawn exhaust: a short silencer split into four outlets, a higher, rawer note than the Japanese bikes, a big airbox honk and the radial valvetrain's tick |
+
+Not published by MV, so estimated: rod length, throttle bore, cam timing, crank inertia, friction, the
+runner length, the exhaust valve and the wet weight.
+
+#### Tuned (`--tuned yes`): F4 RC with the racing kit
+
+```bash
+./engine_sim --engine-type f4rr --tuned yes
+```
+
+MV's own tune of this engine: the F4 RC (Reparto Corse, 2015), with the racing kit fitted. MV's F4 RC spec
+sheet rates it at 158.0 kW (212 hp) at 13600 rpm and 115 N·m at 9300 rpm (151 kW / 205 hp in street
+trim). Bore, stroke, 13.4:1, the gearbox and the gearing stay as on the RR. The changes MV lists:
+
+- a lighter crankshaft and lighter pistons and rods (sim: crank inertia 0.034 → 0.029 kg·m², reciprocating
+  mass 0.30 → 0.27 kg per cylinder, both estimates);
+- a cylinder head with new intake ducts and four upper Magneti Marelli injectors with more fuel flow: both
+  TSS curves breathe more, most at the top;
+- the racing kit: a Termignoni titanium exhaust with its mapped ECU. Drawn as the stock route in titanium
+  with heat-blued headers a size up, no exhaust valve and a shorter titanium can with four titanium tips
+  (the kit's real route is an estimate). It's louder, with more crackle and a higher note;
+- 175 kg dry with the kit (MV), ~193 kg wet (estimate).
+
+The limiter is not published for the RC; it stays at 14000 rpm.
+
+| | Stock (F4 RR) | F4 RC kit (sim) | MV (F4 RC kit) |
+|---|---|---|---|
+| Peak torque | 111 N·m at 9500–10000 rpm | 115–116 N·m at 9500–10000 rpm | 115 N·m at 9300 |
+| Peak power | 147.8 kW (198 hp) at 13500 rpm | 157.9 kW (212 hp) at 13500–14000 rpm | 158.0 kW (212 hp) at 13600 |
+| Mass with rider | 288 kg | 273 kg | 175 kg dry |
+| 0–200 km/h | 7.1 s | 6.9 s | |
+| After 30 s in 6th | ~304 km/h | ~304 km/h | 302 km/h |
+
+Both versions blend the TSS curves across the same ~2300 rpm span, fitted together with the curves so
+that torque stays within a few N·m of its peak through the change and power climbs without a step (at
+most 7–8.5 kW per 500 rpm, against 12 kW with an instant switch). From 4500 rpm up the kit's torque is at
+or above stock; below 4000 it is about 1 N·m under. The kit's power is still rising slightly at the
+14000 limiter (156.8 kW at 13500, 157.9 at 14000), a little past MV's 13600. The HUD shows F4 RC after the rpm.
+
 ### `mxking`: Yamaha MX King 150 (2015-2020)
 
 The Indonesian underbone (Jupiter MX King, T150 engine), made from the engine template: a single
@@ -759,7 +818,7 @@ calibrated so that the published torque and power come out of the physics.
 
 | Option | |
 |---|---|
-| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `rs3`, `lfa`, `v4`, `s1000rr`, `h2`, `zx10r`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
+| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `rs3`, `lfa`, `v4`, `s1000rr`, `h2`, `zx10r`, `f4rr`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
@@ -822,6 +881,8 @@ engines/
                             type), build_h2.py, h2.mesh, h2_supercharger.mesh
   kawasaki_zx10r/            kawasaki_zx10r.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_zx10r.py, zx10r.mesh
+  mv_agusta_f4rr/           mv_agusta_f4rr.hpp (engine, sound, gearing, test targets, demo ride, type),
+                            build_f4rr.py, f4rr.mesh
   yamaha_mxking/            mxking.hpp (engine, sound, gearing, test targets, type, race version),
                             build_mxking.py, mxking.mesh, mxking_race.mesh
   _template/                a new engine to copy (not built): myengine.hpp, build_myengine.py, engine.mk
@@ -892,14 +953,14 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    - the `engineType`: id, labels, mesh path, physics test, for bikes the gearbox placement and an
      optional `ride` for `--wav`; other versions of the engine go in `variants` (`--variant <name>`).
 4. **Register.** The header ends with `REGISTER_ENGINE(<type function>, <key>)`; the key orders
-   `--engine-type list` (inline4 10, rs3 15, lfa 17, mustang-v6 18, v4 20, s1000rr 30, h2 40, zx10r 45, mxking 50), pick a free one. `engine.mk` lists the
+   `--engine-type list` (inline4 10, rs3 15, lfa 17, mustang-v6 18, v4 20, s1000rr 30, h2 40, zx10r 45, f4rr 47, mxking 50), pick a free one. `engine.mk` lists the
    header and the mesh rule. Nothing outside the folder needs an edit: the Makefile includes every
    `engine.mk` and generates `engines/all.hpp`, `make test` picks the engine up, and the help line
    and HUD follow from what it has (bike or car, boost, wheelie control).
 5. **Calibrate.** Put the published figures in `bikeSpec` or `carSpec` and run
    `./engine_sim --engine-type <name> --phystest` until it passes. Environment variables override
    parameters while you try values, for every engine: `VE_BASE VE_PEAK VE_RPM VE_WIDTH` (and `VEL_*`
-   for a low-cam lobe), the wave tuning `RAM_LEN RAM_DIA RAM_C RAM_GAIN RAM_DECAY SCAV_LEN SCAV_C
+   for a low-cam lobe, `CAM_SWITCH CAM_BLEND` for an rpm-scheduled blend between the two), the wave tuning `RAM_LEN RAM_DIA RAM_C RAM_GAIN RAM_DECAY SCAV_LEN SCAV_C
    SCAV_GAIN SCAV_DECAY`, `FMEP_A FMEP_B FMEP_C`, `RESID ETA INERTIA STARTER`,
    `IDLE_KP IDLE_KI IDLE_SG IDLE_BASE IDLE_SPARK IDLE_MIN`, the cycle-to-cycle variation `CYC_IDLE CYC_FULL`, `SC_PR SC_FLOW SC_CHOKE SC_RELIEF`,
    `TURBO_AREA TURBO_WG TURBO_BOOST TURBO_INERTIA TURBO_KNOCK TURBO_FALL TURBO_TOPRPM TURBO_TOP
