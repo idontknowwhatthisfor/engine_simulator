@@ -45,6 +45,10 @@ struct gearboxModel {
     // one pair-spacing past the top gear (485 for five gears)
     float Z_REV = 485.f;
     static float gearZ(int g) { return 335.f + 30.f * (g - 1); }
+    // the constant-mesh head pair (input gear, countershaft head gear), 16 mm wide: far enough behind
+    // the clutch that the countershaft gear, whose rim reaches ~36 mm into the clutch's circle, clears
+    // the pressure plate backed off (to z 292) and the dual clutch's drum and apply plates (to 290.5)
+    static constexpr float HEAD_Z = 306.f;
     static float extra(int gears) { return 30.f * (gears - 5); }  // how much longer than the 5-speed
     int nCr = 0, nId = 0, nOr = 0;
     float idX = 0.f, idY = 0.f;  // idler centre relative to the main axis
@@ -86,7 +90,7 @@ struct gearboxModel {
         }
         clutchDisc = makeGear(60.f, 18, 8.f, 12.f);  // the damper-spring bumps show it turning
         pressurePlate = makeGear(68.f, 6, 12.f, 20.f);
-        inShaft = makeCylinder(12.f, 262.f, 312.f);
+        inShaft = makeCylinder(12.f, 262.f, HEAD_Z + 8.f);
         outShaft = makeCylinder(14.f, 316.f, 532.f + X);
         cntShaft = makeCylinder(11.f, 288.f, 500.f + X);
         // reverse set: counter gear and output gear don't touch; the idler sits where it meshes with both
@@ -157,13 +161,15 @@ struct gearboxModel {
                 add(k1Plate, place(ax, ay, z, inA), FRICTION, 0.8f, 0.f);
                 add(k2Plate, place(ax, ay, z, inA), FRICTION, 0.8f, 0.f);
             }
-            add(k1Apply, place(ax, ay, 283.f + lift1, crankDelta), k1 ? BRASS : PLATE, 0.4f, 0.6f);
-            add(k2Apply, place(ax, ay, 283.f + lift2, crankDelta), k2 ? BRASS : PLATE, 0.4f, 0.6f);
+            // apply plates behind the stack (to z 278), backing off up to 5 mm and staying inside the
+            // drum (to z 289): at most 288.5
+            add(k1Apply, place(ax, ay, 281.f + lift1, crankDelta), k1 ? BRASS : PLATE, 0.4f, 0.6f);
+            add(k2Apply, place(ax, ay, 281.f + lift2, crankDelta), k2 ? BRASS : PLATE, 0.4f, 0.6f);
             add(outerInShaft, place(ax, ay, 0.f, inA), SHAFT, 0.3f, 0.8f);
         }
         add(inShaft, place(ax, ay, 0.f, inA), SHAFT, 0.3f, 0.8f);
-        add(inGear, place(ax, ay, 300.f, inA), STEEL, 0.35f, 0.7f);
-        add(headGear, place(ax, cy, 300.f, cntA), STEEL, 0.35f, 0.7f);
+        add(inGear, place(ax, ay, HEAD_Z, inA), STEEL, 0.35f, 0.7f);
+        add(headGear, place(ax, cy, HEAD_Z, cntA), STEEL, 0.35f, 0.7f);
         add(cntShaft, place(ax, cy, 0.f, cntA), SHAFT, 0.3f, 0.8f);
         add(outShaft, place(ax, ay, 0.f, outA), SHAFT, 0.3f, 0.8f);
         add(flange, place(ax, ay, 527.f + extra(gears), outA), PLATE, 0.4f, 0.6f);
