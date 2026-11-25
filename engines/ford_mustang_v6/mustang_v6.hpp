@@ -60,7 +60,7 @@ engineParams mustangV6Params() {
     S.burble = 2.5;
     S.burbleFadeFrom = 3500.0; S.burbleFadeSpan = 2500.0; S.burbleHigh = 0.45;
     S.tick = 0.14;
-    S.raspGain = 0.36;
+    S.raspGain = 0.25;
     return P;
 }
 
@@ -380,7 +380,7 @@ engineParams mustangV6TunedParams() {
     S.drive = 0.081;                // peak ~0.75 in --wav (the blower adds its whine): above the stock car's ~0.5
     S.burble = 2.0;
     S.popRpm = 2500.0; S.popChance = 0.7;
-    S.raspGain = 0.42;
+    S.raspGain = 0.3;
     S.intakeGain = 0.9;
     S.turboGain = 8.0;              // the twin-screw's lobe-pass whine (src/sound.hpp turboVoice): ~12 dB under the exhaust at full throttle
     return P;
