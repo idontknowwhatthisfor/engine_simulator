@@ -65,7 +65,7 @@ tailpipe beams backward: orbit behind a car and the exhaust comes up, in front o
 the engine do; a bike's far side, away from its silencer, is quieter. From the starting view every
 source plays at its mono level, so the balance there is the mono one.
 
-It has ten engines. `engine_sim` is the single entry point, and you pick the engine with
+It has eleven engines. `engine_sim` is the single entry point, and you pick the engine with
 `--engine-type`:
 
 | `--engine-type` | Engine | Drives | Also accepted |
@@ -75,6 +75,7 @@ It has ten engines. `engine_sim` is the single entry point, and you pick the eng
 | `lfa` | Lexus LFA 1LR-GUE 72° V10, 4805 cc | an LFA with the 6-speed ASG | `lexus`, `lexus-lfa`, `v10`, `1lr-gue`, `1lr` |
 | `mustang-v6` | 2014 Ford Mustang V6: 3.7 L Cyclone 60° V6, 3726 cc; `--tuned yes`: twin-screw supercharger, straight pipe and an ECU tune | a Mustang V6 with the MT82 6-speed manual; tuned: close-ratio gears on a 3.73 axle | `mustang`, `ford`, `ford-mustang`, `mustang-3.7`, `cyclone`, `duratec37`, `v6`, `3.7` |
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
+| `rsv4` | Aprilia RSV4 RR 65° V4, 999.6 cc; `--tuned yes`: Akrapovic Evolution titanium system, race map, 16/40 gearing | an RSV4 RR (bike) | `aprilia`, `aprilia-rsv4`, `rsv4rr`, `rsv4-rr`, `aprilia-rsv4rr`, `aprilia-rsv4-rr` |
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
 | `h2` | Kawasaki Ninja H2 supercharged inline-4, 998 cc | a Ninja H2 (bike) | `kawasaki`, `kawasaki-h2`, `ninja-h2` |
 | `zx10r` | Kawasaki Ninja ZX-10R inline-4, 998 cc | a ZX-10R (bike) | `zx-10r`, `ninja-zx10r`, `ninja-zx-10r`, `zx10`, `kawasaki-zx10r` |
@@ -112,7 +113,7 @@ in its place.
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
 meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run ENGINE=<id>`
-or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-mustang-v6`, `make run-v4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-f4rr`, `make run-mxking`; aliases work too). `make test` runs
+or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-mustang-v6`, `make run-v4`, `make run-rsv4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-f4rr`, `make run-mxking`; aliases work too). `make test` runs
 the headless checks for every engine and version of one (`./engine_sim --engine-type list --ids`), and
 fails if any of them fails.
 
@@ -369,6 +370,61 @@ gearbox stay stock. The changes:
 | After 30 s in 6th | ~293 km/h (on the 14000 limiter) | ~323 km/h |
 
 The HUD shows TUNED after the rpm.
+
+### `rsv4`: Aprilia RSV4 RR (2015-2020)
+
+Built like the Ducati V4: the inline-4's piston and rod scaled to the 78 mm bore, on a procedural
+two-pin crank with a front and a rear rod side by side on each pin, with black cam covers. Unlike the
+Ducati, the V is a narrow 65° and the crank turns forward. The published figures are from Aprilia's
+RSV4 RR spec sheet.
+
+| | |
+|---|---|
+| Engine | 78 × 52.3 mm = 999.6 cc, 13.6:1, longitudinal 65° V4, DOHC with four titanium valves per cylinder (33 mm intakes), Pankl rods on 36 mm crankpins, forward-turning crank, four 48 mm Marelli ride-by-wire throttle bodies with eight injectors. Estimates: 105 mm rods, front bank 35° above horizontal (the rear one 10° back of vertical), 92 mm cylinder pitch |
+| Firing | 1-4-2-3 at 0-115-295-540°: two crankpins 180° apart in a 65° V give the uneven 115-180-245-180 beat |
+| Variable intake | Aprilia's ECU-controlled variable-length intake ducts, modelled like MV's TSS with the two-curve model: long ducts for the mid range, short ducts for the top end, blended by rpm from ~7950 to ~10850 rpm (`camSwitchRpm` 9400, `camBlend` 2900); the HUD shows which is in use |
+| Output (sim) | 116 N·m at 10500–11000 rpm, 147.6 kW (198 hp) at 13000–13500 rpm, no ram air (Aprilia: 115 N·m at 10500 / 148 kW (201 hp) at 13000), limiter 14000 rpm (estimate), idle 1250 rpm |
+| Wave tuning | One effective runner, ~0.30 m (estimate) |
+| Gearbox | Cassette six-speed. Primary 73/44 (1.659), straight-cut; gears 39/15, 33/16, 34/20, 31/21, 31/23, 34/27; chain 16/42; 200/55 ZR17 rear (all Aprilia's figures) |
+| Vehicle | 204 kg wet (Aprilia, 18.5 l tank) + 80 kg rider, CdA 0.32 |
+| Rider aids | Same as the other bikes (APRC): quickshifter with rev-matched downshifts, slipper clutch, launch control held near the torque peak (~10000 rpm, for the tall 1st), wheelie control |
+| Exhaust (3D) | 4-2-1: the front bank's headers drop in front of the crankcase, the rear bank's behind the cylinders, each bank's pair merges under the engine into a collector, then a link pipe with the butterfly valve to the short side silencer on the right, angled up, with a titanium end cap |
+| Results (sim) | 0–100 km/h 3.4 s, 0–200 km/h 7.0 s, ~307 km/h after 30 s in 6th, on the limiter (Aprilia: ~291 km/h) |
+| Sound | The 65° V4's hard-edged, uneven howl from the physics, between the Ducati's rumble and the inline-4s' shriek, through medium headers into a short side silencer with a valve, a big airbox, crackle on the overrun and straight-cut primary whine |
+
+Not published by Aprilia, so estimated: rod length, bank angles, cam timing, crank inertia, friction,
+the limiter, the runner length, the exhaust's route and valve.
+
+#### Tuned (`--tuned yes`): Akrapovic Evolution and a race map
+
+```bash
+./engine_sim --engine-type rsv4 --tuned yes
+```
+
+Akrapovic's Evolution full titanium system for the RSV4 RR (S-A10E8-RC), with an ECU race map. On
+Akrapovic's own dyno (at the wheel) the system gives +5.2 kW at 13500 rpm (140.8 → 145.8 kW, +3.7%) and
++3 N·m at ~10800 rpm; it is 3.2 kg lighter than stock (4.7 against 7.9 kg) and 2 dB louder. The engine
+itself is stock. The changes:
+
+- the system: titanium headers on the stock route, heat-blued and a size up, a plain 2-1 merge with no
+  catalyst, no exhaust valve, and Akrapovic's shorter hexagonal titanium muffler with a carbon end cap;
+- the map (estimates): a little more spark, and the limiter 500 rpm up at 14500;
+- the gearing: tuned, on the stock 16/42 chain 6th gear runs into the 14500 limiter at ~321 km/h, so it is
+  gearing-limited. It runs Aprilia's own alternative 16/40 rear sprocket (listed for the RSV4 RR beside the
+  16/42), every ratio 5% taller: 6th now tops out at ~13900 rpm, at the power peak and short of the
+  limiter, drag-limited. The gearbox is stock;
+- 281 kg with the rider (3.2 kg off).
+
+| | Stock | Tuned (sim) |
+|---|---|---|
+| Peak torque | 116 N·m at 11000 rpm | 120 N·m at 11000 rpm (+3 N·m) |
+| Peak power | 147.6 kW (198 hp) at 13500 rpm | 154.8 kW (208 hp) at 13500 rpm (+5%; Akrapovic's +3.7% plus the map) |
+| Limiter | 14000 rpm | 14500 rpm |
+| Gearing | 16/42 | 16/40 |
+| 0–200 km/h | 7.0 s | 6.9 s |
+| After 30 s in 6th | ~307 km/h, on the limiter | ~321–324 km/h, drag-limited at ~13900 rpm |
+
+The gain grows with rpm: about +1% at 5000, +3% at 10800 and +5% at 13500. The HUD shows TUNED after the rpm.
 
 ### `s1000rr`: BMW S 1000 RR (2023-, K67 ShiftCam engine)
 
@@ -821,7 +877,7 @@ calibrated so that the published torque and power come out of the physics.
 
 | Option | |
 |---|---|
-| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `rs3`, `lfa`, `v4`, `s1000rr`, `h2`, `zx10r`, `f4rr`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
+| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `rs3`, `lfa`, `v4`, `rsv4`, `s1000rr`, `h2`, `zx10r`, `f4rr`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
@@ -878,6 +934,8 @@ engines/
                             build_lfa.py, lfa.mesh
   ducati_v4/                ducati_v4.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_v4.py, v4.mesh
+  aprilia_rsv4/             aprilia_rsv4.hpp (engine, sound, gearing, test targets, demo ride, type),
+                            build_rsv4.py, rsv4.mesh
   bmw_s1000rr/              bmw_s1000rr.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_s1000rr.py, s1000rr.mesh
   kawasaki_h2/              kawasaki_h2.hpp (engine, supercharger, sound, gearing, test targets, demo ride,
@@ -956,7 +1014,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    - the `engineType`: id, labels, mesh path, physics test, for bikes the gearbox placement and an
      optional `ride` for `--wav`; other versions of the engine go in `variants` (`--variant <name>`).
 4. **Register.** The header ends with `REGISTER_ENGINE(<type function>, <key>)`; the key orders
-   `--engine-type list` (inline4 10, rs3 15, lfa 17, mustang-v6 18, v4 20, s1000rr 30, h2 40, zx10r 45, f4rr 47, mxking 50), pick a free one. `engine.mk` lists the
+   `--engine-type list` (inline4 10, rs3 15, lfa 17, mustang-v6 18, v4 20, rsv4 22, s1000rr 30, h2 40, zx10r 45, f4rr 47, mxking 50), pick a free one. `engine.mk` lists the
    header and the mesh rule. Nothing outside the folder needs an edit: the Makefile includes every
    `engine.mk` and generates `engines/all.hpp`, `make test` picks the engine up, and the help line
    and HUD follow from what it has (bike or car, boost, wheelie control).
