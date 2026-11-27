@@ -1,5 +1,5 @@
 // calibration overrides: environment variables that replace engine parameters while you calibrate an
-// engine, for any engine type. Read by every --phystest and by --wav (not by the interactive window).
+// engine, for any engine type. Read by every --phystest, --dyno, --wav and the interactive window.
 // Unset variables leave the parameter alone, so without them nothing changes.
 #pragma once
 #include "physics.hpp"

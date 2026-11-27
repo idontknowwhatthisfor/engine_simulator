@@ -239,6 +239,7 @@ int main(int argc, char **argv) {
     const double THETA0 = opt.crankDeg < 0.f ? eng.cyls[0].theta0 : opt.crankDeg * DEGR;
     engineSim sim;
     setupSim(sim, eng, type, THETA0, type.bike && opt.engineOnly);
+    applyCalibrationEnv(sim.P);  // SND_*, VE_*, ... from the environment, as --wav and --dyno do
     sim.P.turbo.bov = opt.bov;
     // the full-throttle dyno curve (D), measured in the background on a copy of the engine
     dynoSweep dyno;
