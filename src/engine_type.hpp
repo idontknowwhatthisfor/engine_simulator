@@ -113,6 +113,7 @@ struct carSpec {
     double coastDownLo = 0.0, coastDownHi = 0.0;  // normal mode, coasting: first downshift rpm (0: no check)
     bool dumpStalls = true;                      // manual: dumping the clutch at idle in 1st stalls it
     double reverseLo = -40.0, reverseHi = -5.0;  // km/h after 4 s in R at 25% pedal
+    double pullAwayHi = 70.0;                    // manual: most km/h 3 s after a 30-40% pedal take-off (a very light car is quicker)
 };
 
 struct engineType;

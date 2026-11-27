@@ -532,7 +532,7 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
         double minRpm = 1e9;
         run(3.0, [&] { minRpm = std::min(minRpm, sim.rpm()); });
         check("manual normal: gentle take-off, lowest rpm", minRpm, 600, 4000, "rpm");
-        check("manual normal: moving in 1st after the take-off", sim.drive.v * 3.6, 5, 70, "km/h");
+        check("manual normal: moving in 1st after the take-off", sim.drive.v * 3.6, 5, S.pullAwayHi, "km/h");
         sim.drive.requestShift(+1, sim.time);
         check("manual normal: shift on the move without C refused", sim.drive.gear, 1, 1, "");
         sim.drive.clutchPedal = true;
@@ -563,7 +563,7 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
         check("manual DCT: idling in 1st, clutch open", sim.drive.clutch, 0.0, 0.05, "");
         sim.pedalTarget = 0.3;
         run(3.0, none);
-        check("manual DCT: pulls away without C", sim.drive.v * 3.6, 10, 70, "km/h");
+        check("manual DCT: pulls away without C", sim.drive.v * 3.6, 10, S.pullAwayHi, "km/h");
         // up through four gears, each at 80% of the limiter, at 60% pedal
         const double shiftAt = 0.8 * REV_LIMIT;
         const int topUp = std::min(5, sim.drive.P.gears);
@@ -624,7 +624,7 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
                     lowest, sim.drive.v * 3.6);
         check("manual DCT: anti-stall braking to the stop", lowest, 500, REV_LIMIT, "rpm");
         check("manual DCT: in 1st once stopped", stoppedGear, 1, 1, "");
-        check("manual DCT: pulls away after the stop", sim.drive.v * 3.6, 5, 70, "km/h");
+        check("manual DCT: pulls away after the stop", sim.drive.v * 3.6, 5, S.pullAwayHi, "km/h");
         // hill-hold: stopped on a 15% hill in 1st with the brake released and the throttle shut, it stays
         // put; then the throttle pulls it up the hill
         sim.pedalTarget = 0.0;
@@ -638,7 +638,7 @@ int physicsTestCar(const engineModel &e, const engineType &type) {
         check("manual DCT: hill-hold on 15% (most roll back)", -rolled * 3.6, 0.0, 0.5, "km/h");
         sim.pedalTarget = 0.4;
         run(3.0, none);
-        check("manual DCT: pulls away up the hill", sim.drive.v * 3.6, 5, 70, "km/h");
+        check("manual DCT: pulls away up the hill", sim.drive.v * 3.6, 5, S.pullAwayHi, "km/h");
         sim.drive.grade = 0.0;
     }
     {

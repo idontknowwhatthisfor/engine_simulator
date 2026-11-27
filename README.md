@@ -74,6 +74,7 @@ It has eleven engines. `engine_sim` is the single entry point, and you pick the 
 | `rs3` | Audi RS 3 2.5 TFSI turbocharged inline-5, 2480 cc | an RS 3 (8Y) with the 7-speed S tronic | `audi`, `audi-rs3`, `rs-3`, `inline5`, `i5`, `2.5tfsi`, `daza` |
 | `lfa` | Lexus LFA 1LR-GUE 72° V10, 4805 cc | an LFA with the 6-speed ASG | `lexus`, `lexus-lfa`, `v10`, `1lr-gue`, `1lr` |
 | `mustang-v6` | 2014 Ford Mustang V6: 3.7 L Cyclone 60° V6, 3726 cc; `--tuned yes`: twin-screw supercharger, straight pipe and an ECU tune | a Mustang V6 with the MT82 6-speed manual; tuned: close-ratio gears on a 3.73 axle | `mustang`, `ford`, `ford-mustang`, `mustang-3.7`, `cyclone`, `duratec37`, `v6`, `3.7` |
+| `ca2006` | Cosworth CA2006 2.4 L 90° Formula 1 V8, 2399 cc, 20,000 rpm | a Williams FW28 with the 7-speed seamless sequential box | `cosworth`, `cosworth-ca2006`, `ca`, `f1`, `f1-v8`, `fw28`, `williams-fw28` |
 | `v4` | Ducati Desmosedici Stradale 90° V4, 1103 cc | a Panigale V4 (bike) | `ducati`, `ducati-v4`, `panigale` |
 | `rsv4` | Aprilia RSV4 RR 65° V4, 999.6 cc; `--tuned yes`: Akrapovic Evolution titanium system, race map, 16/40 gearing | an RSV4 RR (bike) | `aprilia`, `aprilia-rsv4`, `rsv4rr`, `rsv4-rr`, `aprilia-rsv4rr`, `aprilia-rsv4-rr` |
 | `s1000rr` | BMW S 1000 RR inline-4, 999 cc | an S 1000 RR (bike) | `bmw`, `s1000`, `bmw-s1000rr` |
@@ -113,7 +114,7 @@ in its place.
 
 `make` builds `engine_sim` and any missing meshes. Run it from the project root, because it loads the
 meshes and `SpaceMono-Regular.ttf` from there. Shortcuts: `make run` (inline-4), `make run ENGINE=<id>`
-or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-mustang-v6`, `make run-v4`, `make run-rsv4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-f4rr`, `make run-mxking`; aliases work too). `make test` runs
+or `make run-<id>` (`make run-rs3`, `make run-lfa`, `make run-mustang-v6`, `make run-ca2006`, `make run-v4`, `make run-rsv4`, `make run-s1000rr`, `make run-h2`, `make run-zx10r`, `make run-f4rr`, `make run-mxking`; aliases work too). `make test` runs
 the headless checks for every engine and version of one (`./engine_sim --engine-type list --ids`), and
 fails if any of them fails.
 
@@ -317,6 +318,36 @@ the pulley ratio (`driveRatio`) sets how much. The crank pays for the compressio
 | Results (sim) | 0–100 km/h 4.6 s floored from idle, 4.1 s with launch control, 0–200 km/h 13.5 s, ¼ mile 12.15 s; see [stats.md](stats.md). The ratios, axle and shift point came from sweeping them with `--drag-stats` |
 | Drawn | `mustang_v6_blower.mesh` (built with the engine by `build_mustang_v6.py`, placed at the mesh's `supercharger_at`): a see-through figure-8 rotor case, the 4-lobe male rotor with its pulley and the 6-lobe female rotor of the other hand, each turning about its own axis (`turboModel::ROTOR_A`, `ROTOR_B`), the female the other way at 4/6 speed, and the belt from the crank damper |
 | Sound | The straight pipe as before, plus the blower's whine: the male rotor's lobe pass (4 × rotor speed, ~900 Hz at the limiter) and its harmonics, ~12 dB under the exhaust at full throttle and growing with the boost. The bypass's steady recirculation is near silent; only its snap open is heard |
+
+### `ca2006`: Cosworth CA2006 (2006), 2.4 L Formula 1 V8, in the Williams FW28
+
+```bash
+./engine_sim --engine-type ca2006
+```
+
+Built like the LFA (the inline-4's piston and rod scaled to the 98 mm bore, on a procedural crank,
+crankcase, two banks, heads and blue cam covers), on a flat-plane crank: four pins, the outer two at
+0° and the inner two at 180°, each shared by one rod from each bank. Each bank is an inline-4 firing
+every 180°, and the 90° V puts the other bank half way between, so the eight fire evenly every 90°.
+Cosworth's figures come from Race Engine Technology (issues 20, 21 and 73), as collected in
+[Grand Prix Engines Note 108](https://www.grandprixengines.co.uk/Note_108.pdf); the rest are estimates.
+
+| | |
+|---|---|
+| Engine | 98 × 39.75 mm = 2399 cc (the 2006 rules: a 90° V8 of at most 2.4 L with a bore of at most 98 mm), 13.3:1, rods 2.570 × the stroke = 102.2 mm, 41.3 mm inlet valves with 16 mm lift, pneumatic valve springs, a fixed inlet (the rules), eight throttle barrels under a carbon airbox, dry sump. Bore spacing 106 mm (estimate). Cylinders 1-4 are bank A (−x), 5-8 bank B (+x), n+4 sharing n's pin |
+| Firing | 1-5-3-7-4-8-2-6, every 90° (the usual flat-plane V8 order: estimate). No free 1st- or 2nd-order force: the 1st-order forces cancel in each bank and the two banks' 2nd-order forces add up sideways, which the vertical check does not see. There is a small 2nd-order rocking couple, and the test checks it against the textbook |
+| Output (sim) | 294 N·m at 18,000 rpm, 560 kW (752 hp) at 19,000. Cosworth: 290.7 N·m at 17,000, 563 kW / 755 bhp at 19,250, and on its power curve 614 / 731 / 711 bhp at 16,000 / 18,000 / 20,000 (sim: 612 / 742 / 715). Idle 4000 rpm, limiter 20,000 (Cosworth ran it to just over 20,000, the first F1 engine to get there). Idle to the limiter takes 0.42 s in neutral: there is no flywheel (0.032 kg·m² estimate) |
+| Wave tuning | Fixed trumpets ~0.20 m from bell mouth to valve, and equal-length 4-into-1 headers per bank, measured on the drawn exhaust (estimates) |
+| Gearbox | Williams' 7-speed seamless-shift sequential box. The ratios are not published, so these are estimates: a medium-downforce set, 4.78 / 3.67 / 2.98 / 2.51 / 2.16 / 1.90 / 1.72 with a final drive of 4.40 (1st to ~115 km/h, 7th to ~320 km/h at 19,500 rpm). Power-on upshifts are seamless (`seamlessUp`), with a 0.02 s / 0.04 s clutch for downshifts. 4-plate carbon clutch, launch at ~12,000 rpm |
+| Vehicle | 605 kg with the driver (the 2006 minimum) plus ~35 kg of fuel, 0.330 m rears, CdA 1.25 (estimate, medium downforce), rear-wheel drive, carbon brakes |
+| Exhaust (3D) | Exhaust ports on the outer sides of the heads: each bank's four equal-length primaries curl down and back to a 4-into-1 collector beside the gearbox, then a short blued tailpipe rises through the bodywork, its open end pointing up and back. No catalyst, silencer or valve. Intake: a carbon airbox over the V with the eight trumpets standing in it, and the snorkel forward and up to the roll-hoop scoop |
+| Results (sim) | 0–100 km/h 2.2 s floored and 1.9 s with launch control (optimistic: the simulator has no tyre grip limit, and the real car manages ~2.5 s), 0–200 km/h 4.9 s (2006 F1: ~5 s). Full-throttle upshifts at ~19,800 rpm |
+| Sound | The detailed voice with nothing to muffle it: two open 4-into-1 systems at 8 × rpm / 120 (1333 Hz at 20,000 rpm), the airbox howl over the driver's head, straight-cut gear whine, almost no valvetrain tick (pneumatic springs), crackle on the overrun. At full throttle it is ~2 dB louder than the stock LFA |
+
+An F1 car is far outside the road-car windows `src/test_car.hpp` was written for, so the CA2006 sets
+its own: an idle at 4000 rpm and its start flare, the coast-down, reverse, and `carSpec::pullAwayHi`
+(a 640 kg car at 30–40% pedal reaches ~70–85 km/h in 3 s, over the 70 km/h road-car default). It also
+sets `dumpStalls = false`: dumping the clutch in 1st at idle makes it bog, then it drives away.
 
 ### `v4`: Ducati Desmosedici Stradale (Panigale V4)
 
@@ -877,7 +908,7 @@ calibrated so that the published torque and power come out of the physics.
 
 | Option | |
 |---|---|
-| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `rs3`, `lfa`, `v4`, `rsv4`, `s1000rr`, `h2`, `zx10r`, `f4rr`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
+| `--engine-type T` (or `--engine-type=T`) | `inline4` (default), `rs3`, `lfa`, `mustang-v6`, `ca2006`, `v4`, `rsv4`, `s1000rr`, `h2`, `zx10r`, `f4rr`, `mxking` or an alias; `list` prints them, `list --ids` one runnable configuration per line (for scripts). `--v4` and `--s1000rr` still work. |
 | `--engine-only` | No gearbox or vehicle (a bike engine runs on a stand) |
 | `--selftest` | Kinematics checks: parts stay joined, strokes, clearances, firing lags vs. crank geometry |
 | `--phystest` | Physics checks against the engine's targets (start, idle, limiter, dyno curve, firing order, balance, acceleration, shifting, quickshifter rev-match, …) |
@@ -932,6 +963,8 @@ engines/
                             build_rs3.py, rs3.mesh, build_rs3_turbo.py, rs3_turbo.mesh (procedural turbo)
   lexus_lfa/                lexus_lfa.hpp (engine, sound, ASG gearing, exhaust and intake, car spec, type),
                             build_lfa.py, lfa.mesh
+  cosworth_ca2006/          cosworth_ca2006.hpp (engine, sound, seamless gearing, exhaust and intake, car spec,
+                            type), build_ca2006.py, ca2006.mesh
   ducati_v4/                ducati_v4.hpp (engine, sound, gearing, test targets, demo ride, type),
                             build_v4.py, v4.mesh
   aprilia_rsv4/             aprilia_rsv4.hpp (engine, sound, gearing, test targets, demo ride, type),
@@ -1014,7 +1047,7 @@ the mesh's firing intervals against the engine's published `bikeSpec::pattern`. 
    - the `engineType`: id, labels, mesh path, physics test, for bikes the gearbox placement and an
      optional `ride` for `--wav`; other versions of the engine go in `variants` (`--variant <name>`).
 4. **Register.** The header ends with `REGISTER_ENGINE(<type function>, <key>)`; the key orders
-   `--engine-type list` (inline4 10, rs3 15, lfa 17, mustang-v6 18, v4 20, rsv4 22, s1000rr 30, h2 40, zx10r 45, f4rr 47, mxking 50), pick a free one. `engine.mk` lists the
+   `--engine-type list` (inline4 10, rs3 15, lfa 17, mustang-v6 18, ca2006 19, v4 20, rsv4 22, s1000rr 30, h2 40, zx10r 45, f4rr 47, mxking 50), pick a free one. `engine.mk` lists the
    header and the mesh rule. Nothing outside the folder needs an edit: the Makefile includes every
    `engine.mk` and generates `engines/all.hpp`, `make test` picks the engine up, and the help line
    and HUD follow from what it has (bike or car, boost, wheelie control).

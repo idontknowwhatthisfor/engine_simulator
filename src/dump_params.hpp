@@ -35,7 +35,7 @@ static_assert(sizeof(turboParams) == 352, "turboParams changed: update dumpTurbo
 static_assert(sizeof(engineParams) == 1256, "engineParams changed: update dumpEngine()");
 static_assert(sizeof(drivetrainParams) == 456, "drivetrainParams changed: update dumpDrive()");
 static_assert(sizeof(bikeSpec) == 544, "bikeSpec changed: update dumpBikeSpec()");
-static_assert(sizeof(carSpec) == 552, "carSpec changed: update dumpCarSpec()");
+static_assert(sizeof(carSpec) == 560, "carSpec changed: update dumpCarSpec()");
 
 void dumpSound(const paramDumper &d, const soundParams &S) {
     DUMP(d, S, pipeLowHz); DUMP(d, S, pipeResHz); DUMP(d, S, pipeResGain); DUMP(d, S, masterHz);
@@ -126,6 +126,7 @@ void dumpCarSpec(const paramDumper &d, const carSpec &S) {
     DUMP(d, S, launchHi); DUMP(d, S, launchTo100What); DUMP(d, S, launchTo100Lo); DUMP(d, S, launchTo100Hi); DUMP(d, S, wotUpLo); DUMP(d, S, lightUpLo); DUMP(d, S, lightUpHi); DUMP(d, S, hillPedal);
     DUMP(d, S, hillGrade); DUMP(d, S, flatGearLo); DUMP(d, S, flatGearHi); DUMP(d, S, coastDownLo);
     DUMP(d, S, coastDownHi); DUMP(d, S, dumpStalls); DUMP(d, S, reverseLo); DUMP(d, S, reverseHi);
+    DUMP(d, S, pullAwayHi);
 }
 
 void dumpBikeSpec(const paramDumper &d, const bikeSpec &S) {
